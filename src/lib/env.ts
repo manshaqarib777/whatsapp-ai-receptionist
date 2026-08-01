@@ -62,6 +62,25 @@ const serverSchema = z.object({
     .transform((value) => value === 'true'),
 
   /**
+   * Auth-endpoint rate limiting.
+   *
+   * Better Auth applies its own per-IP limiter to /api/auth/*. It is enabled by
+   * default in production builds, which is easy to miss — configuring it here makes
+   * it explicit and reviewable rather than an implicit library default.
+   *
+   * The E2E harness raises the ceiling because it deliberately generates signup
+   * traffic that would otherwise look abusive. Production keeps the strict value.
+   */
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  /**
+   * Credential endpoints (sign-in, sign-up, change-password) get a much tighter
+   * budget than general auth traffic — this is the credential-stuffing surface.
+   * 5 per 10s per IP is generous for a human and hostile to a script.
+   */
+  AUTH_CREDENTIAL_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */

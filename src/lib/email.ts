@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { createTransport, type Transporter } from 'nodemailer';
 
 import { env, isProduction, isTest } from '@/lib/env';
@@ -188,11 +190,24 @@ function toHtml(body: string): string {
   ].join('');
 }
 
-/** Masks an address for logging: `alex@example.com` → `a***@example.com`. */
+/**
+ * Masks an address for logging: `alex@example.com` → `a***@example.com#3f2a1b`.
+ *
+ * The six-character suffix is a truncated SHA-256 of the full address. It is not
+ * reversible, so no PII is logged (SECURITY_RULES.md), but it is *stable* and
+ * *distinguishing*: two different recipients produce different suffixes.
+ *
+ * Without it, `alex@gmail.com` and `alex+test@gmail.com` both render as
+ * `a***@gmail.com`, which makes "did this go to the right person?" unanswerable
+ * from the logs — a question that came up in practice.
+ */
 export function maskEmail(email: string): string {
   const [local, domain] = email.split('@');
   if (!local || !domain) return '[invalid]';
-  return `${local.slice(0, 1)}***@${domain}`;
+
+  const fingerprint = createHash('sha256').update(email).digest('hex').slice(0, 6);
+
+  return `${local.slice(0, 1)}***@${domain}#${fingerprint}`;
 }
 
 /** Chooses the adapter from configuration. */

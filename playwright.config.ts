@@ -29,5 +29,12 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
+    env: {
+      // The suite deliberately generates signup traffic that would otherwise look
+      // abusive to the per-IP limiter. Raising the ceiling HERE keeps production
+      // strict rather than weakening the application to suit its tests.
+      AUTH_RATE_LIMIT_MAX: '1000',
+      AUTH_CREDENTIAL_RATE_LIMIT_MAX: '1000',
+    },
   },
 });

@@ -17,11 +17,11 @@ import {
 
 describe('maskEmail', () => {
   it('keeps only the first character of the local part', () => {
-    expect(maskEmail('alex@example.com')).toBe('a***@example.com');
+    expect(maskEmail('alex@example.com')).toMatch(/^a\*\*\*@example\.com#[0-9a-f]{6}$/);
   });
 
   it('preserves the domain, which is not personally identifying', () => {
-    expect(maskEmail('someone@acme-dental.co.uk')).toBe('s***@acme-dental.co.uk');
+    expect(maskEmail('someone@acme-dental.co.uk')).toContain('@acme-dental.co.uk#');
   });
 
   it('never leaks the full local part', () => {
@@ -29,6 +29,28 @@ describe('maskEmail', () => {
 
     expect(masked).not.toContain('firstname');
     expect(masked).not.toContain('lastname');
+  });
+
+  it('DISTINGUISHES addresses that mask identically', () => {
+    // The reason the fingerprint exists: without it these are both
+    // "m***@gmail.com", making it impossible to confirm from the logs which
+    // recipient actually received a message.
+    const base = maskEmail('alex@gmail.com');
+    const alias = maskEmail('alex+signup@gmail.com');
+
+    expect(base).not.toBe(alias);
+  });
+
+  it('is stable for the same address, so logs can be correlated', () => {
+    expect(maskEmail('alex@example.com')).toBe(maskEmail('alex@example.com'));
+  });
+
+  it('does not leak the address through the fingerprint', () => {
+    const masked = maskEmail('alex@example.com');
+
+    expect(masked).not.toContain('alex@example.com');
+    // Six hex characters cannot be reversed to an address.
+    expect(masked.split('#')[1]).toMatch(/^[0-9a-f]{6}$/);
   });
 
   it('handles a malformed address without throwing', () => {

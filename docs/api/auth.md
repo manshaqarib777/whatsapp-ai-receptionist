@@ -97,11 +97,17 @@ and auth routes are all rejected in favour of `/dashboard`. 30 unit tests.
 
 ### Rate limiting
 
-In-process (`src/lib/rate-limit.ts`). Sign-in 5/min, sign-up 3/15min, password reset
-3/15min, magic link 3/15min, two-factor 5/5min.
+Auth endpoints (`/api/auth/*`) are limited **by Better Auth's own per-IP limiter**,
+configured explicitly in `src/lib/auth.ts` via `AUTH_RATE_LIMIT_WINDOW_SECONDS` and
+`AUTH_RATE_LIMIT_MAX` (default: 20 requests per 60s).
 
-**Known limitation**: per-process and resets on deploy. Redis replaces the store in
-Milestone 24.
+`src/lib/rate-limit.ts` provides a separate limiter with per-flow rules for the
+application's **own** routes. It is **not currently applied to any route** — the auth
+endpoints it was written for are covered by the library instead. It is retained
+because Milestones 6 and 14 (inbox send, broadcast) will need it.
+
+**Known limitation**: both limiters are in-process, so they are per-instance and reset
+on deploy. Redis replaces the storage in Milestone 24.
 
 ---
 

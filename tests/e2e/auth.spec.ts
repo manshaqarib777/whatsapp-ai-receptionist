@@ -153,6 +153,46 @@ test.describe('sign up', () => {
   });
 });
 
+test.describe('onboarding', () => {
+  /**
+   * REGRESSION GUARD.
+   *
+   * /onboarding/organization originally lived inside the (app) route group, whose
+   * layout redirects any user with zero organizations TO onboarding. The page that
+   * creates the first organization was therefore guarded by a rule requiring you to
+   * already have one — an infinite redirect loop, hit by every new user on their
+   * very first sign-in.
+   *
+   * Onboarding now has its own route group with a narrower contract: authenticated,
+   * but not required to belong to an organization.
+   */
+  test('does not redirect to itself', async ({ request }) => {
+    const email = uniqueEmail('onboarding-loop');
+
+    await request.post('/api/auth/sign-up/email', {
+      data: { name: 'Loop Test', email, password: STRONG_PASSWORD },
+    });
+
+    // Unauthenticated, the page must send us to login — never to itself.
+    const response = await request.get('/onboarding/organization', {
+      maxRedirects: 0,
+      failOnStatusCode: false,
+    });
+
+    const location = response.headers()['location'] ?? '';
+
+    expect(location).not.toContain('/onboarding/organization');
+    expect(location).toContain('/login');
+  });
+
+  test('a signed-out visitor reaches login rather than looping', async ({ page }) => {
+    await page.goto('/onboarding/organization');
+
+    // Playwright follows redirects; a loop would time out rather than land here.
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  });
+});
+
 test.describe('sign in', () => {
   test('shows a generic message for unknown credentials', async ({ page }) => {
     await page.goto('/login');

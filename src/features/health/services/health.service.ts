@@ -1,4 +1,4 @@
-import { currentTransport, verifyEmailTransport } from '@/lib/email';
+import { currentTransport } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -52,28 +52,23 @@ export async function checkDatabase(): Promise<DependencyStatus> {
 }
 
 /**
- * Verifies the SMTP connection when SMTP is the configured transport.
+ * Reports how mail is configured to leave the application.
  *
- * Reports `not-configured` rather than `error` for the console transport: that is a
- * deliberate development setting, not a fault, and must not make the health check
- * report the service as degraded.
+ * Deliberately does NOT open an SMTP connection. An earlier version did, and it was
+ * wrong on three counts: a liveness probe would open an outbound connection to a
+ * third party on every call; the probe's latency became the provider's latency; and
+ * a provider blip would report OUR service as down when it is running fine.
+ *
+ * A liveness check should test what we own. Provider reachability is a separate,
+ * on-demand concern — `verifyEmailTransport()` in src/lib/email.ts exists for that.
  */
-export async function checkEmail(): Promise<DependencyStatus> {
-  try {
-    const result = await withTimeout(verifyEmailTransport(), DEPENDENCY_TIMEOUT_MS);
-
-    if (result === null) return 'not-configured';
-
-    return result ? 'ok' : 'error';
-  } catch {
-    return 'error';
-  }
+export function checkEmail(): DependencyStatus {
+  return currentTransport() === 'smtp' ? 'ok' : 'not-configured';
 }
 
 export async function getHealthReport(): Promise<HealthReport> {
-  // Checked in parallel — a health endpoint should not take the sum of its
-  // dependencies' latencies.
-  const [database, email] = await Promise.all([checkDatabase(), checkEmail()]);
+  const database = await checkDatabase();
+  const email = checkEmail();
 
   const degraded = database !== 'ok' || email === 'error';
 

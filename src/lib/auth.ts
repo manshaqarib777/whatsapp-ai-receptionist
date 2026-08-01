@@ -92,6 +92,30 @@ export const auth = betterAuth({
     },
   },
 
+  /**
+   * Per-IP rate limiting on /api/auth/*, configured explicitly rather than left to
+   * the library's defaults. Storage is in-memory, so it is per-process and resets on
+   * deploy — the same limitation as src/lib/rate-limit.ts, and resolved the same way
+   * in Milestone 24 when Redis lands.
+   */
+  rateLimit: {
+    enabled: true,
+    window: env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    max: env.AUTH_RATE_LIMIT_MAX,
+    /**
+     * Better Auth ships stricter built-in rules for credential paths (3 per 10s)
+     * which the global `max` above does NOT override. Restating them here makes the
+     * real limit visible in our own code — an invisible default is one nobody
+     * reviews, and it silently shaped test behaviour before it was found.
+     */
+    customRules: {
+      '/sign-in/email': { window: 10, max: env.AUTH_CREDENTIAL_RATE_LIMIT_MAX },
+      '/sign-up/email': { window: 10, max: env.AUTH_CREDENTIAL_RATE_LIMIT_MAX },
+      '/change-password': { window: 10, max: env.AUTH_CREDENTIAL_RATE_LIMIT_MAX },
+      '/change-email': { window: 10, max: env.AUTH_CREDENTIAL_RATE_LIMIT_MAX },
+    },
+  },
+
   advanced: {
     useSecureCookies: isProduction,
     defaultCookieAttributes: {
