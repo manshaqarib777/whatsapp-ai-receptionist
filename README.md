@@ -149,7 +149,13 @@ This project follows a strict, documented process. Before contributing, read:
 | [`.claude/RULES.md`](.claude/RULES.md) | Master rules |
 | [`.claude/ARCHITECTURE_RULES.md`](.claude/ARCHITECTURE_RULES.md) | Layering, folder structure |
 | [`.claude/CODING_STANDARDS.md`](.claude/CODING_STANDARDS.md) | Code style, forbidden patterns |
-| [`.claude/DESIGN_RULES.md`](.claude/DESIGN_RULES.md) | Visual system |
+| [`.claude/DESIGN_RULES.md`](.claude/DESIGN_RULES.md) | Visual system — start here for design |
+| [`.claude/DESIGN_TOKENS.md`](.claude/DESIGN_TOKENS.md) | Token values, dark mode, elevation |
+| [`.claude/COMPONENT_DESIGN.md`](.claude/COMPONENT_DESIGN.md) | Cards, forms, tables, dashboard, charts |
+| [`.claude/MOTION_RULES.md`](.claude/MOTION_RULES.md) | Interaction states, motion, skeletons |
+| [`.claude/ACCESSIBILITY_RULES.md`](.claude/ACCESSIBILITY_RULES.md) | WCAG 2.2 AA conformance |
+| [`.claude/RTL_I18N_RULES.md`](.claude/RTL_I18N_RULES.md) | Arabic / RTL support |
+| [`.claude/LANDING_PAGE_RULES.md`](.claude/LANDING_PAGE_RULES.md) | Marketing surfaces |
 | [`.claude/UI_RULES.md`](.claude/UI_RULES.md) | Component construction |
 | [`.claude/DATABASE_RULES.md`](.claude/DATABASE_RULES.md) | Schema, migrations, queries |
 | [`.claude/API_RULES.md`](.claude/API_RULES.md) | Route contracts |

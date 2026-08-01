@@ -85,7 +85,13 @@ outside its authorised scope.
 | `DEVELOPMENT_WORKFLOW.md` | Starting any task; branching, commits, PRs. |
 | `MILESTONE_RULES.md` | Planning or closing out a milestone. |
 | `CODING_STANDARDS.md` | Writing or refactoring any code. |
-| `DESIGN_RULES.md` | Design tokens, spacing, colour, typography. |
+| `DESIGN_RULES.md` | **Start here for design.** The bar, spacing, radius, type, colour, layout. |
+| `DESIGN_TOKENS.md` | Token values, colour ramps, dark mode, shadows, z-index. |
+| `COMPONENT_DESIGN.md` | Cards, forms, tables, sidebar, dashboard, charts, hierarchy. |
+| `MOTION_RULES.md` | Interaction states, Framer Motion, micro-interactions, skeletons. |
+| `ACCESSIBILITY_RULES.md` | WCAG 2.2 AA conformance and verification. |
+| `RTL_I18N_RULES.md` | Arabic / RTL, logical properties, translation. |
+| `LANDING_PAGE_RULES.md` | Marketing and landing surfaces. |
 | `UI_RULES.md` | Building or changing components and screens. |
 | `DATABASE_RULES.md` | Schema, migrations, queries. |
 | `API_RULES.md` | Route handlers, webhooks, contracts. |

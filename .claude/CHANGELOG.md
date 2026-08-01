@@ -51,8 +51,30 @@ change gets an entry in the same PR.
 - Tooling gates: ESLint (0 warnings), Prettier, Husky, lint-staged, Commitlint.
 - Documentation: README, architecture overview, API reference, schema-change record.
 
+**Design system documentation** (audit against premium SaaS standards)
+
+- `DESIGN_TOKENS.md` — three-tier token architecture, OKLCH colour values for light
+  and dark, status and chart token specifications, two-layer elevation scale, named
+  z-index scale, ramp generation, dark-mode strategy.
+- `COMPONENT_DESIGN.md` — visual hierarchy, per-component spacing table, and visual
+  specifications for cards, forms, tables, sidebar and navigation, dashboards, charts,
+  badges, toasts, and modals. Includes SaaS dashboard best practice.
+- `MOTION_RULES.md` — interaction state matrix (rest, hover, focus, pressed, selected,
+  disabled, loading, error), Framer Motion API rules, micro-interaction catalogue,
+  skeleton loader construction, page transitions.
+- `ACCESSIBILITY_RULES.md` — WCAG 2.2 Level AA named as the conformance target, with
+  the criteria most at risk in this product and a per-component and per-milestone
+  verification procedure.
+- `RTL_I18N_RULES.md` — Arabic and right-to-left support: logical properties, what
+  flips and what does not, bidi text, numerals, Arabic typography, translation rules.
+- `LANDING_PAGE_RULES.md` — marketing surface standards distinct from the product.
+
 ### Changed
-- Nothing yet.
+- `DESIGN_RULES.md` — added a design-system file index, a layout composition section,
+  and an expanded mobile-first strategy. Corrected the token location from the
+  non-existent `src/ui/tokens.css` to `src/app/globals.css`.
+- `MILESTONE_RULES.md` — recorded the token debt Milestone 3 must clear before any
+  component is authored.
 
 ### Deprecated
 - Nothing yet.

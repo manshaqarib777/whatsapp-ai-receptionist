@@ -219,6 +219,18 @@ of truth for scope.
 **Ordering constraints from the PRD**
 - Milestone 03 (Design System) is built **before any pages**. "Only after Design System
   is approved proceed."
+
+**Milestone 03 carries debt from Milestone 01** that must be cleared before any
+component is authored:
+- Set `--radius: 1rem` (currently 10px, documented as 16px) — `DESIGN_TOKENS.md` §6.
+- Add `--success`, `--warning`, `--info` tokens with `-subtle` and `-foreground`
+  variants — referenced by `DESIGN_RULES.md`, absent from `globals.css`.
+- Replace the greyscale `--chart-1…5` placeholders with a real categorical palette —
+  `COMPONENT_DESIGN.md` §8.
+- Add `--shadow-*` and `--z-*` scales — `DESIGN_TOKENS.md` §4, §5.
+- Add the no-flash theme script and the `prefers-reduced-motion` CSS reset.
+- Add the ESLint rule forbidding physical direction utilities — `RTL_I18N_RULES.md` §5.
+- Add `vitest-axe` and an RTL Playwright project to the test setup.
 - Every milestone ends in **STOP** — verify, document, wait for approval.
 - **Never add features from future milestones.** Implementing Inbox AI suggestions
   (M06) does not license building the AI Engine (M08).

@@ -1,5 +1,20 @@
 # Design Rules
 
+The design system spans several files. This one holds the principles and the scales.
+
+| File | Covers |
+|---|---|
+| **`DESIGN_RULES.md`** (this file) | The bar, spacing, radius, type, colour, elevation, motion scale, layout, iconography |
+| `DESIGN_TOKENS.md` | Concrete token values, colour ramps, dark mode, shadows, z-index |
+| `COMPONENT_DESIGN.md` | Visual hierarchy, cards, forms, tables, sidebar, dashboard, charts |
+| `MOTION_RULES.md` | Interaction states, Framer Motion patterns, micro-interactions, skeletons |
+| `ACCESSIBILITY_RULES.md` | WCAG 2.2 AA conformance and verification |
+| `RTL_I18N_RULES.md` | Arabic / RTL and internationalisation |
+| `LANDING_PAGE_RULES.md` | Marketing surfaces |
+| `UI_RULES.md` | Component construction — props, states, layering |
+
+---
+
 ## The Bar
 
 Every screen must look like **Framer, Linear, Stripe, Vercel, Raycast**.
@@ -42,9 +57,35 @@ Only after the design system is **approved** may pages be built.
 
 ---
 
+## Layout Composition
+
+What makes a layout read as Framer/Linear rather than as an admin template.
+
+- **Content is centred and capped, never full-bleed.** Backgrounds may span the
+  viewport; content sits in a 1152–1440px column. Full-width text at 2560px is the
+  clearest tell of an unconsidered layout.
+- **Asymmetry over symmetry.** A 2/3 + 1/3 split reads as designed; two equal halves
+  read as a default. Reserve equal columns for genuinely peer content.
+- **Compose in horizontal bands.** A page is a vertical stack of full-width bands, each
+  with its own background and internal grid. This is what allows generous spacing
+  without the page feeling empty.
+- **One focal point per viewport.** As the user scrolls, exactly one thing should be
+  the most important.
+- **Group by proximity before reaching for a border.** Space, then background change,
+  then a hairline — in that order. Boxes inside boxes inside boxes is the admin-template
+  signature.
+- **Anchor the corners.** Sticky header, sidebar, and a bottom-pinned account menu give
+  the app a frame; free-floating content in an unstructured page feels unfinished.
+- **Consistent optical margins.** The gap from content to viewport edge is the same on
+  every page. Inconsistent page padding is noticed even when it cannot be named.
+
+---
+
 ## Tokens
 
-All tokens live in `src/ui/tokens.css` and are exposed through Tailwind config.
+Tokens live in **`src/app/globals.css`** — Tailwind v4 is CSS-first, so there is no
+`tailwind.config.js`. Values and the three-tier architecture are in `DESIGN_TOKENS.md`.
+
 Never a raw hex, px, or ms value in a component. No arbitrary Tailwind values —
 `p-[13px]` is a lint error.
 
@@ -173,10 +214,41 @@ Breakpoints: `sm 640  md 768  lg 1024  xl 1280  2xl 1536`.
 
 Verified at every milestone: **desktop, laptop, tablet, mobile, ultra-wide**.
 
-- Mobile-first. The inbox must be fully usable at 375px.
 - Content max width 1440px; reading columns max 720px. On ultra-wide, centre and cap —
   never stretch a table to 2560px.
 - 4-column grid mobile, 8 tablet, 12 desktop.
+
+### Mobile-first — the strategy, not the slogan
+
+**Write the mobile layout first, then add complexity upward.** Base classes are mobile;
+`sm:`, `md:`, `lg:` add to them. A codebase full of `lg:` overrides undoing desktop
+defaults is desktop-first wearing mobile-first clothing.
+
+```tsx
+// Wrong — desktop first, walked back
+<div className="flex gap-8 p-12 max-lg:flex-col max-lg:p-6">
+
+// Right — mobile base, enhanced upward
+<div className="flex flex-col gap-6 p-6 lg:flex-row lg:gap-8 lg:p-12">
+```
+
+- **Design the smallest viewport first.** It forces prioritisation: what survives at
+  375px is what actually matters. Cutting from desktop keeps the wrong things.
+- **Breakpoints follow content, not devices.** Add one where the layout breaks, not
+  because a phone has that width.
+- **Touch targets 44×44px** on any touch-capable viewport
+  (`ACCESSIBILITY_RULES.md` 2.5.8) — larger than the 24px WCAG floor.
+- **Nothing is hover-only.** Touch has no hover. Every hover affordance has a tap and a
+  focus equivalent.
+- **Reachability**: primary actions sit within thumb reach — bottom sheets rather than
+  centred modals, bottom-anchored primary buttons on long forms.
+- **Tables become cards** below `md`. Horizontal scrolling on a phone is a failure, and
+  a reflow violation (`ACCESSIBILITY_RULES.md` 1.4.10).
+- **Sidebar becomes a drawer or bottom tabs** below `lg`.
+- **Test on a real device**, not just a resized window — hover, scroll momentum,
+  keyboard overlay, and safe-area insets all differ.
+- **Respect safe areas** on notched devices: `env(safe-area-inset-*)` for anything
+  pinned to an edge.
 
 ---
 
