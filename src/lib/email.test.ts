@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { InMemoryEmailAdapter, currentTransport, maskEmail, sendEmail } from '@/lib/email';
+import {
+  InMemoryEmailAdapter,
+  currentTransport,
+  maskEmail,
+  sendEmail,
+} from '@/lib/email';
 
 /**
  * Email port.
  *
- * The SMTP adapter itself is exercised against a real Mailpit server rather than
- * unit-tested with a mocked socket — a mocked SMTP client proves nothing about
- * whether mail is actually deliverable. These cover the parts that are pure.
+ * The SMTP adapter is deliberately not unit-tested with a mocked socket — a mocked
+ * SMTP client proves nothing about whether mail is actually deliverable. It is
+ * verified against a real server manually. These cover the parts that are pure.
  */
 
 describe('maskEmail', () => {

@@ -41,16 +41,18 @@ const serverSchema = z.object({
   /**
    * How mail leaves the application.
    *
-   * `smtp`  — a real SMTP connection. Locally this points at Mailpit (docker), so
-   *           development exercises the same code path as production.
-   * `console` — writes the message to the terminal. Development convenience only;
-   *           rejected in production, because silently discarding a password-reset
-   *           email is worse than failing to boot.
+   * `smtp`  — a real SMTP connection through nodemailer. Works with any provider:
+   *           Resend, Postmark, SES, Gmail, or a corporate relay.
+   * `console` — writes the message to the terminal, with the link on its own line.
+   *           Development convenience only; rejected in production, because
+   *           silently discarding a password-reset email is worse than failing
+   *           to boot.
    */
   EMAIL_TRANSPORT: z.enum(['smtp', 'console']).default('console'),
 
   SMTP_HOST: z.string().min(1).optional(),
-  SMTP_PORT: z.coerce.number().int().positive().max(65535).default(1025),
+  // 587 is STARTTLS, the default for nearly every provider. 465 is implicit TLS.
+  SMTP_PORT: z.coerce.number().int().positive().max(65535).default(587),
   SMTP_USER: z.string().min(1).optional(),
   SMTP_PASSWORD: z.string().min(1).optional(),
   /** TLS on connect (port 465). STARTTLS on 587 is negotiated automatically. */

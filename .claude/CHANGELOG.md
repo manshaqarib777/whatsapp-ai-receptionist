@@ -30,11 +30,11 @@ change gets an entry in the same PR.
 
 **Email delivery — real SMTP**
 
-- SMTP transport via nodemailer, working against any provider (Resend, SES, Postmark,
-  Mailgun, a corporate relay). Selected with `EMAIL_TRANSPORT=smtp`.
-- **Mailpit** added to docker compose: a local SMTP server on `localhost:1025` with a
-  web inbox at **http://localhost:8025**. Development now exercises the same code path
-  as production instead of a console stub that behaves differently.
+- SMTP transport via nodemailer, working against any provider (Resend, Postmark, SES,
+  Gmail, a corporate relay). Selected with `EMAIL_TRANSPORT=smtp`; switching provider
+  changes environment variables only.
+- The `console` transport now prints each message as a delimited block with the link on
+  its own line, so a verification link is usable without a mail server.
 - Environment validation refuses to boot in production unless `EMAIL_TRANSPORT=smtp`,
   and rejects a half-set SMTP credential pair — the dangerous state is one where the
   app starts and account-critical mail silently goes nowhere.

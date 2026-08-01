@@ -141,12 +141,12 @@ describe('parseEnv — auth configuration (Milestone 2)', () => {
     const parsed = parseEnv({
       ...validEnv,
       EMAIL_TRANSPORT: 'smtp',
-      SMTP_HOST: 'localhost',
-      SMTP_PORT: '1025',
+      SMTP_HOST: 'smtp.example.com',
     });
 
     expect(parsed.EMAIL_TRANSPORT).toBe('smtp');
-    expect(parsed.SMTP_PORT).toBe(1025);
+    // 587 (STARTTLS) is the sensible default for nearly every provider.
+    expect(parsed.SMTP_PORT).toBe(587);
     expect(parsed.SMTP_SECURE).toBe(false);
   });
 
@@ -157,7 +157,12 @@ describe('parseEnv — auth configuration (Milestone 2)', () => {
     ).toBe(587);
 
     expect(() =>
-      parseEnv({ ...validEnv, EMAIL_TRANSPORT: 'smtp', SMTP_HOST: 'h', SMTP_PORT: '99999' }),
+      parseEnv({
+        ...validEnv,
+        EMAIL_TRANSPORT: 'smtp',
+        SMTP_HOST: 'h',
+        SMTP_PORT: '99999',
+      }),
     ).toThrowError(/SMTP_PORT/);
   });
 

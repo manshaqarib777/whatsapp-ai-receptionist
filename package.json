@@ -23,8 +23,7 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "prepare": "husky",
-    "mail": "echo 'Local inbox: http://localhost:8025' && (xdg-open http://localhost:8025 2>/dev/null || open http://localhost:8025 2>/dev/null || true)"
+    "prepare": "husky"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",

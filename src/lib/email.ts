@@ -7,14 +7,13 @@ import { logger } from '@/lib/logger';
 /**
  * Email port with three adapters, selected by EMAIL_TRANSPORT:
  *
- *   smtp     Real SMTP via nodemailer. Locally this points at Mailpit (docker
- *            compose), so development exercises the same code path as production —
- *            no stub that behaves differently from the thing that will actually run.
- *            In production, point it at Resend, SES, Postmark, or a relay.
- *   console  Writes the message to the terminal. Development convenience only;
- *            env validation rejects it in production.
+ *   smtp       Real SMTP via nodemailer. Works with any provider — Resend,
+ *              Postmark, SES, Gmail, or a corporate relay. Required in production.
+ *   console    Writes the message to the terminal with the link on its own line.
+ *              Zero setup, development only; env validation rejects it in
+ *              production.
  *   in-memory  Tests. Assert the port was called with the right payload without
- *            opening a socket.
+ *              opening a socket.
  */
 
 export type EmailMessage = {
@@ -89,8 +88,8 @@ export class InMemoryEmailAdapter implements EmailPort {
 /**
  * SMTP adapter — the real transport.
  *
- * Works against any SMTP server: Mailpit locally, and Resend, SES, Postmark,
- * Mailgun, or a corporate relay in production. Only environment variables change.
+ * Works against any SMTP server — Resend, Postmark, SES, Mailgun, Gmail, or a
+ * corporate relay. Switching provider changes environment variables only.
  *
  * The transport is created lazily and reused. Nodemailer pools connections, so
  * constructing one per message would open a new TCP+TLS handshake every time.
@@ -136,7 +135,11 @@ class SmtpEmailAdapter implements EmailPort {
       });
 
       logger.info(
-        { recipient: maskEmail(message.to), subject: message.subject, messageId: info.messageId },
+        {
+          recipient: maskEmail(message.to),
+          subject: message.subject,
+          messageId: info.messageId,
+        },
         'email sent',
       );
     } catch (error) {
@@ -170,10 +173,7 @@ class SmtpEmailAdapter implements EmailPort {
  * template belongs in a later milestone, with the design system behind it.
  */
 function toHtml(body: string): string {
-  const escaped = body
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  const escaped = body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const linked = escaped.replace(
     /(https?:\/\/\S+)/g,

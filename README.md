@@ -73,8 +73,9 @@ npm run db:seed
 npm run dev
 ```
 
-Then create an account at http://localhost:3000/signup and open the verification email
-at **http://localhost:8025** (Mailpit — see Email below).
+Then create an account at http://localhost:3000/signup. With the default `console`
+transport, the verification link is printed in the terminal running `npm run dev`.
+See **Email** below to send real mail instead.
 
 ---
 
@@ -90,9 +91,9 @@ Names and purpose only — never commit values. See [`.env.example`](.env.exampl
 | `AUTH_SECRET` | **yes** | Session signing secret, 32+ chars. `openssl rand -base64 32` |
 | `EMAIL_FROM` | no | From address on outbound mail |
 | `EMAIL_TRANSPORT` | no (`console`) | `smtp` for real delivery. **Required to be `smtp` in production.** |
-| `SMTP_HOST` | if `smtp` | SMTP server. `localhost` for the bundled Mailpit |
-| `SMTP_PORT` | no (`1025`) | 1025 Mailpit, 587 STARTTLS, 465 TLS |
-| `SMTP_USER` / `SMTP_PASSWORD` | no | Set both or neither. Blank for Mailpit |
+| `SMTP_HOST` | if `smtp` | SMTP server hostname |
+| `SMTP_PORT` | no (`587`) | 587 STARTTLS, 465 implicit TLS |
+| `SMTP_USER` / `SMTP_PASSWORD` | no | Set both or neither |
 | `SMTP_SECURE` | no (`false`) | `true` for implicit TLS on port 465 |
 | `GOOGLE_CLIENT_ID` / `_SECRET` | no | Enables Google sign-in when both are set |
 | `GITHUB_CLIENT_ID` / `_SECRET` | no | Enables GitHub sign-in when both are set |
@@ -102,17 +103,27 @@ it makes a production server behave as though it were in development.
 
 ### Email
 
-Development uses **Mailpit**, a local SMTP server that starts with `npm run db:up`. It
-accepts real SMTP connections and captures every message instead of delivering it.
+Two transports, selected by `EMAIL_TRANSPORT`:
 
-**Read your mail at http://localhost:8025** — verification links, password resets, and
-magic links all land there.
+**`console`** (default) — writes each message to the terminal with the link on its own
+line. Zero setup. Use this if you just want to click a verification link locally.
 
-This means development exercises the same code path as production rather than a stub
-that behaves differently. To use a real provider, change `SMTP_HOST`, `SMTP_USER`, and
-`SMTP_PASSWORD` — nothing else. Setting `EMAIL_TRANSPORT=console` falls back to
-printing links in the terminal; the app refuses to boot with that setting in
-production.
+**`smtp`** — real delivery through nodemailer. Works with any provider:
+
+| Provider | `SMTP_HOST` | `SMTP_PORT` |
+|---|---|---|
+| Resend | `smtp.resend.com` | 587 |
+| Postmark | `smtp.postmarkapp.com` | 587 |
+| Amazon SES | `email-smtp.<region>.amazonaws.com` | 587 |
+| Gmail | `smtp.gmail.com` | 587 |
+
+Set `SMTP_USER` and `SMTP_PASSWORD` together — a half-set pair is rejected at boot.
+For Gmail, `SMTP_PASSWORD` must be an
+[App Password](https://myaccount.google.com/apppasswords), not your account password,
+and `EMAIL_FROM` must match `SMTP_USER` or Gmail will rewrite it.
+
+**Production refuses to boot unless `EMAIL_TRANSPORT=smtp`** — an app that starts while
+silently discarding password-reset mail is worse than one that does not start.
 
 Configuration is validated by Zod at boot in [`src/lib/env.ts`](src/lib/env.ts). The
 application **refuses to start** on a missing or malformed variable, and the error
@@ -135,8 +146,7 @@ names every offending variable. `process.env` is read nowhere else — enforced 
 | `npm run test:coverage` | Tests with coverage |
 | `npm run test:e2e` | Playwright E2E |
 | `npm run verify` | typecheck → lint → test → build |
-| `npm run db:up` / `db:down` | Start / stop Postgres **and Mailpit** |
-| `npm run mail` | Open the local mail inbox (http://localhost:8025) |
+| `npm run db:up` / `db:down` | Start / stop Postgres |
 | `npm run db:migrate` | Create and apply a migration |
 | `npm run db:deploy` | Apply migrations (CI/production) |
 | `npm run db:seed` | Seed the database |

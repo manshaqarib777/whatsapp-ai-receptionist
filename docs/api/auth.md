@@ -107,10 +107,10 @@ Milestone 24.
 
 ## Known Limitations
 
-1. ~~No email provider.~~ **Resolved.** Real SMTP via nodemailer. Development uses
-   Mailpit (docker compose) on `localhost:1025`, with an inbox at
-   http://localhost:8025. Production points `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD` at
-   any provider. Environment validation **refuses to boot** in production unless
-   `EMAIL_TRANSPORT=smtp`, so account-critical mail can never be silently discarded.
+1. ~~No email provider.~~ **Resolved.** Real SMTP via nodemailer, working with any
+   provider through `SMTP_HOST`/`SMTP_USER`/`SMTP_PASSWORD`. Local development may use
+   the `console` transport, which prints links to the terminal. Environment validation
+   **refuses to boot** in production unless `EMAIL_TRANSPORT=smtp`, so account-critical
+   mail can never be silently discarded.
 2. **OAuth is unverified end to end** — no credentials are available. The configuration
    logic and the disabled path are tested; the redirect round-trip is not.
