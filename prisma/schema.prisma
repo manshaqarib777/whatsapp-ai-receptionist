@@ -1,0 +1,29 @@
+// Milestone 1 — Project Foundation.
+//
+// This schema is deliberately minimal. The full data model (tenants, users,
+// conversations, messages, audit logs, history, versioning) is designed in
+// Milestone 4 per /docs/PRODUCT_REQUIREMENTS.md. Adding those tables here would
+// be implementing future-milestone scope.
+
+// Prisma 7: the connection URL lives in prisma.config.ts (for Migrate) and is
+// supplied to PrismaClient via a driver adapter at runtime. See src/lib/prisma.ts.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Infrastructure table used only to prove that migrations apply and the Prisma
+/// client round-trips against a real database.
+///
+/// Exempt from the `tenant_id` rule in .claude/DATABASE_RULES.md: this holds no
+/// tenant data. The rule applies to every business table from Milestone 2 onward.
+/// See /docs/database/schema-change.md.
+model HealthCheck {
+  id        String   @id @default(uuid()) @db.Uuid
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  @@map("health_checks")
+}
