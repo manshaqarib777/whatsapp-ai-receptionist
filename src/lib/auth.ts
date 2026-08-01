@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
@@ -95,6 +97,15 @@ export const auth = betterAuth({
     defaultCookieAttributes: {
       httpOnly: true,
       sameSite: 'lax',
+    },
+    database: {
+      /**
+       * Better Auth generates nanoid-style ids by default ("RcwvRt61U2kt…"), which
+       * Postgres rejects for our `@db.Uuid` columns. Generating real UUIDs here keeps
+       * the native uuid type — smaller than text, and indexed properly — rather than
+       * widening every primary key to text to accommodate the library.
+       */
+      generateId: () => randomUUID(),
     },
   },
 

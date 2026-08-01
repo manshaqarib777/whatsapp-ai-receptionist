@@ -104,6 +104,16 @@ change gets an entry in the same PR.
 - Nothing yet.
 
 ### Fixed
+- **Signup was completely broken.** Better Auth generates nanoid-style ids, which
+  Postgres rejected for the `@db.Uuid` primary keys, so every registration failed with
+  `P2007` and no account was created. The auth layer now generates real UUIDs
+  (`advanced.database.generateId`). Found while manually verifying the setup, not by
+  the test suite — see below.
+- Signup no longer treats HTTP 400/422 as success. That masking existed to hide
+  duplicate addresses, but the auth layer already handles duplicates
+  enumeration-safely by returning 200 with no token. The masking instead concealed the
+  id bug above, letting the E2E suite pass against a flow that created zero accounts.
+  Added an API-level regression guard that asserts a real UUID is returned.
 - Removed `NODE_ENV` from `.env`. Next.js sets it itself, and overriding it made
   `next start` behave as a development server — including injecting the dev-tools
   overlay into production HTML. Caught by the Milestone 1 tripwire test.

@@ -59,6 +59,38 @@ test.describe('route protection', () => {
 });
 
 test.describe('sign up', () => {
+  /**
+   * REGRESSION GUARD.
+   *
+   * A previous version of this suite asserted only that the UI said "Check your
+   * email". Signup was completely broken — the auth library generated nanoid-style
+   * ids that Postgres rejected for uuid columns — and this test still passed,
+   * because the form treated the resulting 422 as success in order to mask
+   * duplicate addresses. Zero accounts were being created.
+   *
+   * The API-level assertion below cannot be satisfied by the UI's error handling,
+   * so the flow must genuinely work for it to pass.
+   */
+  test('the signup endpoint actually creates an account', async ({ request }) => {
+    const response = await request.post('/api/auth/sign-up/email', {
+      data: {
+        name: 'E2E Tester',
+        email: uniqueEmail('api-signup'),
+        password: STRONG_PASSWORD,
+      },
+    });
+
+    expect(response.status()).toBe(200);
+
+    const payload = (await response.json()) as { user?: { id?: string } };
+
+    expect(payload.user?.id).toBeTruthy();
+    // The id must be a real UUID — this is precisely what was broken.
+    expect(payload.user?.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+  });
+
   test('creates an account and asks for email verification', async ({ page }) => {
     await page.goto('/signup');
 
@@ -85,8 +117,25 @@ test.describe('sign up', () => {
     ).toBeVisible();
   });
 
-  test('does not reveal that an address is already registered', async ({ page }) => {
+  test('does not reveal that an address is already registered', async ({
+    page,
+    request,
+  }) => {
     const email = uniqueEmail('duplicate');
+
+    // Assert enumeration resistance at the API level too, so this cannot be
+    // satisfied by the UI merely rendering the same screen for a failed request.
+    const first = await request.post('/api/auth/sign-up/email', {
+      data: { name: 'E2E Tester', email, password: STRONG_PASSWORD },
+    });
+    const second = await request.post('/api/auth/sign-up/email', {
+      data: { name: 'E2E Tester', email, password: STRONG_PASSWORD },
+    });
+
+    expect(first.status()).toBe(200);
+    expect(second.status()).toBe(second.status());
+    // A duplicate must not be distinguishable by status code.
+    expect(second.status()).toBe(200);
 
     for (const attempt of [1, 2]) {
       await page.goto('/signup');

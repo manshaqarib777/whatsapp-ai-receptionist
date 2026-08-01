@@ -60,13 +60,15 @@ export function SignupForm({ providers }: { providers: string[] }) {
     setIsPending(false);
 
     if (error) {
-      // A duplicate address must look identical to success. Anything else that
-      // fails is reported generically.
-      if (error.status === 422 || error.status === 400) {
-        setSubmitted(true);
-        return;
-      }
-
+      // Every error is surfaced. Enumeration resistance is handled by the auth
+      // layer itself, which returns 200 with no token for an address that already
+      // exists — so the duplicate case never reaches here.
+      //
+      // An earlier version treated 400/422 as success to mask duplicates. That
+      // masked a genuine backend failure instead: signup was broken for weeks of
+      // commits while the E2E test still passed, because the UI showed "Check your
+      // email" for a request that created nothing. Never swallow an error class to
+      // hide one case within it.
       setFormError('We could not create your account. Please try again.');
       return;
     }
