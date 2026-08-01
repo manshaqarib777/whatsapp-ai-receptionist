@@ -73,8 +73,8 @@ npm run db:seed
 npm run dev
 ```
 
-Then create an account at http://localhost:3000/signup. The verification link is
-printed to the terminal running `npm run dev` — open it to activate the account.
+Then create an account at http://localhost:3000/signup and open the verification email
+at **http://localhost:8025** (Mailpit — see Email below).
 
 ---
 
@@ -89,14 +89,30 @@ Names and purpose only — never commit values. See [`.env.example`](.env.exampl
 | `LOG_LEVEL` | no (defaults to `info`) | Pino log level |
 | `AUTH_SECRET` | **yes** | Session signing secret, 32+ chars. `openssl rand -base64 32` |
 | `EMAIL_FROM` | no | From address on outbound mail |
+| `EMAIL_TRANSPORT` | no (`console`) | `smtp` for real delivery. **Required to be `smtp` in production.** |
+| `SMTP_HOST` | if `smtp` | SMTP server. `localhost` for the bundled Mailpit |
+| `SMTP_PORT` | no (`1025`) | 1025 Mailpit, 587 STARTTLS, 465 TLS |
+| `SMTP_USER` / `SMTP_PASSWORD` | no | Set both or neither. Blank for Mailpit |
+| `SMTP_SECURE` | no (`false`) | `true` for implicit TLS on port 465 |
 | `GOOGLE_CLIENT_ID` / `_SECRET` | no | Enables Google sign-in when both are set |
 | `GITHUB_CLIENT_ID` / `_SECRET` | no | Enables GitHub sign-in when both are set |
 
 `NODE_ENV` is deliberately **not** set in `.env` — Next.js manages it, and overriding
 it makes a production server behave as though it were in development.
 
-**No email provider is configured.** In development, verification, password-reset, and
-magic-link messages are written to the application log. Look there for the link.
+### Email
+
+Development uses **Mailpit**, a local SMTP server that starts with `npm run db:up`. It
+accepts real SMTP connections and captures every message instead of delivering it.
+
+**Read your mail at http://localhost:8025** — verification links, password resets, and
+magic links all land there.
+
+This means development exercises the same code path as production rather than a stub
+that behaves differently. To use a real provider, change `SMTP_HOST`, `SMTP_USER`, and
+`SMTP_PASSWORD` — nothing else. Setting `EMAIL_TRANSPORT=console` falls back to
+printing links in the terminal; the app refuses to boot with that setting in
+production.
 
 Configuration is validated by Zod at boot in [`src/lib/env.ts`](src/lib/env.ts). The
 application **refuses to start** on a missing or malformed variable, and the error
@@ -119,7 +135,8 @@ names every offending variable. `process.env` is read nowhere else — enforced 
 | `npm run test:coverage` | Tests with coverage |
 | `npm run test:e2e` | Playwright E2E |
 | `npm run verify` | typecheck → lint → test → build |
-| `npm run db:up` / `db:down` | Start / stop Postgres |
+| `npm run db:up` / `db:down` | Start / stop Postgres **and Mailpit** |
+| `npm run mail` | Open the local mail inbox (http://localhost:8025) |
 | `npm run db:migrate` | Create and apply a migration |
 | `npm run db:deploy` | Apply migrations (CI/production) |
 | `npm run db:seed` | Seed the database |

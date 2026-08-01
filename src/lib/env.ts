@@ -39,6 +39,27 @@ const serverSchema = z.object({
   EMAIL_FROM: z.string().email().default('noreply@whatsapp-receptionist.local'),
 
   /**
+   * How mail leaves the application.
+   *
+   * `smtp`  — a real SMTP connection. Locally this points at Mailpit (docker), so
+   *           development exercises the same code path as production.
+   * `console` — writes the message to the terminal. Development convenience only;
+   *           rejected in production, because silently discarding a password-reset
+   *           email is worse than failing to boot.
+   */
+  EMAIL_TRANSPORT: z.enum(['smtp', 'console']).default('console'),
+
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().max(65535).default(1025),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  /** TLS on connect (port 465). STARTTLS on 587 is negotiated automatically. */
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */
@@ -56,7 +77,44 @@ const clientSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url('NEXT_PUBLIC_APP_URL must be a valid URL'),
 });
 
-const envSchema = serverSchema.merge(clientSchema);
+const envSchema = serverSchema.merge(clientSchema).superRefine((env, ctx) => {
+  // A half-configured transport is the dangerous state: the app boots, users sign
+  // up, and their verification mail goes nowhere. Catch it at startup instead.
+  if (env.EMAIL_TRANSPORT === 'smtp' && !env.SMTP_HOST) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SMTP_HOST'],
+      message: 'SMTP_HOST is required when EMAIL_TRANSPORT=smtp.',
+    });
+  }
+
+  // Credentials come as a pair or not at all.
+  if (env.SMTP_USER && !env.SMTP_PASSWORD) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SMTP_PASSWORD'],
+      message: 'SMTP_PASSWORD is required when SMTP_USER is set.',
+    });
+  }
+
+  if (env.SMTP_PASSWORD && !env.SMTP_USER) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['SMTP_USER'],
+      message: 'SMTP_USER is required when SMTP_PASSWORD is set.',
+    });
+  }
+
+  // Production must never fall back to writing account-critical mail to a log.
+  if (env.NODE_ENV === 'production' && env.EMAIL_TRANSPORT !== 'smtp') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['EMAIL_TRANSPORT'],
+      message:
+        'EMAIL_TRANSPORT must be "smtp" in production. The console transport discards mail.',
+    });
+  }
+});
 
 export type Env = z.infer<typeof envSchema>;
 

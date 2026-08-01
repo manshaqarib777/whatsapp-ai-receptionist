@@ -1,16 +1,20 @@
+import { createTransport, type Transporter } from 'nodemailer';
+
 import { env, isProduction, isTest } from '@/lib/env';
+import { UpstreamError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 
 /**
- * Email port.
+ * Email port with three adapters, selected by EMAIL_TRANSPORT:
  *
- * No email provider is configured in Milestone 2 — one cannot be without credentials.
- * Rather than pretend, this defines the boundary the application depends on and ships
- * a console adapter for development.
- *
- * This is a deliberate, documented limitation (MILESTONE_02_PLAN.md, Risk 1), not a
- * mock standing in for a delivered feature. Wiring a real provider means implementing
- * one function.
+ *   smtp     Real SMTP via nodemailer. Locally this points at Mailpit (docker
+ *            compose), so development exercises the same code path as production —
+ *            no stub that behaves differently from the thing that will actually run.
+ *            In production, point it at Resend, SES, Postmark, or a relay.
+ *   console  Writes the message to the terminal. Development convenience only;
+ *            env validation rejects it in production.
+ *   in-memory  Tests. Assert the port was called with the right payload without
+ *            opening a socket.
  */
 
 export type EmailMessage = {
@@ -47,7 +51,7 @@ class ConsoleEmailAdapter implements EmailPort {
       [
         '',
         '  ┌─────────────────────────────────────────────────────────────',
-        `  │ EMAIL (not sent — no provider configured)`,
+        `  │ EMAIL (not sent — EMAIL_TRANSPORT=console)`,
         `  │ To:      ${maskEmail(message.to)}`,
         `  │ Subject: ${message.subject}`,
         '  ├─────────────────────────────────────────────────────────────',
@@ -82,6 +86,108 @@ export class InMemoryEmailAdapter implements EmailPort {
   }
 }
 
+/**
+ * SMTP adapter — the real transport.
+ *
+ * Works against any SMTP server: Mailpit locally, and Resend, SES, Postmark,
+ * Mailgun, or a corporate relay in production. Only environment variables change.
+ *
+ * The transport is created lazily and reused. Nodemailer pools connections, so
+ * constructing one per message would open a new TCP+TLS handshake every time.
+ */
+class SmtpEmailAdapter implements EmailPort {
+  private transport: Transporter | null = null;
+
+  private getTransport(): Transporter {
+    if (this.transport) return this.transport;
+
+    if (!env.SMTP_HOST) {
+      // Unreachable in practice — env validation rejects this at boot — but the
+      // type system does not know that.
+      throw new Error('SMTP_HOST is not configured.');
+    }
+
+    this.transport = createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE,
+      ...(env.SMTP_USER && env.SMTP_PASSWORD
+        ? { auth: { user: env.SMTP_USER, pass: env.SMTP_PASSWORD } }
+        : {}),
+      // A hung SMTP server must not hold a request open indefinitely.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
+      pool: true,
+      maxConnections: 5,
+    });
+
+    return this.transport;
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    try {
+      const info = await this.getTransport().sendMail({
+        from: env.EMAIL_FROM,
+        to: message.to,
+        subject: message.subject,
+        text: message.body,
+        html: toHtml(message.body),
+      });
+
+      logger.info(
+        { recipient: maskEmail(message.to), subject: message.subject, messageId: info.messageId },
+        'email sent',
+      );
+    } catch (error) {
+      // Log without the body — it carries single-use links, which are credentials.
+      logger.error(
+        { err: error, recipient: maskEmail(message.to), subject: message.subject },
+        'email delivery failed',
+      );
+
+      throw new UpstreamError('Could not send email.', error);
+    }
+  }
+
+  /** Verifies the connection. Used by the health check and by setup diagnostics. */
+  async verify(): Promise<boolean> {
+    try {
+      await this.getTransport().verify();
+      return true;
+    } catch (error) {
+      logger.warn({ err: error }, 'smtp verification failed');
+      return false;
+    }
+  }
+}
+
+/**
+ * Minimal HTML part.
+ *
+ * Deliberately plain: HTML mail is a rendering minefield across clients, and these
+ * are transactional messages whose entire job is to deliver one link. A designed
+ * template belongs in a later milestone, with the design system behind it.
+ */
+function toHtml(body: string): string {
+  const escaped = body
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const linked = escaped.replace(
+    /(https?:\/\/\S+)/g,
+    '<a href="$1" style="color:#2563eb">$1</a>',
+  );
+
+  return [
+    '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;',
+    'font-size:15px;line-height:1.6;color:#111;max-width:520px">',
+    linked.replace(/\n/g, '<br>'),
+    '</div>',
+  ].join('');
+}
+
 /** Masks an address for logging: `alex@example.com` → `a***@example.com`. */
 export function maskEmail(email: string): string {
   const [local, domain] = email.split('@');
@@ -89,24 +195,47 @@ export function maskEmail(email: string): string {
   return `${local.slice(0, 1)}***@${domain}`;
 }
 
-let adapter: EmailPort = new ConsoleEmailAdapter();
+/** Chooses the adapter from configuration. */
+function createAdapter(): EmailPort {
+  if (isTest) return new InMemoryEmailAdapter();
 
-/** Replaces the adapter. Used by tests and by future provider wiring. */
+  return env.EMAIL_TRANSPORT === 'smtp'
+    ? new SmtpEmailAdapter()
+    : new ConsoleEmailAdapter();
+}
+
+let adapter: EmailPort = createAdapter();
+
+/** Replaces the adapter. Used by tests and by setup diagnostics. */
 export function setEmailAdapter(next: EmailPort): void {
   adapter = next;
 }
 
+export function currentTransport(): string {
+  return isTest ? 'in-memory' : env.EMAIL_TRANSPORT;
+}
+
+/**
+ * Verifies the SMTP connection, when SMTP is the configured transport.
+ * Returns null when the transport is not SMTP, so callers can report "n/a".
+ */
+export async function verifyEmailTransport(): Promise<boolean | null> {
+  if (!(adapter instanceof SmtpEmailAdapter)) return null;
+
+  return adapter.verify();
+}
+
 export async function sendEmail(message: EmailMessage): Promise<void> {
-  if (isProduction) {
-    // Fail loudly rather than silently dropping account-critical mail. A production
-    // deployment without a provider must not appear to work.
+  if (isProduction && env.EMAIL_TRANSPORT !== 'smtp') {
+    // Belt and braces: env validation already rejects this at boot. Silently
+    // discarding a password-reset email is worse than a loud failure.
     throw new Error(
-      'No email provider is configured. Password resets, verification, and magic links cannot be delivered.',
+      'EMAIL_TRANSPORT must be "smtp" in production. Account-critical mail cannot be delivered.',
     );
   }
 
   if (isTest && !(adapter instanceof InMemoryEmailAdapter)) {
-    // Guard against a test accidentally exercising the console adapter.
+    // Guard against a test accidentally opening a real SMTP connection.
     adapter = new InMemoryEmailAdapter();
   }
 

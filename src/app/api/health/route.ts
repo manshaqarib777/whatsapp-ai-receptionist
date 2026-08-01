@@ -27,6 +27,7 @@ export const GET = withApiHandler(
     if (report.status !== 'ok') {
       throw new UnhealthyError('One or more dependencies are unavailable.', [
         { path: 'checks.database', message: `database is ${report.checks.database}` },
+      { path: 'checks.email', message: `email is ${report.checks.email}` },
       ]);
     }
 

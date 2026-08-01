@@ -28,6 +28,20 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Email delivery — real SMTP**
+
+- SMTP transport via nodemailer, working against any provider (Resend, SES, Postmark,
+  Mailgun, a corporate relay). Selected with `EMAIL_TRANSPORT=smtp`.
+- **Mailpit** added to docker compose: a local SMTP server on `localhost:1025` with a
+  web inbox at **http://localhost:8025**. Development now exercises the same code path
+  as production instead of a console stub that behaves differently.
+- Environment validation refuses to boot in production unless `EMAIL_TRANSPORT=smtp`,
+  and rejects a half-set SMTP credential pair — the dangerous state is one where the
+  app starts and account-critical mail silently goes nowhere.
+- The health check now verifies the SMTP connection alongside the database, in
+  parallel. The console transport reports `not-configured` rather than `error`, so a
+  deliberate development setting does not mark the service degraded.
+
 **Milestone 2 — Authentication**
 
 - Email/password sign-up and sign-in with mandatory email verification.

@@ -127,6 +127,85 @@ describe('parseEnv — auth configuration (Milestone 2)', () => {
     );
   });
 
+  it('defaults to the console transport', () => {
+    expect(parseEnv(validEnv).EMAIL_TRANSPORT).toBe('console');
+  });
+
+  it('requires SMTP_HOST when the transport is smtp', () => {
+    expect(() => parseEnv({ ...validEnv, EMAIL_TRANSPORT: 'smtp' })).toThrowError(
+      /SMTP_HOST is required/,
+    );
+  });
+
+  it('accepts a complete smtp configuration', () => {
+    const parsed = parseEnv({
+      ...validEnv,
+      EMAIL_TRANSPORT: 'smtp',
+      SMTP_HOST: 'localhost',
+      SMTP_PORT: '1025',
+    });
+
+    expect(parsed.EMAIL_TRANSPORT).toBe('smtp');
+    expect(parsed.SMTP_PORT).toBe(1025);
+    expect(parsed.SMTP_SECURE).toBe(false);
+  });
+
+  it('coerces SMTP_PORT to a number and rejects an out-of-range one', () => {
+    expect(
+      parseEnv({ ...validEnv, EMAIL_TRANSPORT: 'smtp', SMTP_HOST: 'h', SMTP_PORT: '587' })
+        .SMTP_PORT,
+    ).toBe(587);
+
+    expect(() =>
+      parseEnv({ ...validEnv, EMAIL_TRANSPORT: 'smtp', SMTP_HOST: 'h', SMTP_PORT: '99999' }),
+    ).toThrowError(/SMTP_PORT/);
+  });
+
+  it('rejects a half-set credential pair in either direction', () => {
+    const base = { ...validEnv, EMAIL_TRANSPORT: 'smtp', SMTP_HOST: 'h' };
+
+    expect(() => parseEnv({ ...base, SMTP_USER: 'u' })).toThrowError(/SMTP_PASSWORD/);
+    expect(() => parseEnv({ ...base, SMTP_PASSWORD: 'p' })).toThrowError(/SMTP_USER/);
+  });
+
+  it('accepts both credentials together', () => {
+    const parsed = parseEnv({
+      ...validEnv,
+      EMAIL_TRANSPORT: 'smtp',
+      SMTP_HOST: 'smtp.resend.com',
+      SMTP_USER: 'resend',
+      SMTP_PASSWORD: 'secret',
+    });
+
+    expect(parsed.SMTP_USER).toBe('resend');
+  });
+
+  it('parses SMTP_SECURE as a boolean', () => {
+    const base = { ...validEnv, EMAIL_TRANSPORT: 'smtp', SMTP_HOST: 'h' };
+
+    expect(parseEnv({ ...base, SMTP_SECURE: 'true' }).SMTP_SECURE).toBe(true);
+    expect(parseEnv({ ...base, SMTP_SECURE: 'false' }).SMTP_SECURE).toBe(false);
+  });
+
+  it('REFUSES the console transport in production', () => {
+    // Silently writing a password-reset email to a log file in production is worse
+    // than refusing to boot.
+    expect(() =>
+      parseEnv({ ...validEnv, NODE_ENV: 'production', EMAIL_TRANSPORT: 'console' }),
+    ).toThrowError(/must be "smtp" in production/);
+  });
+
+  it('allows the smtp transport in production', () => {
+    const parsed = parseEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      EMAIL_TRANSPORT: 'smtp',
+      SMTP_HOST: 'smtp.resend.com',
+    });
+
+    expect(parsed.EMAIL_TRANSPORT).toBe('smtp');
+  });
+
   it('defaults EMAIL_FROM and rejects a malformed address', () => {
     expect(parseEnv(validEnv).EMAIL_FROM).toContain('@');
     expect(() => parseEnv({ ...validEnv, EMAIL_FROM: 'not-an-address' })).toThrowError(

@@ -19,5 +19,30 @@ services:
       timeout: 5s
       retries: 10
 
+  # Local SMTP server. Accepts mail on 1025 and serves a web inbox on 8025.
+  #
+  # This makes development use the SAME code path as production — a real SMTP
+  # connection through nodemailer — rather than a console stub that behaves
+  # differently from the thing that will actually run. Nothing leaves the machine:
+  # Mailpit captures every message instead of delivering it.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: war_mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      # Loopback only — this accepts unauthenticated mail and must never be
+      # reachable from the network.
+      - '127.0.0.1:1025:1025' # SMTP
+      - '127.0.0.1:8025:8025' # Web inbox
+    healthcheck:
+      test: ['CMD', 'sh', '-c', 'nc -z localhost 1025 || exit 1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   war_postgres_data:
