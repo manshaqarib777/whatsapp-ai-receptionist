@@ -98,3 +98,110 @@ Covered by `src/features/health/tests/health.integration.test.ts`:
 - `SELECT 1` succeeds against the live connection.
 
 These tests **fail** rather than skip when the database is unreachable.
+
+---
+
+# Schema Change — Milestone 2 (Authentication)
+
+Date: 2026-08-01
+Migration: `prisma/migrations/20260801021835_auth`
+Status: Applied (local)
+
+## New Tables
+
+| Table | Purpose |
+|---|---|
+| `users` | Identity. Global, not tenant-scoped. |
+| `sessions` | Active logins + `active_organization_id`, IP, user agent |
+| `accounts` | Credential and OAuth provider links (`password` holds the hash) |
+| `verifications` | Email verification, password reset, magic-link tokens |
+| `two_factors` | TOTP secret and backup codes |
+| `organizations` | **The tenant** |
+| `members` | User ↔ organization with `role` — where RBAC lives |
+| `invitations` | Pending invites with expiry |
+| `audit_logs` | Append-only security event log |
+
+## Relations
+
+```
+User 1─n Session          onDelete: Cascade
+User 1─n Account          onDelete: Cascade
+User 1─n TwoFactor        onDelete: Cascade
+User 1─n Member           onDelete: Cascade
+User 1─n Invitation       onDelete: Cascade  (as inviter)
+User 1─n AuditLog         onDelete: SetNull  (history survives user deletion)
+
+Organization 1─n Member      onDelete: Cascade
+Organization 1─n Invitation  onDelete: Cascade
+Organization 1─n AuditLog    onDelete: Cascade
+```
+
+`AuditLog.actorId` uses `SetNull` rather than `Cascade` deliberately: deleting a user
+must not erase the record of what they did.
+
+## Indexes
+
+Every foreign key is indexed, plus:
+
+| Index | Reason |
+|---|---|
+| `users.email` (unique) | Sign-in lookup; prevents duplicate accounts |
+| `sessions.token` (unique) | Session resolution on every request |
+| `sessions.expires_at` | Expired-session sweep |
+| `accounts (provider_id, account_id)` (unique) | Prevents duplicate OAuth links |
+| `organizations.slug` (unique) | URL resolution |
+| `members (organization_id, user_id)` (unique) | One membership per user per org |
+| `audit_logs (organization_id, created_at)` | The primary audit query — scoped and ordered |
+| `audit_logs (actor_id, created_at)` | "What did this user do?" |
+| `verifications.identifier`, `.expires_at` | Token lookup and expiry sweep |
+
+## The `tenant_id` Rule — Exemptions
+
+`DATABASE_RULES.md` requires `tenant_id NOT NULL` on every table. That cannot apply
+literally to the tables which *define* tenancy. The exemptions, with reasons:
+
+| Table | Why exempt |
+|---|---|
+| `organizations` | **It is the tenant.** Its own `id` is the tenant id. |
+| `users` | Global. One person may belong to several organizations. |
+| `sessions`, `accounts`, `verifications`, `two_factors` | Hang off the user, not off a tenant. |
+| `health_checks` | Infrastructure (Milestone 1). |
+
+**Tenant-scoped tables** carry `organization_id NOT NULL`: `members`, `invitations`.
+`audit_logs.organization_id` is nullable because some events (signup, failed sign-in)
+occur before any organization context exists.
+
+**Every business table from Milestone 4 onward carries `organization_id NOT NULL`.**
+This list is the complete set of exemptions; it is not a precedent for new tables.
+
+## Better Auth Generated Schema
+
+The auth models originate from `npx @better-auth/cli generate` but are **not** used as
+emitted. The generator produces camelCase columns, no `@map`/`@@map`, and no indexes —
+all of which violate `DATABASE_RULES.md`. Every model was mapped by hand and indexed.
+
+**Regenerating overwrites those mappings.** Generate to a scratch file and merge:
+
+```bash
+npx @better-auth/cli generate --config src/lib/auth.ts --output prisma/generated-auth.prisma
+# then merge by hand into prisma/schema.prisma, preserving @map/@@map and indexes
+```
+
+## Rollback Plan
+
+No production data exists. Drop in reverse dependency order:
+
+```sql
+DROP TABLE IF EXISTS audit_logs, invitations, members, two_factors,
+                     verifications, accounts, sessions, organizations, users CASCADE;
+```
+
+Then re-run `npm run db:deploy`. For an environment holding real data, restore from
+backup and replay to the target migration — exercised in Milestone 25.
+
+## Verification
+
+`src/features/auth/tests/tenant-isolation.integration.test.ts` (17 tests) and
+`audit-log.integration.test.ts` (25 tests) run against real Postgres and prove
+cross-tenant isolation, last-owner protection, privilege-escalation refusal, and that
+the audit log is append-only and PII-free.

@@ -42,7 +42,17 @@ export type RouteContext = {
   logger: ReturnType<typeof requestLogger>;
 };
 
-type Handler = (request: Request, context: RouteContext) => Promise<NextResponse>;
+/**
+ * Next's second argument for dynamic segments, e.g. `{ params: Promise<{ id }> }`.
+ * Generic so a route declares its own params shape rather than casting.
+ */
+export type RouteParams<T = unknown> = { params: Promise<T> };
+
+type Handler<T = unknown> = (
+  request: Request,
+  context: RouteContext,
+  routeParams: RouteParams<T>,
+) => Promise<NextResponse>;
 
 /**
  * Converts a Zod error into our error-detail shape so validation failures are
@@ -112,8 +122,11 @@ export function jsonError(
  * @param routeName Stable identifier used in logs, e.g. "GET /api/health".
  * @param handler   The route implementation.
  */
-export function withApiHandler(routeName: string, handler: Handler) {
-  return async function wrapped(request: Request): Promise<NextResponse> {
+export function withApiHandler<T = unknown>(routeName: string, handler: Handler<T>) {
+  return async function wrapped(
+    request: Request,
+    routeParams: RouteParams<T> = { params: Promise.resolve({} as T) },
+  ): Promise<NextResponse> {
     const correlationId = request.headers.get(CORRELATION_ID_HEADER) ?? randomUUID();
 
     const log = requestLogger({
@@ -125,7 +138,11 @@ export function withApiHandler(routeName: string, handler: Handler) {
     const startedAt = performance.now();
 
     try {
-      const response = await handler(request, { correlationId, logger: log });
+      const response = await handler(
+        request,
+        { correlationId, logger: log },
+        routeParams,
+      );
 
       log.info(
         {

@@ -27,6 +27,9 @@ export default defineConfig({
         'postgresql://war_dev:war_dev_password@localhost:5433/war_dev?schema=public',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
       LOG_LEVEL: 'error',
+      // Auth (Milestone 2). Test-only values — never a real secret.
+      AUTH_SECRET: 'test-secret-at-least-32-characters-long-xxxx',
+      EMAIL_FROM: 'noreply@test.local',
     },
     include: ['src/**/*.test.{ts,tsx}', 'tests/unit/**/*.test.{ts,tsx}'],
     exclude: ['node_modules', '.next', 'tests/e2e/**'],

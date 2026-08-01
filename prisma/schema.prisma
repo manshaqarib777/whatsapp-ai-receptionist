@@ -1,12 +1,14 @@
-// Milestone 1 — Project Foundation.
+// Milestone 2 — Authentication.
 //
-// This schema is deliberately minimal. The full data model (tenants, users,
-// conversations, messages, audit logs, history, versioning) is designed in
-// Milestone 4 per /docs/PRODUCT_REQUIREMENTS.md. Adding those tables here would
-// be implementing future-milestone scope.
+// The auth tables originate from `npx @better-auth/cli generate` but are NOT used as
+// emitted: the generator produces camelCase column names, no snake_case mapping, and
+// no indexes. Every model below is explicitly mapped to satisfy
+// .claude/DATABASE_RULES.md, and indexes are added for every foreign key and every
+// column used in a WHERE or ORDER BY.
+//
+// Regenerating with the CLI will overwrite these mappings — regenerate to
+// prisma/generated-auth.prisma and merge by hand. See docs/database/schema-change.md.
 
-// Prisma 7: the connection URL lives in prisma.config.ts (for Migrate) and is
-// supplied to PrismaClient via a driver adapter at runtime. See src/lib/prisma.ts.
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,12 +17,241 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Infrastructure table used only to prove that migrations apply and the Prisma
-/// client round-trips against a real database.
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+/// A person. Global, NOT tenant-scoped: one user may belong to several
+/// organizations with a different role in each. Tenancy lives on Member.
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false) @map("email_verified")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  twoFactorEnabled Boolean? @default(false) @map("two_factor_enabled")
+
+  sessions    Session[]
+  accounts    Account[]
+  members     Member[]
+  invitations Invitation[]
+  twofactors  TwoFactor[]
+  auditLogs   AuditLog[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// An active login. Database-backed so revocation is immediate (ADR-0001).
 ///
-/// Exempt from the `tenant_id` rule in .claude/DATABASE_RULES.md: this holds no
-/// tenant data. The rule applies to every business table from Milestone 2 onward.
-/// See /docs/database/schema-change.md.
+/// `activeOrganizationId` is the tenant boundary: it is read from THIS row on every
+/// request and never from client input. See SECURITY_RULES.md → Tenant Isolation.
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  activeOrganizationId String? @map("active_organization_id") @db.Uuid
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// A credential or OAuth provider link. `password` holds the hash for the
+/// credential provider; it is never populated for OAuth accounts.
+model Account {
+  id        String @id @default(uuid()) @db.Uuid
+  accountId String @map("account_id")
+  /// "credential" for email+password, otherwise the OAuth provider id.
+  providerId String @map("provider_id")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+/// Short-lived tokens: email verification, password reset, magic link.
+/// Rows are deleted on use — single-use is enforced by the library plus this table.
+model Verification {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verifications")
+}
+
+/// TOTP secret and backup codes. Encrypted at rest by the library.
+model TwoFactor {
+  id          String @id @default(uuid()) @db.Uuid
+  secret      String
+  backupCodes String @map("backup_codes")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("two_factors")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy
+// ---------------------------------------------------------------------------
+
+/// THE TENANT. Every business table from Milestone 4 onward carries
+/// `organization_id` referencing this table.
+///
+/// Exempt from the `tenant_id` rule in DATABASE_RULES.md because it *is* the tenant —
+/// its own id is the tenant id. Recorded in docs/database/schema-change.md so the
+/// exemption is explicit rather than inferred.
+model Organization {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String    @unique
+  logo      String?
+  metadata  String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  members     Member[]
+  invitations Invitation[]
+  auditLogs   AuditLog[]
+
+  @@index([slug])
+  @@index([deletedAt])
+  @@map("organizations")
+}
+
+/// User ↔ Organization, carrying the role. This is where RBAC lives: a person may
+/// be `owner` of one organization and `viewer` of another.
+model Member {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// owner | admin | member | viewer — see src/features/auth/permissions.ts
+  role String @default("member")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// One membership per user per organization.
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("members")
+}
+
+/// A pending invitation to join an organization.
+model Invitation {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email     String
+  role      String?
+  /// pending | accepted | rejected | cancelled
+  status    String   @default("pending")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  inviterId String @map("inviter_id") @db.Uuid
+  user      User   @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([inviterId])
+  @@map("invitations")
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+/// APPEND-ONLY security event log (DATABASE_RULES.md → Audit).
+///
+/// The repository exposes no update or delete path — not discouraged, absent.
+/// There is deliberately no `updatedAt` and no `deletedAt`: an audit row that can be
+/// modified is not an audit row.
+///
+/// `metadata` carries ids and enum values ONLY. Never message bodies, phone numbers,
+/// email addresses, tokens, or any other PII (SECURITY_RULES.md → PII).
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Null for events with no authenticated actor — a failed sign-in, for example.
+  actorId String? @map("actor_id") @db.Uuid
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  /// Null for events outside an organization context, such as signup.
+  organizationId String?       @map("organization_id") @db.Uuid
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// e.g. "auth.sign_in", "member.role_changed" — see audit-log.service.ts
+  action String
+
+  /// The kind of thing acted upon: "user", "member", "organization".
+  entityType String? @map("entity_type")
+  entityId   String? @map("entity_id")
+
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  /// JSON. Ids and enums only — no PII.
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure
+// ---------------------------------------------------------------------------
+
+/// Milestone 1. Proves migrations apply and the client round-trips.
+/// Exempt from tenant scoping: infrastructure, not tenant data.
 model HealthCheck {
   id        String   @id @default(uuid()) @db.Uuid
   checkedAt DateTime @default(now()) @map("checked_at")

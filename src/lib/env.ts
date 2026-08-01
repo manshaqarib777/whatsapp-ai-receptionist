@@ -24,6 +24,28 @@ const serverSchema = z.object({
     ),
 
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
+
+  /**
+   * Session signing secret. A short secret is a weak secret — 32 characters is the
+   * floor, and the app refuses to boot below it rather than running insecurely.
+   */
+  AUTH_SECRET: z
+    .string()
+    .min(
+      32,
+      'AUTH_SECRET must be at least 32 characters. Generate one with: openssl rand -base64 32',
+    ),
+
+  EMAIL_FROM: z.string().email().default('noreply@whatsapp-receptionist.local'),
+
+  /**
+   * OAuth providers are optional. A provider is offered only when both its id and
+   * secret are present; absent credentials must not break the app or the tests.
+   */
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
 });
 
 /**

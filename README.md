@@ -7,15 +7,19 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 1 — Project Foundation.** Complete.
+**Milestone 2 — Authentication.** Complete.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
 is in [`docs/milestones/`](docs/milestones/).
 
-There is no product functionality yet. What exists is the foundation everything else
-is built on: tooling, database, configuration, logging, error handling, health checks,
-tests, and CI.
+What exists so far: the foundation (tooling, database, configuration, logging, error
+handling, health checks, CI) and a complete multi-tenant authentication system —
+sign-up, sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and
+an append-only audit log.
+
+There is no product functionality yet. The dashboard is a placeholder; the design
+system is Milestone 3.
 
 ---
 
@@ -29,6 +33,7 @@ tests, and CI.
 | Async state | React Query v5 |
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | Icons / Fonts | Lucide / Geist |
+| Auth | Better Auth v1.6 ([ADR-0001](docs/architecture/decisions/ADR-0001-better-auth.md)) |
 | Validation | Zod |
 | Logging | Pino (structured, with redaction) |
 | Testing | Vitest + Testing Library, Playwright |
@@ -68,8 +73,8 @@ npm run db:seed
 npm run dev
 ```
 
-Open http://localhost:3000. The status card should report **Operational** and
-**Connected**.
+Then create an account at http://localhost:3000/signup. The verification link is
+printed to the terminal running `npm run dev` — open it to activate the account.
 
 ---
 
@@ -79,10 +84,19 @@ Names and purpose only — never commit values. See [`.env.example`](.env.exampl
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `NODE_ENV` | no (defaults to `development`) | Runtime mode |
 | `DATABASE_URL` | **yes** | Postgres connection string |
 | `NEXT_PUBLIC_APP_URL` | **yes** | Public base URL; exposed to the browser |
 | `LOG_LEVEL` | no (defaults to `info`) | Pino log level |
+| `AUTH_SECRET` | **yes** | Session signing secret, 32+ chars. `openssl rand -base64 32` |
+| `EMAIL_FROM` | no | From address on outbound mail |
+| `GOOGLE_CLIENT_ID` / `_SECRET` | no | Enables Google sign-in when both are set |
+| `GITHUB_CLIENT_ID` / `_SECRET` | no | Enables GitHub sign-in when both are set |
+
+`NODE_ENV` is deliberately **not** set in `.env` — Next.js manages it, and overriding
+it makes a production server behave as though it were in development.
+
+**No email provider is configured.** In development, verification, password-reset, and
+magic-link messages are written to the application log. Look there for the link.
 
 Configuration is validated by Zod at boot in [`src/lib/env.ts`](src/lib/env.ts). The
 application **refuses to start** on a missing or malformed variable, and the error

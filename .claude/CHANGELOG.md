@@ -28,6 +28,22 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 2 — Authentication**
+
+- Email/password sign-up and sign-in with mandatory email verification.
+- Password reset via a single-use, one-hour, emailed link.
+- Magic-link sign-in — single-use, 15-minute expiry.
+- TOTP two-factor authentication with ten single-use backup codes, plus enrolment
+  and removal from `/settings/security`. Both require the account password.
+- OAuth via Google and GitHub, enabled only when credentials are configured.
+- Organizations: create, list, switch, and manage members. Creator becomes owner.
+- RBAC — four roles (`owner`, `admin`, `member`, `viewer`) across 18 permissions,
+  enforced server-side on every protected route. Unknown roles are denied everything.
+- Append-only audit log with PII sanitisation, exposed at `GET /api/audit-logs`.
+- Database-backed sessions with immediate revocation.
+- Auth screens: login, signup, forgot/reset password, verify email, two-factor
+  challenge, security settings, members, and organization onboarding.
+
 **Milestone 1 — Project Foundation**
 
 - Next.js 16 (App Router) + React 19 + TypeScript in strict mode, with
@@ -70,6 +86,11 @@ change gets an entry in the same PR.
 - `LANDING_PAGE_RULES.md` — marketing surface standards distinct from the product.
 
 ### Changed
+- **BREAKING** `AUTH_SECRET` is now required and must be at least 32 characters. The
+  application refuses to start without it. Add it to every environment; generate with
+  `openssl rand -base64 32`.
+- `withApiHandler` now passes Next's route context as a third argument, so dynamic
+  segments can read their params. Existing routes are unaffected.
 - `DESIGN_RULES.md` — added a design-system file index, a layout composition section,
   and an expanded mobile-first strategy. Corrected the token location from the
   non-existent `src/ui/tokens.css` to `src/app/globals.css`.
@@ -83,9 +104,23 @@ change gets an entry in the same PR.
 - Nothing yet.
 
 ### Fixed
-- Nothing yet.
+- Removed `NODE_ENV` from `.env`. Next.js sets it itself, and overriding it made
+  `next start` behave as a development server — including injecting the dev-tools
+  overlay into production HTML. Caught by the Milestone 1 tripwire test.
 
 ### Security
+- `organizationId` is derived server-side from the session row and never from client
+  input, which is what makes tenant scoping trustworthy. Proven by 17 integration tests.
+- Cross-tenant access returns 404 rather than 403, so existence is never confirmed
+  across tenants.
+- Account enumeration is prevented on sign-in, sign-up, password reset, and magic
+  link — all four return identical outcomes whether or not an address is registered.
+- Open-redirect defence on the post-login `next` parameter: absolute, protocol-relative,
+  backslash, encoded-traversal, and control-character vectors are all rejected. 30 tests.
+- Privilege escalation is blocked — only an owner may create another owner, and the
+  last owner can be neither demoted nor removed.
+- Rate limiting on sign-in, sign-up, password reset, magic link, and two-factor.
+- Audit metadata is stripped of PII in code, so a careless caller cannot write it.
 - Security headers on every response: CSP, HSTS, `X-Content-Type-Options`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`.
 - `X-Powered-By` suppressed so the framework version is not advertised.

@@ -12,6 +12,7 @@ const validEnv = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5433/db?schema=public',
   LOG_LEVEL: 'info',
   NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+  AUTH_SECRET: 'a-test-secret-that-is-at-least-32-characters',
 };
 
 describe('parseEnv', () => {
@@ -74,5 +75,62 @@ describe('parseEnv', () => {
 
   it('points the operator at .env.example', () => {
     expect(() => parseEnv({})).toThrowError(/\.env\.example/);
+  });
+});
+
+describe('parseEnv — auth configuration (Milestone 2)', () => {
+  it('requires AUTH_SECRET', () => {
+    const { AUTH_SECRET: _omitted, ...withoutSecret } = validEnv;
+
+    expect(() => parseEnv(withoutSecret)).toThrowError(/AUTH_SECRET/);
+  });
+
+  it('rejects a short AUTH_SECRET rather than running with weak signing', () => {
+    expect(() => parseEnv({ ...validEnv, AUTH_SECRET: 'too-short' })).toThrowError(
+      /at least 32 characters/,
+    );
+  });
+
+  it('tells the operator how to generate a secret', () => {
+    expect(() => parseEnv({ ...validEnv, AUTH_SECRET: 'short' })).toThrowError(
+      /openssl rand/,
+    );
+  });
+
+  it('accepts a secret of exactly the minimum length', () => {
+    const secret = 'x'.repeat(32);
+
+    expect(parseEnv({ ...validEnv, AUTH_SECRET: secret }).AUTH_SECRET).toBe(secret);
+  });
+
+  it('treats OAuth credentials as optional', () => {
+    const parsed = parseEnv(validEnv);
+
+    expect(parsed.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(parsed.GITHUB_CLIENT_ID).toBeUndefined();
+  });
+
+  it('accepts OAuth credentials when supplied', () => {
+    const parsed = parseEnv({
+      ...validEnv,
+      GOOGLE_CLIENT_ID: 'google-id',
+      GOOGLE_CLIENT_SECRET: 'google-secret',
+    });
+
+    expect(parsed.GOOGLE_CLIENT_ID).toBe('google-id');
+    expect(parsed.GOOGLE_CLIENT_SECRET).toBe('google-secret');
+  });
+
+  it('rejects an empty OAuth value, which would otherwise look configured', () => {
+    expect(() => parseEnv({ ...validEnv, GOOGLE_CLIENT_ID: '' })).toThrowError(
+      /GOOGLE_CLIENT_ID/,
+    );
+  });
+
+  it('defaults EMAIL_FROM and rejects a malformed address', () => {
+    expect(parseEnv(validEnv).EMAIL_FROM).toContain('@');
+    expect(() => parseEnv({ ...validEnv, EMAIL_FROM: 'not-an-address' })).toThrowError(
+      /EMAIL_FROM/,
+    );
   });
 });
