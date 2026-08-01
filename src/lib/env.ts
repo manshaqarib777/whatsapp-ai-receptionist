@@ -81,6 +81,20 @@ const serverSchema = z.object({
   AUTH_CREDENTIAL_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
 
   /**
+   * Marks an automated end-to-end run against a local production BUILD, which is not
+   * a production DEPLOYMENT.
+   *
+   * Its only effect is to permit the console email transport, so the suite never
+   * sends real mail. Nothing else relaxes. A genuine deployment that sets this is
+   * announcing it wants mail discarded — so boot logs a warning loudly enough that
+   * nobody does it by accident.
+   */
+  E2E_TEST_RUN: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */
@@ -127,7 +141,12 @@ const envSchema = serverSchema.merge(clientSchema).superRefine((env, ctx) => {
   }
 
   // Production must never fall back to writing account-critical mail to a log.
-  if (env.NODE_ENV === 'production' && env.EMAIL_TRANSPORT !== 'smtp') {
+  // E2E_TEST_RUN exempts an automated run against a local production build.
+  if (
+    env.NODE_ENV === 'production' &&
+    env.EMAIL_TRANSPORT !== 'smtp' &&
+    !env.E2E_TEST_RUN
+  ) {
     ctx.addIssue({
       code: 'custom',
       path: ['EMAIL_TRANSPORT'],

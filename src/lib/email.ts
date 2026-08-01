@@ -219,6 +219,12 @@ function createAdapter(): EmailPort {
     : new ConsoleEmailAdapter();
 }
 
+if (isProduction && env.EMAIL_TRANSPORT !== 'smtp') {
+  logger.warn(
+    'EMAIL IS BEING DISCARDED: running a production build with EMAIL_TRANSPORT=console via E2E_TEST_RUN. No verification, reset, or invitation mail will be delivered.',
+  );
+}
+
 let adapter: EmailPort = createAdapter();
 
 /** Replaces the adapter. Used by tests and by setup diagnostics. */
