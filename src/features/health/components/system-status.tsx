@@ -38,7 +38,12 @@ export function SystemStatus() {
 
       <CardContent>
         {isPending ? (
-          <div className="space-y-3" aria-busy="true" aria-label="Loading system status">
+          <div
+            role="status"
+            className="space-y-3"
+            aria-busy="true"
+            aria-label="Loading system status"
+          >
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-5 w-48" />
           </div>

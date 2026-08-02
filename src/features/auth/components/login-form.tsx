@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import { OAuthButtons } from '@/features/auth/components/oauth-buttons';
 import {
   signInSchema,
@@ -142,7 +142,7 @@ export function LoginForm({ providers }: { providers: string[] }) {
         noValidate
         className="space-y-4"
       >
-        <FormField
+        <TextField
           label="Email"
           name="email"
           type="email"
@@ -156,7 +156,7 @@ export function LoginForm({ providers }: { providers: string[] }) {
 
         {mode === 'password' ? (
           <div className="space-y-2">
-            <FormField
+            <TextField
               label="Password"
               name="password"
               type="password"

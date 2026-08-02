@@ -95,6 +95,22 @@ const serverSchema = z.object({
     .transform((value) => value === 'true'),
 
   /**
+   * Serves the design-system gallery at `/design` from a production BUILD.
+   *
+   * The gallery is a development tool. It is always available in development, and in
+   * a production build it 404s unless this is explicitly set — which only the E2E
+   * suite does, so it can audit the real production markup rather than the
+   * development server's (whose injected dev toolbar is not ours to make accessible).
+   *
+   * A deployment must never set it. It exposes no data and reaches no API, but it is
+   * not a product surface and has no business being reachable.
+   */
+  DESIGN_GALLERY: z
+    .enum(['enabled', 'disabled'])
+    .default('disabled')
+    .transform((value) => value === 'enabled'),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */
@@ -187,3 +203,9 @@ export const env: Env = parseEnv(process.env);
 export const isDevelopment = env.NODE_ENV === 'development';
 export const isProduction = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';
+
+/**
+ * Whether `/design` is served. Development always; a production build only when
+ * `DESIGN_GALLERY=enabled` is set explicitly, which only the E2E suite does.
+ */
+export const isDesignGalleryEnabled = !isProduction || env.DESIGN_GALLERY;

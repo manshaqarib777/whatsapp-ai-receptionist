@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -82,7 +82,7 @@ export function ForgotPasswordForm() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <FormField
+        <TextField
           label="Email"
           name="email"
           type="email"
@@ -179,7 +179,7 @@ export function ResetPasswordForm() {
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <FormField
+        <TextField
           label="New password"
           name="password"
           type="password"
@@ -192,7 +192,7 @@ export function ResetPasswordForm() {
           autoFocus
         />
 
-        <FormField
+        <TextField
           label="Confirm new password"
           name="confirmPassword"
           type="password"

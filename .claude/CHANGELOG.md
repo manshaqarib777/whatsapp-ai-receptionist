@@ -28,6 +28,36 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 3 — Design System**
+
+- Design tokens completed: `--success`, `--warning`, `--info` (each with `-foreground`
+  and `-subtle`), a categorical six-colour chart palette separated by hue rather than
+  lightness, a two-layer `--elevation-xs…xl` scale, a named `--z-*` scale, and
+  `--radius` corrected to 16px. Every component consumes tokens only.
+- Light and dark themes, switchable and remembered, with no flash of the wrong theme
+  on load. A theme switcher offers light, dark, or follow-the-system.
+- `prefers-reduced-motion` is honoured globally, and components that animate in
+  JavaScript check it individually rather than relying on the CSS reset.
+- Form components: labelled field wrapper, text field, select, textarea, checkbox,
+  radio, switch, date picker (localised, popover calendar), and time picker (fixed
+  slots, canonical 24-hour value, localised display).
+- Data components: sortable table with `aria-sort`, pagination, and table-shaped empty
+  and loading states; metric card that requires a comparison period and colours by
+  sentiment rather than by sign; line, area, bar, and sparkline charts, each shipping a
+  screen-reader data table; timeline; markdown renderer.
+- Rich text editor whose schema is the allow-list, so unknown markup is dropped rather
+  than escaped, and `javascript:`/`data:` links never become links.
+- File uploader with drag and drop, a keyboard route, previews, progress, and
+  client-side type and size validation.
+- Overlays: dialog, sheet, dropdown, popover, tooltip, toasts, and a ⌘K/Ctrl+K command
+  palette that matches on keywords as well as labels.
+- Navigation: collapsible sidebar whose active item comes from the route and whose
+  collapse state survives a reload, sticky page header, breadcrumbs, tabs, accordion,
+  and an application shell that turns the sidebar into a drawer on a phone.
+- Empty, error, and loading states as components, so no screen can omit one.
+- A development-only component gallery at `/design` showing every component in every
+  state, with theme and direction toggles. It 404s in a production build.
+
 **Email delivery — real SMTP**
 
 - SMTP transport via nodemailer, working against any provider (Resend, Postmark, SES,
@@ -100,6 +130,20 @@ change gets an entry in the same PR.
 - `LANDING_PAGE_RULES.md` — marketing surface standards distinct from the product.
 
 ### Changed
+
+- Auth screens are restyled onto the design system — a card surface, the shared field
+  components, and a theme switcher. Structure and behaviour are unchanged; Milestone
+  2's auth tests pass unmodified.
+- `--muted-foreground`, `--destructive`, and `--success` are darker in light mode. All
+  three failed the WCAG AA 4.5:1 text threshold at their previous values (4.34, 4.00,
+  and 4.44 respectively), measured on the gallery.
+- `--sidebar-accent` is darker in light mode. At 0.97 lightness against a 0.985 rail the
+  active navigation item was all but invisible, which is the one state a sidebar cannot
+  afford to be subtle about.
+- The shared form field moved from `src/features/auth/components/form-field.tsx` to
+  `src/components/form-field.tsx` and is now `TextField`. It is domain-agnostic and no
+  longer implies that labelled inputs are an auth concern.
+
 - **BREAKING** `AUTH_SECRET` is now required and must be at least 32 characters. The
   application refuses to start without it. Add it to every environment; generate with
   `openssl rand -base64 32`.
@@ -118,6 +162,23 @@ change gets an entry in the same PR.
 - Nothing yet.
 
 ### Fixed
+
+- Chart data tables no longer cause horizontal page overflow on a phone. `sr-only` on a
+  `<table>` does not clamp it, so a full-width table sat off-screen and widened the
+  document; the wrapper carries the class instead.
+- The page header no longer nests an `<li>` inside an `<li>`, which the browser
+  silently reshuffled into markup React disagreed with — discarding and re-rendering
+  that part of the page on every load.
+- The command palette no longer throws when opened. It rendered its input and items
+  without the cmdk root that supplies their context.
+- Rendering a stored rich-text document containing an unknown node no longer throws.
+  Unknown content is rewritten to text rather than crashing the page around it.
+- Loading regions carry `role="status"`. `aria-label` on a bare `<div>` is invalid ARIA
+  and is ignored, so what was loading was announced as nothing at all.
+- The gallery's animation section no longer renders different text on the server and the
+  client, which made React discard and rebuild that part of the page under reduced
+  motion.
+
 - **Signup was completely broken.** Better Auth generates nanoid-style ids, which
   Postgres rejected for the `@db.Uuid` primary keys, so every registration failed with
   `P2007` and no account was created. The auth layer now generates real UUIDs

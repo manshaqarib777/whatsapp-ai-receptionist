@@ -71,6 +71,21 @@ const eslintConfig = defineConfig([
         },
       ],
 
+      /* --- RTL: logical properties only (RTL_I18N_RULES.md) ---
+         Arabic is a first-class locale for this product (the Gulf payment
+         providers in Milestone 12 make that explicit). Physical direction
+         utilities do not flip, so they must not reach the codebase at all —
+         convention alone will not hold across twenty features. */
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "JSXAttribute[name.name='className'] > Literal[value=/(^|\\s|:)(p[lr]|m[lr]|left|right|border-[lr]|rounded-[lr]|text-(left|right)|float-(left|right)|inset-[lr])-/]",
+          message:
+            'Use logical properties so RTL works: ps-/pe-, ms-/me-, start-/end-, border-s/border-e, text-start/text-end. See .claude/RTL_I18N_RULES.md.',
+        },
+      ],
+
       /* --- Correctness --- */
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'no-var': 'error',

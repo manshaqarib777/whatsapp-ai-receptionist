@@ -7,19 +7,24 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 2 — Authentication.** Complete.
+**Milestone 3 — Design System.** Complete, awaiting visual review.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
 is in [`docs/milestones/`](docs/milestones/).
 
 What exists so far: the foundation (tooling, database, configuration, logging, error
-handling, health checks, CI) and a complete multi-tenant authentication system —
-sign-up, sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and
-an append-only audit log.
+handling, health checks, CI), a complete multi-tenant authentication system — sign-up,
+sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and an
+append-only audit log — and a token-driven design system every later screen is built
+from.
 
-There is no product functionality yet. The dashboard is a placeholder; the design
-system is Milestone 3.
+Browse the components at **<http://localhost:3000/design>** while the development
+server is running. It is a development tool, not a product page, and 404s in a
+production build.
+
+There is no product functionality yet. The dashboard is a placeholder; the real
+dashboard is Milestone 5 and the inbox is Milestone 6.
 
 ---
 
@@ -135,7 +140,7 @@ names every offending variable. `process.env` is read nowhere else — enforced 
 
 | Command | Purpose |
 |---|---|
-| `npm run dev` | Development server |
+| `npm run dev` | Development server (component gallery at `/design`) |
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run typecheck` | `tsc --noEmit` — must be 0 errors |

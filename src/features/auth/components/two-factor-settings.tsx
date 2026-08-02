@@ -3,7 +3,7 @@
 import { ShieldCheck, ShieldOff } from 'lucide-react';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import { authClient } from '@/lib/auth-client';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -141,7 +141,7 @@ export function TwoFactorSettings({ enabled }: { enabled: boolean }) {
             noValidate
             className="space-y-4"
           >
-            <FormField
+            <TextField
               label="Confirm your password"
               name="password"
               type="password"
@@ -186,7 +186,7 @@ export function TwoFactorSettings({ enabled }: { enabled: boolean }) {
               </code>
             </div>
 
-            <FormField
+            <TextField
               label="Enter the 6-digit code"
               name="code"
               value={code}

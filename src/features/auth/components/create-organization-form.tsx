@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import {
   createOrganizationSchema,
   slugify,
@@ -86,7 +86,7 @@ export function CreateOrganizationForm() {
         </Alert>
       ) : null}
 
-      <FormField
+      <TextField
         label="Organization name"
         name="name"
         value={name}
@@ -97,7 +97,7 @@ export function CreateOrganizationForm() {
         autoFocus
       />
 
-      <FormField
+      <TextField
         label="Address"
         name="slug"
         value={effectiveSlug}
