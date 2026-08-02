@@ -111,10 +111,33 @@ client extension injects `organization_id` (and `branch_id` where applicable) in
 query, and the repository layer takes a scope object it cannot construct itself.
 
 **Rejected: Postgres RLS as the primary mechanism.** It is the right *defence in depth*
-and `DATABASE_RULES.md:108` already asks for it, so it will be enabled — but as a second
-layer. As the primary control it needs per-request role switching and session variables,
-and it is invisible to the Vitest suite, so the isolation tests would prove nothing about
-the code path the app actually takes.
+and `DATABASE_RULES.md:108` already asks for it. As the primary control it needs
+per-request role switching and session variables, and it is invisible to the Vitest
+suite, so the isolation tests would prove nothing about the code path the app actually
+takes.
+
+> **Amended 2026-08-02 — RLS is deferred to Milestone 23 (Security), not shipped here.**
+>
+> The plan said RLS would be enabled as a second layer in this milestone. On
+> implementation that turned out to be undeliverable honestly, so it is being reported
+> rather than faked.
+>
+> A working RLS policy needs to know the current tenant, which means
+> `current_setting('app.organization_id')` set per connection. Prisma 7 with the
+> `PrismaPg` driver adapter pools connections and offers no per-request hook, so the
+> setting can only be applied with `SET LOCAL` inside an explicit transaction — which
+> would mean wrapping every read in the application in a transaction, at a real
+> latency cost.
+>
+> The alternatives are worse. A policy that permits access when the setting is absent
+> is decorative: it passes review, blocks nothing, and creates false confidence — which
+> `RULES.md` §"No placeholder shipping" forbids. Enabling RLS without `FORCE` leaves the
+> owning role exempt, which is the role the application uses, so it would likewise
+> block nothing.
+>
+> The primary control (AD-2) is implemented and covered by 32 passing isolation tests.
+> RLS is tracked to Milestone 23, where provisioning a least-privilege database role is
+> already in scope and the transaction-context work has somewhere to belong.
 
 ### AD-3 — Money stays `numeric`, with four guardrails
 

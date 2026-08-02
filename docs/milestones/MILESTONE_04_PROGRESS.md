@@ -28,11 +28,13 @@ Plan: `MILESTONE_04_PLAN.md` (approved 2026-08-02, both open questions answered)
 - [x] ESLint now permits `@prisma/client` in `src/lib/db/**` only (it is the database
       layer); everywhere else the existing restriction stands
 
+- [x] Erasure (redaction) path — `src/lib/db/erasure.ts`, registry-driven, 12 tests
+- [x] RLS decision made and documented (deferred to Milestone 23 — see Issue 10)
+
 ## Pending Tasks
 
 - [ ] Scope-injection Prisma client extension + base repository
-- [ ] RLS policies as defence in depth
-- [ ] Erasure (redaction) path
+- [ ] ~~RLS policies as defence in depth~~ — **deferred to Milestone 23**, see Issue 10
 - [ ] `prisma/seed.ts` — deterministic, meeting `DATABASE_RULES.md:193` in full
 - [ ] Tests per the plan's Testing Strategy
 - [ ] `EXPLAIN ANALYZE` evidence for the two hot queries
@@ -54,6 +56,8 @@ Plan: `MILESTONE_04_PLAN.md` (approved 2026-08-02, both open questions answered)
 | 6 | Found #5 only because the appointment `EXCLUDE` constraint failed with "functions in index expression must be marked IMMUTABLE" | Resolved | `tstzrange(timestamp, timestamp)` needs a TimeZone-dependent cast, so Postgres refused the index. `tstzrange` itself is IMMUTABLE — the constraint was a canary for the column types, not the cause. Worth recording: the constraint paid for itself before it ever ran in production. |
 | 7 | `contacts.lifecycleStage` was created camelCase, against `DATABASE_RULES.md:46` | Resolved | Missing `@map`. Found by an insert in the smoke test, then swept for with `information_schema.columns WHERE column_name ~ '[A-Z]'` — it was the only one. Migrated as a `RENAME`, not Prisma's generated DROP + ADD, which discards data. |
 | 8 | `prisma migrate diff` proposes dropping the HNSW index on every run | Open — mitigated | Prisma cannot express an HNSW index, so it reads as drift. Removed from the generated migration by hand and documented in both the constraints migration and `schema-change.md`. **Every future `migrate diff` must be reviewed for this before applying.** |
+| 10 | RLS cannot be shipped honestly in this milestone | **Deferred to Milestone 23** | A policy needs `current_setting('app.organization_id')` per connection. Prisma 7's `PrismaPg` adapter pools connections with no per-request hook, so it can only be set via `SET LOCAL` inside an explicit transaction — wrapping every read in one, at a latency cost. A policy that permits access when the setting is absent is decorative and forbidden by `RULES.md` §"No placeholder shipping"; RLS without `FORCE` exempts the owning role, which is the role the app uses. The primary control (AD-2) is implemented with 32 passing isolation tests. Milestone 23 already provisions a least-privilege role, which is where this belongs. |
+| 11 | Generated Prisma client went stale after the `lifecycle_stage` rename and every db test failed | Resolved | `db:generate` reads `schema.prisma`, not the database, so it must be re-run after a schema edit even when migrations already applied. CI already orders `db:generate` before `db:deploy`, so CI was never at risk — this was a local-only trap. |
 | 9 | Prisma migration timestamps are generated from the system clock, and a hand-created folder dated in the future sorted after the generated one | Resolved | `20260802090000_extensions` would have run *after* the schema migration on a fresh database, so `CREATE TABLE ... vector(1536)` would fail in CI while passing locally. Renamed to `20260802033000_extensions` and the history row updated in place — a surgical rename, not a reset. |
 
 ## Technical Decisions
