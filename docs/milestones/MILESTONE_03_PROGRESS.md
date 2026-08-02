@@ -1,8 +1,8 @@
 # Milestone 3 — Progress
 
-Status: Complete — awaiting visual review
+Status: Complete — approved 2026-08-02
 Started: 2026-08-01
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 See `MILESTONE_03_COMPLETED.md` for the closing report.
 
@@ -46,8 +46,10 @@ See `MILESTONE_03_COMPLETED.md` for the closing report.
 
 - [x] Decision on control heights — resolved 2026-08-02: compact 28/32/36px scale
       stands, `COMPONENT_DESIGN.md` §4 amended to match. No component changed.
-- [ ] Visual review and approval — **STOP** before Milestone 4
-- [ ] Preview deployment — deferred; no preview environment exists yet
+- [x] Visual review and approval — approved 2026-08-02. Milestone 4 is unblocked.
+- [ ] Preview deployment — deferred; no preview environment exists yet. Carried into
+      Milestone 4 as a prerequisite rather than deferred again (see
+      `MILESTONE_04_PLAN.md` → Risks).
 
 ## Issues
 

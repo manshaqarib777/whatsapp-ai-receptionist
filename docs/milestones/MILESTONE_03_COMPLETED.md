@@ -270,7 +270,9 @@ Webhook, AI, and query latency are not applicable to this milestone.
 - [ ] Exercised on a preview deployment — **not done**; no preview environment is
       configured yet. Exercised against a local production build instead, which is
       what the E2E suite runs against.
-- [ ] **STOP — visual review and approval required before Milestone 4**
+- [x] **STOP — visual review and approval** — approved 2026-08-02. The control-height
+      question in Known Limitations §4 was decided at the same time: the compact scale
+      stands.
 
 ---
 
