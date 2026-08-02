@@ -2,8 +2,9 @@
 
 Created: 2026-08-02
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 4`
-Status: **Awaiting approval.** Two decisions below need a human answer before any
-migration is generated — see Open Questions.
+Status: **Approved 2026-08-02.** Both open questions answered — branches are real
+isolation boundaries, and the Tier 1 / Tier 2 split is accepted. See Open Questions for
+the recorded answers.
 
 ---
 
@@ -427,14 +428,20 @@ attachment, an emoji-only message, a failed delivery, a right-to-left name, a
 Two need an answer before migrations are generated. Everything else in this plan I will
 proceed on.
 
-1. **Are branches real isolation boundaries?** AD-1 assumes yes, on the strength of
-   Milestone 18's "Separate Calendars, Separate Knowledge, Separate AI." If branches are
-   only labels on a shared dataset, the schema is materially different and cheaper. This
-   is a product question.
-2. **Tier 1 + Tier 2, or all ~75 tables migrated now?** AD-6 recommends tiering and
-   explains why. The opposite reading of "Every table" is legitimate.
+1. ~~**Are branches real isolation boundaries?**~~ **Answered 2026-08-02: yes, real
+   isolation boundaries, not labels.** AD-1 stands as written — `branch_id NOT NULL` on
+   every branch-scoped table, auto-provisioned `Main` branch per organization, and
+   branch scoping enforced in the same client extension as organization scoping (AD-2)
+   and proven by its own isolation tests.
+2. ~~**Tier 1 + Tier 2, or all ~75 tables migrated now?**~~ **Answered 2026-08-02:
+   tiering approved.** AD-6 stands — the ER diagram covers all ~75 tables across all 25
+   milestones; migrations create the ~45 Tier-1 tables (milestones 5–14 plus
+   `branches`). Tier-2 tables are created by one additive migration each, at the
+   milestone that owns them. The scaffolding-only variant was considered and rejected:
+   a table with no feature columns protects the graph no better than the diagram does,
+   while still carrying a Prisma model, a repository, and isolation tests.
 
-Both are recorded here rather than assumed, per `MILESTONE_RULES.md:22`.
+Both questions are now answered. No blocking questions remain; implementation proceeds.
 
 ---
 
