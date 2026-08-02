@@ -24,7 +24,10 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17-alpine
+        # Must match docker/docker-compose.yml. Milestone 4 stores embeddings in
+        # Postgres, and stock postgres:17-alpine has no vector extension — the
+        # migration that runs CREATE EXTENSION vector would pass locally and fail here.
+        image: pgvector/pgvector:pg17
         env:
           POSTGRES_USER: war_test
           POSTGRES_PASSWORD: war_test_password

@@ -29,9 +29,9 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false) @map("email_verified")
   image         String?
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
 
   twoFactorEnabled Boolean? @default(false) @map("two_factor_enabled")
 
@@ -41,6 +41,17 @@ model User {
   invitations Invitation[]
   twofactors  TwoFactor[]
   auditLogs   AuditLog[]
+
+  // Milestone 4. All SetNull on delete: a departing user must not take
+  // conversations, messages, or audit history with them.
+  assignedConversations Conversation[]             @relation("ConversationAssignee")
+  authoredMessages      Message[]                  @relation("MessageAuthor")
+  conversationNotes     ConversationNote[]         @relation("NoteAuthor")
+  approvedKnowledge     KnowledgeDocumentVersion[] @relation("KnowledgeApprover")
+  resourceProfiles      Resource[]
+  activities            Activity[]                 @relation("ActivityActor")
+  tasks                 Task[]                     @relation("TaskAssignee")
+  notifications         Notification[]
 
   @@index([email])
   @@index([deletedAt])
@@ -54,9 +65,9 @@ model User {
 model Session {
   id        String   @id @default(uuid()) @db.Uuid
   token     String   @unique
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
 
@@ -74,8 +85,8 @@ model Session {
 /// A credential or OAuth provider link. `password` holds the hash for the
 /// credential provider; it is never populated for OAuth accounts.
 model Account {
-  id        String @id @default(uuid()) @db.Uuid
-  accountId String @map("account_id")
+  id         String @id @default(uuid()) @db.Uuid
+  accountId  String @map("account_id")
   /// "credential" for email+password, otherwise the OAuth provider id.
   providerId String @map("provider_id")
 
@@ -85,13 +96,13 @@ model Account {
   accessToken           String?   @map("access_token")
   refreshToken          String?   @map("refresh_token")
   idToken               String?   @map("id_token")
-  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
-  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(3)
   scope                 String?
   password              String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([providerId, accountId])
   @@index([userId])
@@ -104,9 +115,9 @@ model Verification {
   id         String   @id @default(uuid()) @db.Uuid
   identifier String
   value      String
-  expiresAt  DateTime @map("expires_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([identifier])
   @@index([expiresAt])
@@ -142,13 +153,66 @@ model Organization {
   slug      String    @unique
   logo      String?
   metadata  String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
 
   members     Member[]
   invitations Invitation[]
   auditLogs   AuditLog[]
+
+  // Milestone 4. Every business table carries organization_id; Prisma requires
+  // the inverse side of each relation to be declared here.
+  branches           Branch[]
+  whatsappAccounts   WhatsappAccount[]
+  contacts           Contact[]
+  companies          Company[]
+  conversations      Conversation[]
+  messages           Message[]
+  messageAttachments MessageAttachment[]
+  labels             Label[]
+  conversationLabels ConversationLabel[]
+  conversationNotes  ConversationNote[]
+  knowledgeSources   KnowledgeSource[]
+  knowledgeDocs      KnowledgeDocument[]
+  knowledgeVersions  KnowledgeDocumentVersion[]
+  knowledgeChunks    KnowledgeChunk[]
+  ingestionJobs      IngestionJob[]
+  promptTemplates    PromptTemplate[]
+  promptVersions     PromptTemplateVersion[]
+  aiRuns             AiRun[]
+  aiRunCitations     AiRunCitation[]
+  services           Service[]
+  resources          Resource[]
+  availabilityRules  AvailabilityRule[]
+  availabilityExc    AvailabilityException[]
+  appointments       Appointment[]
+  apptReminders      AppointmentReminder[]
+  pipelines          Pipeline[]
+  pipelineStages     PipelineStage[]
+  deals              Deal[]
+  tags               Tag[]
+  taggables          Taggable[]
+  activities         Activity[]
+  tasks              Task[]
+  notifications      Notification[]
+  quoteTemplates     QuoteTemplate[]
+  quotes             Quote[]
+  quoteLineItems     QuoteLineItem[]
+  quoteVersions      QuoteVersion[]
+  invoices           Invoice[]
+  invoiceLineItems   InvoiceLineItem[]
+  payments           Payment[]
+  refunds            Refund[]
+  paymentEvents      PaymentEvent[]
+  workflows          Workflow[]
+  workflowVersions   WorkflowVersion[]
+  workflowRuns       WorkflowRun[]
+  workflowRunSteps   WorkflowRunStep[]
+  segments           Segment[]
+  messageTemplates   WhatsappMessageTemplate[]
+  campaigns          Campaign[]
+  campaignRecipients CampaignRecipient[]
 
   @@index([slug])
   @@index([deletedAt])
@@ -169,8 +233,8 @@ model Member {
   /// owner | admin | member | viewer — see src/features/auth/permissions.ts
   role String @default("member")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   /// One membership per user per organization.
   @@unique([organizationId, userId])
@@ -190,8 +254,8 @@ model Invitation {
   role      String?
   /// pending | accepted | rejected | cancelled
   status    String   @default("pending")
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   inviterId String @map("inviter_id") @db.Uuid
   user      User   @relation(fields: [inviterId], references: [id], onDelete: Cascade)
@@ -238,7 +302,7 @@ model AuditLog {
   /// JSON. Ids and enums only — no PII.
   metadata Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   @@index([organizationId, createdAt])
   @@index([actorId, createdAt])
@@ -254,7 +318,1871 @@ model AuditLog {
 /// Exempt from tenant scoping: infrastructure, not tenant data.
 model HealthCheck {
   id        String   @id @default(uuid()) @db.Uuid
-  checkedAt DateTime @default(now()) @map("checked_at")
+  checkedAt DateTime @default(now()) @map("checked_at") @db.Timestamptz(3)
 
   @@map("health_checks")
+}
+
+// ===========================================================================
+// Milestone 4 — Database
+//
+// Design: docs/database/er-diagram.md (85 tables, all 25 milestones)
+// Plan:   docs/milestones/MILESTONE_04_PLAN.md
+// Change: docs/database/schema-change.md
+//
+// Conventions applied to every model below:
+//   - organization_id on every business table, NOT NULL      (AD-1)
+//   - branch_id on every branch-scoped table, NOT NULL       (AD-1)
+//   - deleted_at for soft delete — trash and restore         (AD-4)
+//   - redacted_at where PII lives — erasure, a different act (AD-4)
+//   - version for optimistic locking on edited entities
+//   - money as Decimal(15,4) with a sibling currency column  (AD-3)
+//
+// Partial unique indexes, CHECK constraints, and the appointment overlap
+// exclusion constraint cannot be expressed in Prisma schema syntax. They are
+// added as hand-written SQL in the generated migrations — see
+// docs/database/schema-change.md → Constraints.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Enums
+//
+// Prisma enums become Postgres enum types, which satisfies DATABASE_RULES.md
+// §Constraints ("enforce invariants in the database, not only in code") more
+// strongly than a CHECK on a text column, and gives TypeScript exhaustiveness
+// for free. Cost: adding a value later needs ALTER TYPE in a migration.
+// ---------------------------------------------------------------------------
+
+enum ConversationStatus {
+  open
+  pending
+  resolved
+  archived
+
+  @@map("conversation_status")
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+
+  @@map("message_direction")
+}
+
+enum MessageAuthorType {
+  contact
+  agent
+  ai
+  system
+
+  @@map("message_author_type")
+}
+
+enum MessageContentType {
+  text
+  image
+  audio
+  video
+  document
+  location
+  sticker
+
+  @@map("message_content_type")
+}
+
+enum DeliveryStatus {
+  queued
+  sent
+  delivered
+  read
+  failed
+
+  @@map("delivery_status")
+}
+
+enum ContactLifecycleStage {
+  lead
+  prospect
+  customer
+  churned
+
+  @@map("contact_lifecycle_stage")
+}
+
+enum ChannelStatus {
+  active
+  disconnected
+  suspended
+
+  @@map("channel_status")
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy — Branch
+// ---------------------------------------------------------------------------
+
+/// The second tenancy level. Milestone 18 gives a branch separate calendars,
+/// knowledge, and AI, so it is a real isolation boundary and not a label —
+/// confirmed with the user on 2026-08-02.
+///
+/// Every organization auto-provisions one `Main` branch (`is_default`), so a
+/// single-branch business is simply an org with one branch. That is what keeps
+/// `branch_id` NOT NULL everywhere and avoids two query shapes forever.
+model Branch {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String
+
+  /// IANA zone. Scheduling depends on it: a two-city business cannot express
+  /// "9am local" without knowing which local.
+  timezone String @default("UTC")
+
+  /// Exactly one per organization, enforced by a partial unique index.
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  whatsappAccounts WhatsappAccount[]
+  contacts         Contact[]
+  companies        Company[]
+  conversations    Conversation[]
+  labels           Label[]
+  knowledgeSources KnowledgeSource[]
+  knowledgeDocs    KnowledgeDocument[]
+  knowledgeChunks  KnowledgeChunk[]
+  promptTemplates  PromptTemplate[]
+  aiRuns           AiRun[]
+  services         Service[]
+  resources        Resource[]
+  appointments     Appointment[]
+  pipelines        Pipeline[]
+  deals            Deal[]
+  tags             Tag[]
+  activities       Activity[]
+  tasks            Task[]
+  quoteTemplates   QuoteTemplate[]
+  quotes           Quote[]
+  invoices         Invoice[]
+  workflows        Workflow[]
+  segments         Segment[]
+  messageTemplates WhatsappMessageTemplate[]
+  campaigns        Campaign[]
+
+  @@index([organizationId])
+  @@index([organizationId, deletedAt])
+  @@map("branches")
+}
+
+// ---------------------------------------------------------------------------
+// Channels and contacts
+// ---------------------------------------------------------------------------
+
+/// A WhatsApp Business number. `phoneNumberId` is how an inbound webhook
+/// resolves to a tenant — DATABASE_RULES.md requires tenancy to come from the
+/// session or the WhatsApp phone number id and never from a request body, so
+/// this column is globally unique rather than unique per org.
+model WhatsappAccount {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  /// Meta's phone_number_id. The webhook's tenant key.
+  phoneNumberId      String @unique @map("phone_number_id")
+  wabaId             String @map("waba_id")
+  displayPhoneNumber String @map("display_phone_number")
+
+  /// A key into the secret store. NEVER the token itself.
+  accessTokenRef String @map("access_token_ref")
+
+  status ChannelStatus @default(active)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  conversations Conversation[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("whatsapp_accounts")
+}
+
+/// A customer. ONE table — Milestone 6 calls this a Contact and Milestone 10
+/// calls it a Customer; `lifecycleStage` carries the distinction. Two tables
+/// would mean two identities for the same person.
+///
+/// PII: displayName, phoneNumber, email. Erasure redacts them in place and sets
+/// `redactedAt`, leaving the row skeleton so the audit trail still resolves.
+model Contact {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  companyId String?  @map("company_id") @db.Uuid
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  /// E.164. Unique per organization among non-deleted rows — a partial unique
+  /// index, so a soft-deleted contact does not block re-registration.
+  phoneNumber String  @map("phone_number")
+  displayName String  @map("display_name")
+  email       String?
+  locale      String  @default("en")
+
+  lifecycleStage ContactLifecycleStage @default(lead) @map("lifecycle_stage")
+
+  hasConsent Boolean   @default(false) @map("has_consent")
+  optedOutAt DateTime? @map("opted_out_at") @db.Timestamptz(3)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(3)
+  redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
+  version    Int       @default(1)
+
+  conversations      Conversation[]
+  appointments       Appointment[]
+  deals              Deal[]
+  quotes             Quote[]
+  invoices           Invoice[]
+  campaignRecipients CampaignRecipient[]
+
+  @@index([organizationId, phoneNumber])
+  @@index([branchId])
+  @@index([companyId])
+  @@index([organizationId, lifecycleStage])
+  @@map("contacts")
+}
+
+/// A business a contact belongs to. Carries the VAT number invoicing needs.
+model Company {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name      String
+  vatNumber String? @map("vat_number")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  contacts Contact[]
+  deals    Deal[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("companies")
+}
+
+// ---------------------------------------------------------------------------
+// Inbox — the hot path
+// ---------------------------------------------------------------------------
+
+model Conversation {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  whatsappAccountId String          @map("whatsapp_account_id") @db.Uuid
+  whatsappAccount   WhatsappAccount @relation(fields: [whatsappAccountId], references: [id], onDelete: Restrict)
+
+  /// SetNull: a departing user must not take conversations with them.
+  assigneeId String? @map("assignee_id") @db.Uuid
+  assignee   User?   @relation("ConversationAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  status      ConversationStatus @default(open)
+  isPinned    Boolean            @default(false) @map("is_pinned")
+  isEscalated Boolean            @default(false) @map("is_escalated")
+
+  /// Denormalised on purpose: the inbox list orders by this, and deriving it
+  /// from `messages` per row is the N+1 that would define this product's
+  /// performance profile.
+  lastMessageAt DateTime @default(now()) @map("last_message_at") @db.Timestamptz(3)
+  unreadCount   Int      @default(0) @map("unread_count")
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(3)
+  redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
+  version    Int       @default(1)
+
+  messages Message[]
+  labels   ConversationLabel[]
+  notes    ConversationNote[]
+  aiRuns   AiRun[]
+
+  @@index([organizationId, lastMessageAt])
+  @@index([branchId, status])
+  @@index([contactId])
+  @@index([assigneeId])
+  @@index([whatsappAccountId])
+  @@map("conversations")
+}
+
+/// PII: `body`. Redacted, never deleted.
+model Message {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  /// Meta's message id. Unique per organization — THIS is what makes webhook
+  /// processing idempotent under Meta's retries (DATABASE_RULES.md).
+  /// Null for outbound messages until the send is acknowledged.
+  whatsappMessageId String? @map("whatsapp_message_id")
+
+  direction  MessageDirection
+  authorType MessageAuthorType @map("author_type")
+  /// The staff user for an agent message; null for contact, ai, and system.
+  authorId   String?           @map("author_id") @db.Uuid
+  author     User?             @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  contentType MessageContentType @default(text) @map("content_type")
+  body        String?            @db.Text
+
+  deliveryStatus DeliveryStatus @default(queued) @map("delivery_status")
+  failureReason  String?        @map("failure_reason")
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(3)
+  redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
+
+  attachments        MessageAttachment[]
+  aiRuns             AiRun[]
+  campaignRecipients CampaignRecipient[]
+
+  /// THE webhook idempotency key (DATABASE_RULES.md). Postgres permits many
+  /// NULLs in a unique index, which is exactly right: outbound messages have no
+  /// WhatsApp id until the send is acknowledged, and they must not collide.
+  @@unique([organizationId, whatsappMessageId], map: "uq_messages_organization_id_whatsapp_message_id")
+  @@index([conversationId, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("messages")
+}
+
+/// The blob lives in object storage; this row holds the key.
+/// DATABASE_RULES.md forbids blobs in Postgres.
+model MessageAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  messageId String  @map("message_id") @db.Uuid
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  storageKey String  @map("storage_key")
+  mimeType   String  @map("mime_type")
+  sizeBytes  BigInt  @map("size_bytes")
+  fileName   String? @map("file_name")
+
+  /// WhatsApp media URLs are short-lived, so the copy-to-storage step is
+  /// visible in the schema rather than discovered at Milestone 6.
+  sourceUrlExpiresAt DateTime? @map("source_url_expires_at") @db.Timestamptz(3)
+
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(3)
+  redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
+
+  @@index([messageId])
+  @@index([organizationId])
+  @@map("message_attachments")
+}
+
+model Label {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name  String
+  color String @default("neutral")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  conversations ConversationLabel[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("labels")
+}
+
+model ConversationLabel {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  labelId String @map("label_id") @db.Uuid
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([conversationId, labelId])
+  @@index([labelId])
+  @@index([organizationId])
+  @@map("conversation_labels")
+}
+
+/// Internal only. Never sent to the contact — the one thing this table must
+/// guarantee, and why notes are not messages with a flag.
+model ConversationNote {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  authorId String? @map("author_id") @db.Uuid
+  author   User?   @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  body String @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  @@index([conversationId, createdAt])
+  @@index([organizationId])
+  @@map("conversation_notes")
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge base
+// ---------------------------------------------------------------------------
+
+enum KnowledgeSourceKind {
+  upload
+  website
+  faq
+  notion
+  google_docs
+
+  @@map("knowledge_source_kind")
+}
+
+enum KnowledgeVersionStatus {
+  draft
+  pending_approval
+  approved
+  archived
+
+  @@map("knowledge_version_status")
+}
+
+enum JobStatus {
+  queued
+  running
+  succeeded
+  failed
+
+  @@map("job_status")
+}
+
+model KnowledgeSource {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  kind KnowledgeSourceKind
+  name String
+
+  /// Key into the secret store for sources needing credentials (Notion, Google).
+  configRef String? @map("config_ref")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  documents     KnowledgeDocument[]
+  ingestionJobs IngestionJob[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("knowledge_sources")
+}
+
+model KnowledgeDocument {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  sourceId String          @map("source_id") @db.Uuid
+  source   KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  title String
+
+  /// The version retrieval should use. Null until a version is approved, which
+  /// is what stops an unapproved document from ever being cited.
+  currentVersionId String? @unique @map("current_version_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  versions KnowledgeDocumentVersion[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([sourceId])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeDocumentVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  documentId String            @map("document_id") @db.Uuid
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  versionNumber Int                    @map("version_number")
+  status        KnowledgeVersionStatus @default(draft)
+
+  approvedById String?   @map("approved_by_id") @db.Uuid
+  approvedBy   User?     @relation("KnowledgeApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime? @map("approved_at") @db.Timestamptz(3)
+
+  extractedText String @map("extracted_text") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  chunks KnowledgeChunk[]
+
+  @@unique([documentId, versionNumber])
+  @@index([organizationId])
+  @@index([documentId, status])
+  @@map("knowledge_document_versions")
+}
+
+/// Chunks hang off a document VERSION, not a document. Milestone 7 requires
+/// approval, so retrieval must be able to see only approved versions — a
+/// constraint that is inexpressible if chunks point at the document.
+///
+/// `embedding` is Unsupported, so it cannot be read or written through the
+/// Prisma Client. Inserts and similarity search both go through $queryRaw with
+/// tagged-template parameters. Expected, not an oversight.
+model KnowledgeChunk {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  documentVersionId String                   @map("document_version_id") @db.Uuid
+  documentVersion   KnowledgeDocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Cascade)
+
+  ordinal Int
+  content String @db.Text
+
+  embedding Unsupported("vector(1536)")?
+
+  /// A model change invalidates every vector — embeddings from different models
+  /// are not comparable. Recording both makes re-embedding a job rather than a
+  /// redesign.
+  embeddingModel String @map("embedding_model")
+  dimensions     Int    @default(1536)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  citations AiRunCitation[]
+
+  @@unique([documentVersionId, ordinal])
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("knowledge_chunks")
+}
+
+model IngestionJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  sourceId String          @map("source_id") @db.Uuid
+  source   KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  status JobStatus @default(queued)
+  error  String?   @db.Text
+
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@index([sourceId, status])
+  @@map("ingestion_jobs")
+}
+
+// ---------------------------------------------------------------------------
+// AI engine
+// ---------------------------------------------------------------------------
+
+enum AiRunOutcome {
+  answered
+  escalated
+  refused
+  failed
+
+  @@map("ai_run_outcome")
+}
+
+enum PromptVersionStatus {
+  draft
+  active
+  archived
+
+  @@map("prompt_version_status")
+}
+
+/// Branch-scoped: Milestone 18 gives each branch separate AI.
+model PromptTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  key  String
+  name String
+
+  currentVersionId String? @unique @map("current_version_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  versions PromptTemplateVersion[]
+
+  @@index([organizationId])
+  @@index([branchId, key])
+  @@map("prompt_templates")
+}
+
+model PromptTemplateVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  templateId String         @map("template_id") @db.Uuid
+  template   PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  versionNumber Int                 @map("version_number")
+  body          String              @db.Text
+  status        PromptVersionStatus @default(draft)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  aiRuns AiRun[]
+
+  @@unique([templateId, versionNumber])
+  @@index([organizationId])
+  @@map("prompt_template_versions")
+}
+
+/// One AI inference. Milestone 8's confidence, intent, and fallback signals land
+/// here, and Milestone 22's "AI Usage" reads from it — designing it once now
+/// avoids M22 inventing a parallel usage table.
+model AiRun {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  conversationId String?       @map("conversation_id") @db.Uuid
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  outputMessageId String?  @map("output_message_id") @db.Uuid
+  outputMessage   Message? @relation(fields: [outputMessageId], references: [id], onDelete: SetNull)
+
+  promptVersionId String?                @map("prompt_version_id") @db.Uuid
+  promptVersion   PromptTemplateVersion? @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+
+  /// "provider/model" through the AI Gateway, e.g. "anthropic/claude-sonnet-5".
+  model  String
+  intent String?
+
+  confidence Decimal? @db.Decimal(5, 4)
+
+  inputTokens  Int @default(0) @map("input_tokens")
+  outputTokens Int @default(0) @map("output_tokens")
+
+  /// Model pricing is USD while the tenant may bill in SAR, so cost carries its
+  /// own currency (AD-3).
+  costAmount   Decimal @default(0) @map("cost_amount") @db.Decimal(15, 4)
+  costCurrency String  @default("USD") @map("cost_currency")
+
+  latencyMs Int          @map("latency_ms")
+  outcome   AiRunOutcome
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  citations AiRunCitation[]
+
+  @@index([organizationId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([conversationId])
+  @@map("ai_runs")
+}
+
+/// A table, not a JSON column: Milestone 8 requires citation and Milestone 7
+/// needs to know which chunks earn their keep. A blob answers neither query.
+model AiRunCitation {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  aiRunId String @map("ai_run_id") @db.Uuid
+  aiRun   AiRun  @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+
+  knowledgeChunkId String         @map("knowledge_chunk_id") @db.Uuid
+  knowledgeChunk   KnowledgeChunk @relation(fields: [knowledgeChunkId], references: [id], onDelete: Cascade)
+
+  similarity Decimal @db.Decimal(6, 5)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([aiRunId])
+  @@index([knowledgeChunkId])
+  @@index([organizationId])
+  @@map("ai_run_citations")
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling
+// ---------------------------------------------------------------------------
+
+enum ResourceKind {
+  staff
+  room
+  equipment
+
+  @@map("resource_kind")
+}
+
+enum AppointmentStatus {
+  booked
+  confirmed
+  cancelled
+  rescheduled
+  completed
+  no_show
+
+  @@map("appointment_status")
+}
+
+enum ReminderStatus {
+  scheduled
+  sent
+  failed
+  cancelled
+
+  @@map("reminder_status")
+}
+
+model Service {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name            String
+  description     String? @db.Text
+  durationMinutes Int     @map("duration_minutes")
+
+  priceAmount   Decimal @default(0) @map("price_amount") @db.Decimal(15, 4)
+  priceCurrency String  @default("SAR") @map("price_currency")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  appointments Appointment[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("services")
+}
+
+/// Staff, rooms, and equipment. `userId` is nullable because a treatment room
+/// has no login — one of the few nullable columns with a standing justification.
+model Resource {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  userId String? @map("user_id") @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  kind ResourceKind @default(staff)
+  name String
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  availabilityRules      AvailabilityRule[]
+  availabilityExceptions AvailabilityException[]
+  appointments           Appointment[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([userId])
+  @@map("resources")
+}
+
+model AvailabilityRule {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  resourceId String   @map("resource_id") @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  /// 0 = Sunday .. 6 = Saturday. CHECK constrains the range.
+  weekday   Int
+  startTime DateTime @map("start_time") @db.Time()
+  endTime   DateTime @map("end_time") @db.Time()
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([resourceId, weekday])
+  @@index([organizationId])
+  @@map("availability_rules")
+}
+
+model AvailabilityException {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  resourceId String   @map("resource_id") @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt   DateTime @map("ends_at") @db.Timestamptz(3)
+  reason   String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([resourceId, startsAt])
+  @@index([organizationId])
+  @@map("availability_exceptions")
+}
+
+/// Stores BOTH a UTC instant and the IANA zone the booking was made in.
+/// UTC alone loses the intent: if a government changes a DST rule, "9am local
+/// next month" must still resolve to 9am local.
+///
+/// Double-booking is prevented by an exclusion constraint on
+/// (resource_id, tstzrange(starts_at, ends_at)) — in the database, not by an
+/// application check that races under concurrency.
+model Appointment {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  serviceId String  @map("service_id") @db.Uuid
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  resourceId String   @map("resource_id") @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt   DateTime @map("ends_at") @db.Timestamptz(3)
+  /// IANA zone — the booking intent, not a display preference.
+  timezone String
+
+  status AppointmentStatus @default(booked)
+  notes  String?           @db.Text
+
+  rescheduledFromId String?      @unique @map("rescheduled_from_id") @db.Uuid
+  rescheduledFrom   Appointment? @relation("Reschedule", fields: [rescheduledFromId], references: [id], onDelete: SetNull)
+  rescheduledTo     Appointment? @relation("Reschedule")
+
+  /// RFC 5545 RRULE plus a parent link, so an exception to one occurrence does
+  /// not require materialising every future instance.
+  recurrenceRule     String?       @map("recurrence_rule")
+  recurrenceParentId String?       @map("recurrence_parent_id") @db.Uuid
+  recurrenceParent   Appointment?  @relation("Recurrence", fields: [recurrenceParentId], references: [id], onDelete: Cascade)
+  recurrenceChildren Appointment[] @relation("Recurrence")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  reminders AppointmentReminder[]
+
+  @@index([branchId, startsAt])
+  @@index([organizationId, startsAt])
+  @@index([contactId])
+  @@index([resourceId, startsAt])
+  @@index([serviceId])
+  @@map("appointments")
+}
+
+model AppointmentReminder {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  appointmentId String      @map("appointment_id") @db.Uuid
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  sendAt  DateTime       @map("send_at") @db.Timestamptz(3)
+  channel String         @default("whatsapp")
+  status  ReminderStatus @default(scheduled)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([appointmentId])
+  @@index([status, sendAt])
+  @@index([organizationId])
+  @@map("appointment_reminders")
+}
+
+// ---------------------------------------------------------------------------
+// CRM and work management
+// ---------------------------------------------------------------------------
+
+enum DealStatus {
+  open
+  won
+  lost
+
+  @@map("deal_status")
+}
+
+enum TaggableType {
+  contact
+  deal
+  conversation
+
+  @@map("taggable_type")
+}
+
+enum ActivityKind {
+  note
+  call
+  email
+  meeting
+  stage_change
+  status_change
+
+  @@map("activity_kind")
+}
+
+enum TaskStatus {
+  open
+  in_progress
+  done
+  cancelled
+
+  @@map("task_status")
+}
+
+model Pipeline {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name      String
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  stages PipelineStage[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  pipelineId String   @map("pipeline_id") @db.Uuid
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  name           String
+  position       Int
+  /// 0..1. Drives weighted forecasting at Milestone 15.
+  winProbability Decimal @default(0) @map("win_probability") @db.Decimal(4, 3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  deals Deal[]
+
+  @@unique([pipelineId, position])
+  @@index([organizationId])
+  @@index([pipelineId])
+  @@map("pipeline_stages")
+}
+
+/// Milestone 10 calls this a Lead in one place and a Deal in another. One table;
+/// `status` and the stage carry the distinction.
+model Deal {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String?  @map("contact_id") @db.Uuid
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  companyId String?  @map("company_id") @db.Uuid
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  stageId String        @map("stage_id") @db.Uuid
+  stage   PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+
+  title String
+
+  valueAmount   Decimal @default(0) @map("value_amount") @db.Decimal(15, 4)
+  valueCurrency String  @default("SAR") @map("value_currency")
+
+  status   DealStatus @default(open)
+  closedAt DateTime?  @map("closed_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  quotes Quote[]
+
+  @@index([organizationId, status])
+  @@index([branchId, stageId])
+  @@index([contactId])
+  @@index([companyId])
+  @@map("deals")
+}
+
+model Tag {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name  String
+  color String @default("neutral")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  taggables Taggable[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("tags")
+}
+
+/// POLYMORPHIC — a deliberate deviation from DATABASE_RULES.md "foreign keys
+/// always", recorded in docs/database/schema-change.md → Deviations.
+///
+/// A tag applies to contacts, deals, and conversations alike; a join table per
+/// target is three tables now and six later. The cost is no referential
+/// integrity on `taggableId`. `taggableType` is a Postgres enum, so the type
+/// half is constrained even though the id half cannot be.
+model Taggable {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  tagId String @map("tag_id") @db.Uuid
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  taggableType TaggableType @map("taggable_type")
+  taggableId   String       @map("taggable_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([tagId, taggableType, taggableId])
+  @@index([taggableType, taggableId])
+  @@index([organizationId])
+  @@map("taggables")
+}
+
+/// POLYMORPHIC, same trade-off as Taggable and recorded in the same place.
+model Activity {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  subjectType TaggableType @map("subject_type")
+  subjectId   String       @map("subject_id") @db.Uuid
+
+  kind ActivityKind
+  body String?      @db.Text
+
+  actorId String? @map("actor_id") @db.Uuid
+  actor   User?   @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([subjectType, subjectId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([branchId])
+  @@index([actorId])
+  @@map("activities")
+}
+
+/// Milestone 5's dashboard, not Milestone 10.
+model Task {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  assigneeId String? @map("assignee_id") @db.Uuid
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?    @db.Text
+  dueAt       DateTime?  @map("due_at") @db.Timestamptz(3)
+  status      TaskStatus @default(open)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  @@index([organizationId, status])
+  @@index([branchId, dueAt])
+  @@index([assigneeId, status])
+  @@map("tasks")
+}
+
+/// Org-scoped, not branch-scoped: a user may be notified about any branch they
+/// have access to, and access is an organization-level concept.
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind       String
+  title      String
+  body       String? @db.Text
+  entityType String? @map("entity_type")
+  entityId   String? @map("entity_id") @db.Uuid
+
+  readAt DateTime? @map("read_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([userId, readAt])
+  @@index([organizationId, createdAt])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Commerce
+//
+// Every money column is Decimal(15,4) with a sibling currency column (AD-3).
+// Scale 4, not 2: unit prices, percentage discounts, and VAT intermediates need
+// sub-minor precision, and rounding happens once at the line and document total.
+// ---------------------------------------------------------------------------
+
+enum QuoteStatus {
+  draft
+  sent
+  accepted
+  rejected
+  expired
+
+  @@map("quote_status")
+}
+
+enum InvoiceStatus {
+  draft
+  issued
+  partially_paid
+  paid
+  overdue
+  void
+
+  @@map("invoice_status")
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+
+  @@map("payment_status")
+}
+
+enum PaymentGateway {
+  stripe
+  hyperpay
+  paytabs
+  stcpay
+  applepay
+
+  @@map("payment_gateway")
+}
+
+model QuoteTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name         String
+  bodyTemplate String @map("body_template") @db.Text
+  /// Branding: logo key, colours, footer. Presentation, not money.
+  branding     Json?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  quotes Quote[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("quote_templates")
+}
+
+model Quote {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  dealId String? @map("deal_id") @db.Uuid
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  templateId String?        @map("template_id") @db.Uuid
+  template   QuoteTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  /// Unique per organization among non-deleted rows.
+  number String
+  status QuoteStatus @default(draft)
+
+  subtotalAmount Decimal @default(0) @map("subtotal_amount") @db.Decimal(15, 4)
+  taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(15, 4)
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(15, 4)
+  currency       String  @default("SAR")
+
+  validUntil DateTime? @map("valid_until") @db.Timestamptz(3)
+  sentAt     DateTime? @map("sent_at") @db.Timestamptz(3)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  lineItems QuoteLineItem[]
+  versions  QuoteVersion[]
+  invoices  Invoice[]
+
+  @@index([organizationId, status])
+  @@index([branchId, createdAt])
+  @@index([contactId])
+  @@index([dealId])
+  @@map("quotes")
+}
+
+model QuoteLineItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  quoteId String @map("quote_id") @db.Uuid
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  position    Int
+  description String  @db.Text
+  quantity    Decimal @default(1) @db.Decimal(15, 4)
+
+  unitPriceAmount Decimal @map("unit_price_amount") @db.Decimal(15, 4)
+
+  /// Rate AND computed amount, both stored at issue time. A historical document
+  /// is never recomputed from today's rate — Saudi VAT moved 5% to 15% in 2020.
+  taxRate   Decimal @default(0) @map("tax_rate") @db.Decimal(6, 4)
+  taxAmount Decimal @default(0) @map("tax_amount") @db.Decimal(15, 4)
+
+  lineTotalAmount Decimal @map("line_total_amount") @db.Decimal(15, 4)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([quoteId, position])
+  @@index([organizationId])
+  @@map("quote_line_items")
+}
+
+/// Row-level history. DATABASE_RULES.md requires it for entities users reason
+/// about over time; the audit log alone is not enough.
+model QuoteVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  quoteId String @map("quote_id") @db.Uuid
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  versionNumber Int  @map("version_number")
+  /// The full quote as it stood, line items included.
+  snapshot      Json
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([quoteId, versionNumber])
+  @@index([organizationId])
+  @@map("quote_versions")
+}
+
+model Invoice {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  quoteId String? @map("quote_id") @db.Uuid
+  quote   Quote?  @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+
+  /// Sequential per organization. Several jurisdictions require gapless
+  /// numbering; generation is Milestone 12's problem, uniqueness is enforced here.
+  number String
+  status InvoiceStatus @default(draft)
+
+  subtotalAmount Decimal @default(0) @map("subtotal_amount") @db.Decimal(15, 4)
+  taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(15, 4)
+  totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(15, 4)
+  amountPaid     Decimal @default(0) @map("amount_paid") @db.Decimal(15, 4)
+  currency       String  @default("SAR")
+
+  issuedAt DateTime? @map("issued_at") @db.Timestamptz(3)
+  dueAt    DateTime? @map("due_at") @db.Timestamptz(3)
+  paidAt   DateTime? @map("paid_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  lineItems InvoiceLineItem[]
+  payments  Payment[]
+
+  @@index([organizationId, status])
+  @@index([branchId, issuedAt])
+  @@index([contactId])
+  @@index([quoteId])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  invoiceId String  @map("invoice_id") @db.Uuid
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  position    Int
+  description String  @db.Text
+  quantity    Decimal @default(1) @db.Decimal(15, 4)
+
+  unitPriceAmount Decimal @map("unit_price_amount") @db.Decimal(15, 4)
+  taxRate         Decimal @default(0) @map("tax_rate") @db.Decimal(6, 4)
+  taxAmount       Decimal @default(0) @map("tax_amount") @db.Decimal(15, 4)
+  lineTotalAmount Decimal @map("line_total_amount") @db.Decimal(15, 4)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([invoiceId, position])
+  @@index([organizationId])
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  invoiceId String  @map("invoice_id") @db.Uuid
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  gateway          PaymentGateway
+  /// Unique — all five gateways retry their webhooks, so idempotency has to be
+  /// structural rather than best-effort.
+  gatewayPaymentId String         @unique @map("gateway_payment_id")
+
+  amount   Decimal       @db.Decimal(15, 4)
+  currency String        @default("SAR")
+  status   PaymentStatus @default(pending)
+
+  capturedAt DateTime? @map("captured_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  refunds Refund[]
+  events  PaymentEvent[]
+
+  @@index([invoiceId])
+  @@index([organizationId, status])
+  @@map("payments")
+}
+
+model Refund {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  paymentId String  @map("payment_id") @db.Uuid
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  gatewayRefundId String  @unique @map("gateway_refund_id")
+  amount          Decimal @db.Decimal(15, 4)
+  currency        String  @default("SAR")
+  reason          String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([paymentId])
+  @@index([organizationId])
+  @@map("refunds")
+}
+
+/// Gateway webhook journal. `payload` NEVER holds card data — storing a PAN
+/// would put this system in PCI scope, and the schema forecloses it.
+model PaymentEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  paymentId String  @map("payment_id") @db.Uuid
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  gatewayEventId String @unique @map("gateway_event_id")
+  kind           String
+  payload        Json
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([paymentId])
+  @@index([organizationId])
+  @@map("payment_events")
+}
+
+// ---------------------------------------------------------------------------
+// Automation
+// ---------------------------------------------------------------------------
+
+enum WorkflowRunStatus {
+  running
+  succeeded
+  failed
+  cancelled
+
+  @@map("workflow_run_status")
+}
+
+enum StepStatus {
+  pending
+  running
+  succeeded
+  failed
+  skipped
+
+  @@map("step_status")
+}
+
+enum TemplateApprovalStatus {
+  pending
+  approved
+  rejected
+
+  @@map("template_approval_status")
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  cancelled
+
+  @@map("campaign_status")
+}
+
+model Workflow {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name      String
+  isEnabled Boolean @default(false) @map("is_enabled")
+
+  currentVersionId String? @unique @map("current_version_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  versions WorkflowVersion[]
+
+  @@index([organizationId])
+  @@index([branchId, isEnabled])
+  @@map("workflows")
+}
+
+/// The graph is JSON on the version row, not normalised into node and edge
+/// tables. A visual builder saves the whole graph atomically; normalising buys
+/// referential integrity nobody queries and costs a multi-table transaction per
+/// save. The version row supplies the auditability that is the real requirement.
+model WorkflowVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  workflowId String   @map("workflow_id") @db.Uuid
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  versionNumber Int    @map("version_number")
+  /// { nodes, edges, conditions, variables }
+  definition    Json
+  triggerKind   String @map("trigger_kind")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  runs WorkflowRun[]
+
+  @@unique([workflowId, versionNumber])
+  @@index([organizationId])
+  @@map("workflow_versions")
+}
+
+model WorkflowRun {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  workflowVersionId String          @map("workflow_version_id") @db.Uuid
+  workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Restrict)
+
+  triggerEntityType String? @map("trigger_entity_type")
+  triggerEntityId   String? @map("trigger_entity_id") @db.Uuid
+
+  status WorkflowRunStatus @default(running)
+  error  String?           @db.Text
+
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+
+  steps WorkflowRunStep[]
+
+  @@index([organizationId, status])
+  @@index([workflowVersionId])
+  @@map("workflow_runs")
+}
+
+model WorkflowRunStep {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  workflowRunId String      @map("workflow_run_id") @db.Uuid
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+  /// Matches a node id inside WorkflowVersion.definition.
+  nodeId String     @map("node_id")
+  status StepStatus @default(pending)
+  output Json?
+
+  /// Delay nodes. The scheduler polls this across all runs, so it carries a
+  /// partial index on status = 'pending'.
+  scheduledFor DateTime? @map("scheduled_for") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([workflowRunId])
+  @@index([organizationId])
+  @@map("workflow_run_steps")
+}
+
+model Segment {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name       String
+  /// Filter tree, evaluated against contacts at send time rather than stored as
+  /// a materialised member list — a segment is a question, not a snapshot.
+  definition Json
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  campaigns Campaign[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("segments")
+}
+
+/// Meta must approve template content before it can be sent. A broadcast system
+/// that discovers this at send time is a broadcast system that does not send.
+model WhatsappMessageTemplate {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name     String
+  language String @default("en")
+
+  metaTemplateId  String?                @map("meta_template_id")
+  metaStatus      TemplateApprovalStatus @default(pending) @map("meta_status")
+  rejectionReason String?                @map("rejection_reason")
+
+  /// Header, body, footer, buttons, and the variable placeholders.
+  body Json
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  campaigns Campaign[]
+
+  @@unique([branchId, name, language])
+  @@index([organizationId])
+  @@map("whatsapp_message_templates")
+}
+
+model Campaign {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  segmentId String  @map("segment_id") @db.Uuid
+  segment   Segment @relation(fields: [segmentId], references: [id], onDelete: Restrict)
+
+  templateId String                  @map("template_id") @db.Uuid
+  template   WhatsappMessageTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  name   String
+  status CampaignStatus @default(draft)
+
+  scheduledFor DateTime? @map("scheduled_for") @db.Timestamptz(3)
+  startedAt    DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt   DateTime? @map("finished_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  recipients CampaignRecipient[]
+
+  @@index([organizationId, status])
+  @@index([branchId, scheduledFor])
+  @@index([segmentId])
+  @@index([templateId])
+  @@map("campaigns")
+}
+
+/// `messageId` links back to `messages`, so a broadcast and a conversation are
+/// the same message stream rather than two parallel ones.
+model CampaignRecipient {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  campaignId String   @map("campaign_id") @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  messageId String?  @map("message_id") @db.Uuid
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  status        DeliveryStatus @default(queued)
+  failureReason String?        @map("failure_reason")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@index([contactId])
+  @@index([organizationId])
+  @@map("campaign_recipients")
 }

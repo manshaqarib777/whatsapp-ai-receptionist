@@ -205,3 +205,220 @@ backup and replay to the target migration — exercised in Milestone 25.
 `audit-log.integration.test.ts` (25 tests) run against real Postgres and prove
 cross-tenant isolation, last-owner protection, privilege-escalation refusal, and that
 the audit log is append-only and PII-free.
+
+---
+
+# Schema Change — Milestone 4 (Database)
+
+Date: 2026-08-02
+Plan: `docs/milestones/MILESTONE_04_PLAN.md` (approved)
+Design: `docs/database/er-diagram.md` — 85 tables across all 25 milestones
+Status: In progress
+
+## Scope
+
+50 new Tier-1 tables — everything milestones 5–14 need, plus `branches`. The 25 Tier-2
+tables are designed in the ER diagram and migrated at their own milestone, per plan
+AD-6.
+
+## Infrastructure Change — Postgres image
+
+`postgres:17-alpine` → `pgvector/pgvector:pg17`, in both `docker/docker-compose.yml` and
+`.github/workflows/ci.yml`.
+
+Stock Postgres does not ship the `vector` extension. Verified before writing any
+migration, per plan risk R-3:
+
+```
+before:  btree_gist 1.7, pgcrypto 1.3
+after:   btree_gist 1.7, pgcrypto 1.3, vector 0.8.6
+```
+
+Same Postgres 17 major version, so the existing data volume carried over untouched — all
+11 tables and the `_prisma_migrations` history survived the swap, verified rather than
+assumed. No reset was required and none was performed.
+
+Both images had to change together. Had only the local one changed, `CREATE EXTENSION
+vector` would have succeeded locally and failed in CI.
+
+## Extensions
+
+| Extension | For |
+|---|---|
+| `vector` | Knowledge-base embeddings (`knowledge_chunks.embedding`), HNSW index |
+| `btree_gist` | Appointment overlap prevention — an exclusion constraint mixing `uuid` equality with `tstzrange` overlap needs GiST support for the scalar column |
+| `pgcrypto` | `gen_random_uuid()` — available in PG 17 core, declared explicitly rather than relied on implicitly |
+
+## New Tables
+
+Grouped by originating milestone. Column detail and rationale are in
+`docs/database/er-diagram.md`; this section records counts and the decisions a reviewer
+needs to check.
+
+| Milestone | Count | Tables |
+|---|---|---|
+| 4 | 1 | `branches` |
+| 5 | 2 | `notifications`, `tasks` |
+| 6 | 8 | `whatsapp_accounts`, `contacts`, `conversations`, `messages`, `message_attachments`, `labels`, `conversation_labels`, `conversation_notes` |
+| 7 | 5 | `knowledge_sources`, `knowledge_documents`, `knowledge_document_versions`, `knowledge_chunks`, `ingestion_jobs` |
+| 8 | 4 | `prompt_templates`, `prompt_template_versions`, `ai_runs`, `ai_run_citations` |
+| 9 | 6 | `services`, `resources`, `availability_rules`, `availability_exceptions`, `appointments`, `appointment_reminders` |
+| 10 | 7 | `companies`, `pipelines`, `pipeline_stages`, `deals`, `tags`, `taggables`, `activities` |
+| 11 | 4 | `quote_templates`, `quotes`, `quote_line_items`, `quote_versions` |
+| 12 | 5 | `invoices`, `invoice_line_items`, `payments`, `refunds`, `payment_events` |
+| 13 | 4 | `workflows`, `workflow_versions`, `workflow_runs`, `workflow_run_steps` |
+| 14 | 4 | `segments`, `whatsapp_message_templates`, `campaigns`, `campaign_recipients` |
+
+**Total: 50.**
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `audit_logs` | Add `diff jsonb` | `DATABASE_RULES.md:83` requires a before/after diff; the Milestone 2 model carries only `metadata`. Column-level allow-list keeps PII out. |
+| `organizations` | Add `branches` relation | Every org auto-provisions a `Main` branch. |
+
+## Relations
+
+Full graph in the ER diagram. The `ON DELETE` policy is the part that needs review:
+
+| Policy | Applied to | Reasoning |
+|---|---|---|
+| `Cascade` | Children genuinely owned by a parent: line items, attachments, versions, run steps, campaign recipients, availability rules | The child is meaningless without the parent and has no independent identity. |
+| `Restrict` | Everything else — the default | Deleting a contact that has invoices must fail loudly, not silently erase financial records. |
+| `SetNull` | `conversations.assignee_id`, `audit_logs.actor_id` | A departing user must not take conversations or audit history with them. |
+
+Business deletion is soft (`deleted_at`), so these policies mostly govern genuine hard
+deletion — which for customer data happens only through the erasure path.
+
+## Indexes
+
+Every foreign key, and every column used in `WHERE`, `ORDER BY`, or `JOIN`.
+`organization_id` leads every composite index, per `DATABASE_RULES.md:103`.
+
+The four mandated from day one by `DATABASE_RULES.md:130`:
+
+```
+idx_conversations_organization_id_last_message_at
+idx_messages_conversation_id_created_at
+uq_messages_organization_id_whatsapp_message_id
+idx_contacts_organization_id_phone_number
+```
+
+Additional indexes needing individual justification, since each costs write throughput:
+
+| Index | Justification |
+|---|---|
+| `idx_messages_organization_id_created_at` | Cursor pagination on message history across a branch, not just one conversation. |
+| `hnsw (embedding vector_cosine_ops)` on `knowledge_chunks` | Similarity search. HNSW over IVFFlat: better recall/latency and no training step. |
+| `idx_knowledge_chunks_branch_id` | Branches have separate knowledge (M18); every retrieval filters on it. |
+| `idx_appointments_branch_id_starts_at` | Calendar views are always a branch plus a date range. |
+| `idx_ai_runs_organization_id_created_at` | M22 reads AI usage by org over a period. |
+| `idx_campaign_recipients_campaign_id_status` | Delivery dashboards group by status within a campaign. |
+| `idx_workflow_run_steps_scheduled_for` | The delay-node scheduler polls for due steps across all runs. Partial: `WHERE status = 'pending'`. |
+
+## Constraints
+
+- `NOT NULL` by default. Nullable columns each justified in the ER diagram —
+  `resources.user_id` (a treatment room has no login) and the optional FKs between
+  quote → deal and invoice → quote are the main ones.
+- `CHECK` constraints for every status/enum column, restricting to the documented set.
+- **`uq_messages_organization_id_whatsapp_message_id`** — makes webhook processing
+  idempotent under Meta's retries (`DATABASE_RULES.md:120`).
+- **Gateway idempotency**: unique `payments.gateway_payment_id` and
+  `payment_events.gateway_event_id`. Five gateways all retry.
+- **Partial unique indexes for soft delete**, `... WHERE deleted_at IS NULL`. Without
+  these a soft-deleted contact permanently blocks its phone number and a restore
+  collides (`DATABASE_RULES.md:80`). Applies to `contacts.phone_number`,
+  `branches.slug`, `quotes.number`, `invoices.number`, `labels.name`, `tags.name`.
+- **Exactly one default branch per org**: partial unique index on
+  `(organization_id) WHERE is_default AND deleted_at IS NULL`.
+- **Appointment overlap**: `EXCLUDE USING gist (resource_id WITH =, tstzrange(starts_at,
+  ends_at) WITH &&) WHERE (status IN ('booked','confirmed') AND deleted_at IS NULL)`.
+  Double-booking is prevented by the database, not by an application check that races
+  under concurrency. This is why `btree_gist` is required.
+- **Money**: `numeric(15,4)` with a sibling `*_currency` column, per plan AD-3. Never
+  `float`.
+
+## Deviations From `DATABASE_RULES.md`
+
+Recorded explicitly rather than slipped in.
+
+1. **Polymorphic references on `taggables` and `activities`** break "foreign keys always"
+   (`:118`). A tag applies to contacts, deals, and conversations; a join table per target
+   is three tables now and six later. Mitigated by a `CHECK` on the type column
+   restricting it to the known set, and an index on `(taggable_type, taggable_id)`. The
+   cost is no referential integrity on that column — accepted, and flagged to the user.
+2. **`workflow_versions.definition` is JSON**, not normalised into node and edge tables.
+   A visual builder saves the whole graph atomically; normalising buys integrity nobody
+   queries and costs a multi-table transaction per save. The version row provides the
+   auditability that is the actual requirement.
+3. **`tenant_id` is named `organization_id`** (`:61`). Already established at Milestone 2
+   — `prisma/schema.prisma:133` designates `Organization` as the tenant. The rule file is
+   being amended to match rather than the schema being bent to a name better-auth owns.
+4. **Hard deletion exists, for erasure only.** `:66` says never hard delete customer
+   data; `:182` requires a purge path. These contradict. Resolved per plan AD-4: soft
+   delete is trash-and-restore, erasure is redaction in place. No customer row is ever
+   `DELETE`d; PII columns are overwritten and `redacted_at` set. The rule file needs
+   amending either way.
+
+## Migration Strategy
+
+**Planned as ten domain migrations; delivered as five.** Recorded as a deviation rather
+than quietly re-scoped.
+
+The plan split the work by domain (inbox, knowledge, AI, …) on the reasoning that "one
+logical change per migration" (`DATABASE_RULES.md:148`) meant one domain per migration.
+That does not survive contact with Prisma: `migrate dev` diffs the whole schema at once,
+so ten domain migrations would mean editing `schema.prisma` down to one domain, migrating,
+adding the next, and repeating — with the cross-domain relations (`Organization` alone
+declares 40 back-relations) making the intermediate states invalid. The intermediate
+migrations would be fiction, all applied together in one deploy, none independently
+revertible because the foreign keys span them.
+
+What was delivered instead is split by genuine dependency order, which is what the rule is
+actually protecting:
+
+| # | Migration | Why it is separate |
+|---|---|---|
+| 1 | `20260802033000_extensions` | `vector` and `btree_gist` types must exist before any table or constraint uses them |
+| 2 | `20260802033724_milestone_4_schema` | The 50 tables. One `CREATE`-only unit, no data touched |
+| 3 | `20260802034000_timestamptz` | 169 columns to `TIMESTAMPTZ(3)` — a distinct correction, and it touches the Milestone 1 and 2 tables too |
+| 4 | `20260802034500_constraints` | Partial indexes, CHECKs, and the EXCLUDE constraint; must follow table creation |
+| 5 | `20260802035500_snake_case_lifecycle_stage` | A naming fix, independently revertible |
+
+**A timestamp ordering trap worth knowing about.** Prisma names migration folders from the
+system clock, and migrations apply in lexicographic order. `extensions` was first created
+by hand as `20260802090000` — a time later that day — which sorted it *after* the
+generated schema migration. Locally it had already applied, so everything worked; on a
+fresh CI database the schema migration would have run first and `CREATE TABLE ...
+vector(1536)` would have failed. Renamed to `20260802033000` with the history row updated
+in place. Any hand-created migration folder must be dated relative to the generated ones,
+not to the wall clock.
+
+`branches` needed no expand → backfill → contract after all: every branch-scoped table is
+created empty in the same migration, so `branch_id NOT NULL` is vacuously satisfied. The
+sequence is still documented in the plan so the pattern is established before Milestone
+25, when it becomes load-bearing against real data.
+
+## Rollback Plan
+
+No production deployment exists. Per migration, rollback is `prisma migrate reset`
+against a local or CI database, then `db:deploy` to the target.
+
+The one migration that would need a real rollback if this were live is #2 — dropping
+`branches` after a backfill loses the branch assignment. For a live environment the
+sequence is: restore from backup, replay to migration 1, redeploy the previous
+application version. Exercised properly in Milestone 25; recorded now so it is not
+invented under pressure.
+
+The image change is independently reversible: revert both files to `postgres:17-alpine`.
+Only migration 1 depends on it, and the volume is compatible in both directions.
+
+## Verification
+
+Written as this milestone proceeds. Planned per `MILESTONE_04_PLAN.md` → Testing
+Strategy: per-repository tenant *and* branch isolation, soft delete filtering, partial
+unique indexes permitting re-creation, optimistic-lock 409, audit append-only, erasure
+leaving the trail intact, pgvector similarity ordering, deterministic seed, and
+`EXPLAIN ANALYZE` index-use evidence on the two hot queries.

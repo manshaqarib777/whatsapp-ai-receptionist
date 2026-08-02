@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    # pgvector, not stock postgres: Milestone 4 stores knowledge-base embeddings in
+    # Postgres (MILESTONE_04_PLAN.md AD-5) and postgres:17-alpine does not ship the
+    # vector extension. Same Postgres 17 major version, so the data volume carries over.
+    image: pgvector/pgvector:pg17
     container_name: war_postgres
     restart: unless-stopped
     environment:
