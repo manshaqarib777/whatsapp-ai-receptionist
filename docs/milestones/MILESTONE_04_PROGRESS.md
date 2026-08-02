@@ -23,6 +23,11 @@ Plan: `MILESTONE_04_PLAN.md` (approved 2026-08-02, both open questions answered)
       percent-not-fraction tax rate rejected, soft-deleted phone number reusable,
       second default branch rejected
 
+- [x] Scope-injection Prisma client extension + base repository helpers —
+      `src/lib/db/`, 32 integration tests against real Postgres
+- [x] ESLint now permits `@prisma/client` in `src/lib/db/**` only (it is the database
+      layer); everywhere else the existing restriction stands
+
 ## Pending Tasks
 
 - [ ] Scope-injection Prisma client extension + base repository

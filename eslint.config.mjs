@@ -101,9 +101,11 @@ const eslintConfig = defineConfig([
     rules: { 'no-restricted-properties': 'off' },
   },
 
-  /* src/lib/prisma.ts is the module that constructs the client. */
+  /* src/lib/prisma.ts constructs the client; src/lib/db/ IS the database layer —
+     it reads the Prisma DMMF to derive which models are tenant-scoped, which is
+     what stops that registry drifting as tables are added (Milestone 4, AD-2). */
   {
-    files: ['src/lib/prisma.ts'],
+    files: ['src/lib/prisma.ts', 'src/lib/db/**/*.ts'],
     rules: { 'no-restricted-imports': 'off' },
   },
 
