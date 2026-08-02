@@ -63,6 +63,12 @@ jobs:
       - name: Apply migrations
         run: npm run db:deploy
 
+      - name: Seed
+        # The seed's own acceptance tests assert against this data
+        # (src/lib/db/seed.integration.test.ts), and it is deterministic, so running it
+        # here costs a second and keeps CI identical to a developer's database.
+        run: npm run db:seed
+
       - name: Typecheck
         run: npm run typecheck
 
