@@ -30,9 +30,10 @@ const conversation = (overrides: Partial<ConversationDetail> = {}): Conversation
   ...overrides,
 });
 
-const message = (body: string, direction = 'inbound') => ({
+const message = (body: string, direction = 'inbound', contentType = 'text') => ({
   body,
   direction,
+  contentType,
 });
 
 describe('suggestActions', () => {

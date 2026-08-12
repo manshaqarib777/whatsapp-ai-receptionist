@@ -291,13 +291,13 @@ test.describe('dashboard', () => {
     }
   });
 
-  test('navigating the inbox doorway reaches the Milestone-6 stub', async ({ page }) => {
+  test('navigating to the inbox reaches the real thread', async ({ page }) => {
     const seeded = await openDashboard(page);
 
     try {
-      // Recent conversations link to /inbox/[id], which is a notFound() stub.
+      // Recent conversations link to /inbox/[id], now a real thread (M6).
       await page.getByRole('link', { name: 'E2E Contact' }).first().click();
-      await expect(page.getByText('The inbox is being built')).toBeVisible();
+      await expect(page.getByText('Hello')).toBeVisible();
     } finally {
       await cleanupOrg(seeded);
     }
