@@ -139,5 +139,5 @@ CREATE INDEX "idx_messages_body_trgm"
 -- removed above; the index must exist for Milestone 7 retrieval. See the header
 -- of 20260802034500_constraints and scripts/check-schema-drift.ts.
 -- ---------------------------------------------------------------------------
-CREATE INDEX "idx_knowledge_chunks_embedding_hnsw"
+CREATE INDEX IF NOT EXISTS "idx_knowledge_chunks_embedding_hnsw"
   ON "knowledge_chunks" USING hnsw ("embedding" vector_cosine_ops);

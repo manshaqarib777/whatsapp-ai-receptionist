@@ -7,8 +7,9 @@
  * migration could silently delete the vector index and nothing would call it out.
  *
  * Milestone 6 added a second such index: `idx_messages_body_trgm` (a GIN trigram
- * index on messages.body — Prisma cannot express GIN/trigram either). The guard
- * whitelists both known drops.
+ * index on messages.body — Prisma cannot express GIN/trigram either). Milestone 7
+ * added a third: `idx_knowledge_chunks_content_trgm` (keyword search over chunks).
+ * The guard whitelists all known drops.
  *
  * This script runs the diff and fails the build unless the ONLY drift is the known
  * HNSW + trgm drops. Any other drift — a table, column, or index the migrations and
@@ -21,6 +22,7 @@ import { execFileSync } from 'node:child_process';
 const EXPECTED_DRIFT = [
   'DROP INDEX "idx_knowledge_chunks_embedding_hnsw";',
   'DROP INDEX "idx_messages_body_trgm";',
+  'DROP INDEX "idx_knowledge_chunks_content_trgm";',
 ];
 
 let diff: string;
@@ -65,9 +67,12 @@ if (statements === '') {
 const driftStatements = statements
   .split('\n')
   .filter((line) => line.trim() !== '')
+  .sort()
   .join('\n');
 
-if (driftStatements === EXPECTED_DRIFT.join('\n')) {
+const expected = [...EXPECTED_DRIFT].sort().join('\n');
+
+if (driftStatements === expected) {
   console.log(
     'Only known drift present: the HNSW + trgm indexes (Prisma cannot express them). OK.',
   );

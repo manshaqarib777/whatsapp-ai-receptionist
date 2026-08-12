@@ -857,6 +857,9 @@ model ConversationNote {
 
 enum KnowledgeSourceKind {
   upload
+  pdf
+  docx
+  csv
   website
   faq
   notion
@@ -925,6 +928,13 @@ model KnowledgeDocument {
 
   title String
 
+  /// Upload metadata — the blob lives in object storage (src/lib/storage.ts),
+  /// never in Postgres (DATABASE_RULES.md). Null for website/FAQ sources.
+  storageKey String? @map("storage_key")
+  fileName   String? @map("file_name")
+  mimeType   String? @map("mime_type")
+  sizeBytes  BigInt? @map("size_bytes")
+
   /// The version retrieval should use. Null until a version is approved, which
   /// is what stops an unapproved document from ever being cited.
   currentVersionId String? @unique @map("current_version_id") @db.Uuid
@@ -934,7 +944,8 @@ model KnowledgeDocument {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
   version   Int       @default(1)
 
-  versions KnowledgeDocumentVersion[]
+  versions      KnowledgeDocumentVersion[]
+  ingestionJobs IngestionJob[]
 
   @@index([organizationId])
   @@index([branchId])
@@ -960,10 +971,16 @@ model KnowledgeDocumentVersion {
 
   extractedText String @map("extracted_text") @db.Text
 
+  /// Derived count + content hash. The checksum makes re-ingestion dedupe and
+  /// change detection cheap (a new upload with the same hash is a no-op).
+  chunkCount Int?    @map("chunk_count")
+  checksum   String? @map("checksum")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  chunks KnowledgeChunk[]
+  chunks        KnowledgeChunk[]
+  ingestionJobs IngestionJob[]
 
   @@unique([documentId, versionNumber])
   @@index([organizationId])
@@ -1021,8 +1038,17 @@ model IngestionJob {
   sourceId String          @map("source_id") @db.Uuid
   source   KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
 
-  status JobStatus @default(queued)
-  error  String?   @db.Text
+  /// The document/version this job produces, set when the job completes. The
+  /// route creates the version row (draft) before enqueueing, so the worker
+  /// fills chunks and marks it processed.
+  documentId String?                   @map("document_id") @db.Uuid
+  document   KnowledgeDocument?        @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  versionId  String?                   @map("version_id") @db.Uuid
+  version    KnowledgeDocumentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+
+  status   JobStatus @default(queued)
+  error    String?   @db.Text
+  progress Int?      @default(0)
 
   startedAt  DateTime? @map("started_at") @db.Timestamptz(3)
   finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
