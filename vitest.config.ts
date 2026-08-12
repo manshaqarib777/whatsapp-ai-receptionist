@@ -16,6 +16,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     /**
+     * Above the 5s `asyncUtilTimeout` set in vitest.setup.ts, so a genuinely
+     * stuck `findBy*` reports the element it could not find rather than dying on
+     * an anonymous per-test timeout.
+     */
+    testTimeout: 15_000,
+    /**
      * Test configuration is declared here rather than read from a .env file, so
      * runs are deterministic and identical on every machine and in CI. Only
      * DATABASE_URL is overridable — CI points it at its own service container.

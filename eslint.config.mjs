@@ -58,6 +58,13 @@ const eslintConfig = defineConfig([
             'Read configuration from "@/lib/env" instead. src/lib/env.ts is the only sanctioned reader of process.env.',
         },
       ],
+      /* Both the raw client and the unscoped shared client are off-limits outside
+         the database layer. Milestone 4's tenant isolation (AD-2) is enforced by
+         the client extension in src/lib/db/scoped-prisma.ts, and a feature that
+         imports the unscoped client simply steps around it — so the boundary has
+         to be a lint error, not a convention. The sanctioned unscoped callers are
+         allow-listed by path below, which keeps the list short, explicit, and
+         reviewable. */
       'no-restricted-imports': [
         'error',
         {
@@ -65,7 +72,12 @@ const eslintConfig = defineConfig([
             {
               name: '@prisma/client',
               message:
-                'Import the shared client from "@/lib/prisma". Only repositories may access the database (.claude/ARCHITECTURE_RULES.md §3).',
+                'Only the database layer may touch Prisma directly. Take a Scope and use forScope() from "@/lib/db/scoped-prisma" (.claude/ARCHITECTURE_RULES.md §3, .claude/DATABASE_RULES.md → Multi-Tenancy).',
+            },
+            {
+              name: '@/lib/prisma',
+              message:
+                'This client is UNSCOPED — queries through it can return another tenant\'s rows. Use forScope() from "@/lib/db/scoped-prisma" instead (.claude/DATABASE_RULES.md → Multi-Tenancy).',
             },
           ],
         },
@@ -106,6 +118,29 @@ const eslintConfig = defineConfig([
      what stops that registry drifting as tables are added (Milestone 4, AD-2). */
   {
     files: ['src/lib/prisma.ts', 'src/lib/db/**/*.ts'],
+    rules: { 'no-restricted-imports': 'off' },
+  },
+
+  /* The sanctioned unscoped callers. Each one runs BEFORE a tenant scope exists,
+     so it cannot use forScope() by definition — this is not a grandfather clause
+     for convenience. Adding a file here is a security decision and needs a reason
+     in review; a feature module never belongs in this list.
+
+       lib/auth.ts              Better Auth's adapter owns its own tables.
+       server/auth-context.ts   Resolves session -> organization; derives the scope.
+       auth/organization.service.ts  Creates orgs and reads membership, which is
+                                what a scope is built from.
+       auth/audit-log.service.ts     Pre-dates the extension; takes organizationId
+                                as a required argument and filters on it.
+       health/health.service.ts      `SELECT 1` liveness probe, touches no tenant row. */
+  {
+    files: [
+      'src/lib/auth.ts',
+      'src/server/auth-context.ts',
+      'src/features/auth/services/organization.service.ts',
+      'src/features/auth/services/audit-log.service.ts',
+      'src/features/health/services/health.service.ts',
+    ],
     rules: { 'no-restricted-imports': 'off' },
   },
 

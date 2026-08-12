@@ -28,6 +28,58 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 4 — Database**
+
+- The data model for the whole product: 50 new tables covering the inbox, knowledge
+  base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows, and campaigns.
+  An ER diagram covering all 85 tables across all 25 milestones is committed at
+  `docs/database/er-diagram.md`.
+- Businesses can have multiple branches. Every organization gets one automatically, and
+  conversations, contacts, calendars, knowledge, and AI settings all belong to a
+  specific branch — so a two-location business sees two separate inboxes rather than
+  one merged list.
+- Appointments cannot be double-booked. Two people booking the same person or room at
+  overlapping times is refused by the database itself, so it holds even when both
+  bookings arrive at the same instant.
+- Deleting something moves it to the trash and it can be restored. This is separate
+  from erasing a customer's personal data, which is now a distinct, tested operation.
+- A customer can ask for their data to be erased. Their name, phone number, email,
+  message contents, attachments, and any notes quoting them are overwritten, while the
+  record of the request being honoured survives — so the business can still prove it
+  complied.
+- Money is stored to four decimal places with its currency alongside, and tax is
+  recorded as the rate that applied on the day plus the amount it produced. Reissuing
+  an old invoice will not silently reprice it at today's VAT rate.
+- Appointments store both the exact instant and the timezone they were booked in, so
+  "9am local" survives a daylight-saving rule change.
+- `npm run db:seed` now produces a database you can demo from: two businesses, staff in
+  every role, conversations in every state, appointments past and upcoming, and enough
+  CRM and invoice history for charts to render. It is deterministic, so screenshots and
+  end-to-end tests are reproducible.
+
+### Changed
+
+- **Local Postgres image is now `pgvector/pgvector:pg17`.** Stock `postgres:17-alpine`
+  does not include the `vector` extension the knowledge base needs. Run
+  `npm run db:up` to pick it up; existing local data is preserved.
+
+### Fixed
+
+- Every timestamp in the database is now stored with its timezone. They were previously
+  stored without one, which would have produced wrong appointment times for any
+  business operating across more than one region.
+
+### Security
+
+- Queries are scoped to the signed-in organization and branch centrally rather than at
+  each call site, and database operations that cannot be scoped safely are refused
+  outright. Covered by 32 tests that attempt cross-tenant access and prove it returns
+  nothing. Reaching for the unscoped database client from feature code is now a build
+  error rather than a review comment, so the guarantee cannot be stepped around by
+  accident.
+- Inbound WhatsApp messages are de-duplicated by the database, so a retried delivery
+  from Meta cannot create a second copy of the same message.
+
 **Milestone 3 — Design System**
 
 - Design tokens completed: `--success`, `--warning`, `--info` (each with `-foreground`

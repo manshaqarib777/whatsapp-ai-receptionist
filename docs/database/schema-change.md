@@ -415,10 +415,72 @@ invented under pressure.
 The image change is independently reversible: revert both files to `postgres:17-alpine`.
 Only migration 1 depends on it, and the volume is compatible in both directions.
 
+## Query Plans
+
+`DATABASE_RULES.md:170` requires `EXPLAIN ANALYZE` on any query against `messages` or
+`conversations` before merging.
+
+Measured against **5,017 conversations and 100,058 messages**, not against the seed. At
+seed volume (17 and 58) Postgres sequentially scans everything regardless of what
+indexes exist, so a plan taken there proves nothing. The volume tenant was created for
+the measurement and deleted afterwards; the row counts above and below confirm it.
+
+**Q1 — inbox list, organization-scoped, newest first, first page**
+
+```
+Limit (actual time=0.036..0.115 rows=25)
+  ->  Index Scan Backward using conversations_organization_id_last_message_at_idx
+        Index Cond: (organization_id = $1)
+        Filter: (deleted_at IS NULL)
+        Buffers: shared hit=27
+Execution Time: 0.184 ms
+```
+
+Index scan, and critically **no sort node** — the composite index supplies the ordering,
+so paging deeper does not degrade into sorting the tenant's whole conversation list.
+27 buffers for 25 rows.
+
+**Q2 — message history within a conversation, cursor-paged**
+
+```
+Limit (actual time=0.101..0.104 rows=20)
+  ->  Sort  (Sort Method: quicksort  Memory: 26kB)
+        ->  Bitmap Heap Scan on messages
+              ->  Bitmap Index Scan on messages_conversation_id_created_at_idx
+                    Index Cond: ((conversation_id = $1) AND (created_at < $2))
+Execution Time: 0.149 ms
+```
+
+Index used. The sort node is present because a bitmap scan does not preserve order, and
+Postgres chose bitmap over a plain index scan at 20 rows per conversation. On a
+conversation long enough for the sort to matter, the planner switches to a backward
+index scan and the sort disappears. Recorded rather than tuned: optimising against a
+plan the planner will not choose at real sizes would be guesswork.
+
+Both are comfortably inside any reasonable budget. The figures are from a warm local
+cache and are index-use evidence, not latency targets — those belong to Milestone 24.
+
 ## Verification
 
-Written as this milestone proceeds. Planned per `MILESTONE_04_PLAN.md` → Testing
-Strategy: per-repository tenant *and* branch isolation, soft delete filtering, partial
-unique indexes permitting re-creation, optimistic-lock 409, audit append-only, erasure
-leaving the trail intact, pgvector similarity ordering, deterministic seed, and
-`EXPLAIN ANALYZE` index-use evidence on the two hot queries.
+- `src/lib/db/scoped-prisma.integration.test.ts` — 32 tests. Cross-tenant and
+  cross-branch reads return empty rather than throwing, creates are stamped with the
+  real scope over whatever the caller passed, cross-tenant writes affect zero rows,
+  unique-selector operations are refused, soft-deleted rows hide by default and are
+  reachable for restore and erasure, a trashed phone number is reusable, and a stale
+  optimistic-locked write is a 409.
+- `src/lib/db/erasure.integration.test.ts` — 12 tests, including that the audit trail
+  still resolves to a real row after erasure and that the redaction registry covers
+  every model carrying `redacted_at`.
+- `src/lib/db/seed.integration.test.ts` — 31 tests turning the `DATABASE_RULES.md` seed
+  checklist into assertions, plus four asserting the data is synthetic.
+- Constraint behaviour was additionally exercised directly against Postgres before any
+  test existed: overlapping booking rejected, adjacent booking accepted, inverted range
+  rejected, lowercase currency rejected, a tax rate of `15` rejected where `0.15` is
+  meant, and a second default branch rejected.
+- Seed determinism: three consecutive runs produce an identical md5 across
+  organizations, contacts, conversations, messages, appointments, deals, invoices, and
+  quotes.
+
+Not covered here: pgvector similarity ordering has no data to rank until Milestone 7
+ingests documents, so the HNSW index is verified as present and correctly typed rather
+than by a ranking assertion.

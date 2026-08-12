@@ -23,6 +23,17 @@ function audit(page: Page) {
     .analyze();
 }
 
+/**
+ * The gallery renders every component in the system on one page, so an axe run
+ * over it costs 14–21s even on an idle machine — against a 30s default that left
+ * no headroom, and that tipped over as soon as the suite ran more than one worker.
+ * `retries: 0` (playwright.config.ts) means a flake here is a red build, and
+ * `.claude/TESTING_RULES.md:118` requires it fixed rather than retried, so the
+ * audits get a budget that matches what they actually cost. The audit itself is
+ * unchanged — this widens the clock, not the pass condition.
+ */
+const AUDIT_TIMEOUT_MS = 90_000;
+
 async function openGallery(page: Page, theme: 'light' | 'dark') {
   // Set the theme before the first paint, the same way the stored preference is
   // applied in real use — this is also what proves there is no flash to fix.
@@ -59,6 +70,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
 
     test(`has no accessibility violations in ${theme}`, async ({ page }) => {
+      test.setTimeout(AUDIT_TIMEOUT_MS);
       await openGallery(page, theme);
 
       const results = await audit(page);
@@ -69,6 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
     test(`has no accessibility violations in ${theme}, right to left`, async ({
       page,
     }) => {
+      test.setTimeout(AUDIT_TIMEOUT_MS);
       await openGallery(page, theme);
       await page.getByRole('button', { name: /right-to-left/i }).click();
 

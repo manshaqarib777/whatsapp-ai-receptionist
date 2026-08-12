@@ -19,9 +19,13 @@ import {
  * this extension injects `organization_id` (and `branch_id` where the model has one)
  * into every query, and refuses the operations it cannot safely inject into.
  *
- * Postgres RLS is enabled as a second layer (see the RLS migration). This is the
- * first: it runs in-process, so the isolation tests exercise the exact code path the
- * application takes rather than a database policy the ORM might bypass.
+ * This is currently the ONLY layer. Postgres RLS as defence in depth is deferred to
+ * Milestone 23, where a least-privilege database role is already in scope — Prisma's
+ * pooled driver adapter has no per-request hook, so a policy would need `SET LOCAL`
+ * inside an explicit transaction around every read, and a policy that passes when the
+ * setting is absent blocks nothing. Treat this extension as load-bearing rather than
+ * as one of two belts: it runs in-process, so the isolation tests exercise the exact
+ * code path the application takes.
  *
  * ## Known limits, stated rather than discovered later
  *
@@ -163,9 +167,10 @@ function buildPredicate(
 /**
  * A Prisma client bound to one tenant.
  *
- * Every repository takes a `Scope` and calls this. Nothing else in the application
- * may import `@/lib/prisma` directly — enforced by an ESLint rule, because a comment
- * asking people not to is not a control.
+ * Every repository takes a `Scope` and calls this. Importing `@/lib/prisma` directly is
+ * an ESLint error outside the database layer and a short allow-list of callers that run
+ * before a scope exists (session resolution, org creation, the liveness probe) — a
+ * comment asking people not to is not a control.
  */
 export function forScope(scope: Scope, options: ScopeOptions = {}): ScopedClient {
   return buildScopedClient(scope, options);

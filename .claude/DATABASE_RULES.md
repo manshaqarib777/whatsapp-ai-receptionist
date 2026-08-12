@@ -57,14 +57,30 @@ unique            uq_<table>_<cols>
 ## Every Table Requires
 
 ```sql
-id           uuid primary key default gen_random_uuid()
-tenant_id    uuid not null references tenants(id)
-created_at   timestamptz not null default now()
-updated_at   timestamptz not null default now()
+id               uuid primary key default gen_random_uuid()
+organization_id  uuid not null references organizations(id)
+branch_id        uuid not null references branches(id)   -- branch-scoped tables
+created_at       timestamptz not null default now()
+updated_at       timestamptz not null default now()
 ```
 
-Plus `deleted_at timestamptz` on anything user-facing — soft delete, never hard delete
-customer data.
+**The tenant column is `organization_id`, not `tenant_id`.** There is no `tenants`
+table: `organizations` **is** the tenant (`prisma/schema.prisma` → `Organization`), a
+name Better Auth owns and that is not worth fighting. Amended in Milestone 4, when the
+word was about to appear on fifty tables.
+
+**Tenancy is two levels.** `branch_id` is `NOT NULL` on every branch-scoped table, and
+every organization auto-provisions one default branch — so a single-branch business is
+an organization with one branch, and there is exactly one query shape rather than two.
+Milestone 18 makes branches user-visible; the isolation boundary exists from Milestone
+4. Org-level tables (billing, members, integration credentials) carry no `branch_id`.
+
+**Timestamps are `timestamptz`, and Prisma will not do this for you.** `DateTime` maps
+to `timestamp(3)` *without* time zone unless the field is annotated
+`@db.Timestamptz(3)`. Every one must be.
+
+Plus `deleted_at timestamptz` on anything user-facing — see below, and note that soft
+delete is **not** erasure.
 
 ---
 
@@ -72,6 +88,22 @@ customer data.
 
 Required by the PRD (Milestone 4). Design these in from the start — retrofitting them
 across 20 features is not viable.
+
+**Soft delete is not erasure.** These are two mechanisms that were sharing one name,
+and an earlier version of this file demanded both "never hard delete customer data" and
+a path to "purge a contact and their messages" — which no single mechanism satisfies.
+Separated in Milestone 4:
+
+- **Soft delete** (`deleted_at`) is a product feature: trash and restore. Never
+  describe it as erasure, and never offer it as the answer to a deletion request.
+- **Erasure** (`redacted_at`) overwrites the PII columns in place and leaves the row
+  skeleton, its ids, and its timestamps. Because audit payloads carry no PII, the trail
+  still resolves to a real row afterwards — so the organization can prove it honoured
+  the request. A hard delete would leave that trail dangling.
+
+Erasure is driven by a registry of redactable columns (`src/lib/db/erasure.ts`), not a
+hardcoded list, because later milestones add PII-bearing tables. A test fails if a
+model carrying `redacted_at` is not registered.
 
 **Soft delete**
 - `deleted_at timestamptz` on every user-facing table.
@@ -100,12 +132,37 @@ across 20 features is not viable.
 
 ## Multi-Tenancy
 
-- `tenant_id` on **every** table. `NOT NULL`. Indexed, and first in composite indexes.
-- Every query filters by `tenant_id`. A repository method without a `tenantId`
-  parameter is a bug.
-- `tenant_id` is derived server-side from the session or the WhatsApp phone number id.
+- `organization_id` on **every** business table. `NOT NULL`. Indexed, and first in
+  composite indexes. `branch_id` too, on branch-scoped tables.
+- Every query filters by it. This is **not** left to each author: the scope is injected
+  by a Prisma client extension (`src/lib/db/scoped-prisma.ts`), and repositories take a
+  `Scope` they cannot construct themselves. A guarantee this important cannot rest on
+  remembering a `where` clause several hundred times.
+- The extension **refuses** `findUnique`, `findUniqueOrThrow`, `update`, `delete`, and
+  `upsert` on scoped models. Prisma will not accept a tenant predicate alongside a
+  unique selector, so those operations cannot be scoped and could return another
+  tenant's row. Use `findFirst` / `updateMany` / `deleteMany` with `expectOne`.
+- The scope is **ANDed**, never merged, so a caller passing another organization's id
+  narrows the result to nothing rather than escaping.
+- The registry of which models are scoped is derived from the Prisma DMMF at load time,
+  not hand-written — a table added later is scoped the moment it has the column, and an
+  omitted table would be an unscoped table.
+- Scope is derived server-side from the session row or the WhatsApp phone number id.
   **Never** from a request body.
-- Enable RLS as defence in depth. Application-level scoping is still mandatory.
+- Two things bypass the extension and must scope themselves: raw `$queryRaw` (the
+  pgvector path), and nested writes — the latter fail closed on a `NOT NULL` violation.
+- **Importing `@/lib/prisma` outside the database layer is a lint error.** That client is
+  unscoped, so importing it steps around the extension entirely and the whole control
+  becomes advisory. The exceptions are allow-listed by path in `eslint.config.mjs`, and
+  every one of them runs *before* a scope exists — session resolution, organization
+  creation, the liveness probe. Adding a path there is a security decision. A feature
+  module is never a valid entry.
+- Since RLS is not yet in place, the extension is the **only** isolation layer, not one
+  of two. Weigh changes to it accordingly.
+- RLS as defence in depth is **deferred to Milestone 23**, where a least-privilege
+  database role is already in scope. Prisma's pooled driver adapter has no per-request
+  hook, so a policy would need `SET LOCAL` inside an explicit transaction around every
+  read; a policy that passes when the setting is absent blocks nothing.
 - A query that can return another tenant's row is a security incident, not a defect.
 
 ---
@@ -179,8 +236,10 @@ Use `CREATE INDEX CONCURRENTLY` for existing large tables.
 - Store the minimum. No storing media blobs in Postgres — reference blob storage.
 - Retention policy per tenant, enforced by a scheduled job, documented in
   `/docs/database/`.
-- Opt-out and deletion requests must be executable: a documented, tested path to purge
-  a contact and their messages.
+- Opt-out and deletion requests must be executable: `eraseContact` in
+  `src/lib/db/erasure.ts` redacts a contact and everything they said, in one
+  transaction, and reaches rows that were already soft-deleted. This is the purge path
+  — soft delete is not it.
 - Seeds and fixtures use synthetic data only. Never a copy of production.
 
 ---
