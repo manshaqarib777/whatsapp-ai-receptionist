@@ -28,6 +28,47 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 5 — Dashboard**
+
+- A real dashboard at `/dashboard` replaces the Milestone-2 placeholder: a greeting
+  and date-range picker up top, then four KPIs (new conversations, response time, open
+  revenue, open leads), a conversations-over-time chart, cumulative revenue, an
+  activity feed, upcoming appointments, and recent conversations — all org-scoped and
+  rendered from the seeded data.
+- The date range is global and persisted: choosing 30 or 90 days stores a cookie the
+  server reads, so the first paint already reflects the choice and every widget
+  follows it.
+- Each widget loads and fails on its own. The slowest query delays only its own card,
+  and a failing widget never blanks the rest of the dashboard.
+- The designed app shell (sidebar with route-highlighted navigation, workspace
+  switcher, account menu) replaces the Milestone-2 top bar for signed-in users.
+- A notifications bell in the shell header shows an unread count and a dropdown of the
+  latest notifications for the active organization.
+- The inbox, contacts, and appointment links on the dashboard lead to deliberate
+  "being built" stubs, so every doorway is real without shipping half-built screens.
+
+### Changed
+
+- Sidebar navigation icons are passed by name rather than as component references, so
+  the server layout can hand the nav to the client shell without React rejecting it at
+  runtime.
+- Dashboard notifications are ordered unread-first; they were previously read-first,
+  which buried the one the bell exists to surface.
+- The notifications bell now reads the API's actual response shape; it previously
+  crashed with a client-side error on every dashboard load.
+
+### Fixed
+
+- A runtime crash on every authenticated page: the server layout passed Lucide icon
+  component references into the client app shell, which React cannot serialise. The
+  nav now carries icon names, resolved to icons on the client.
+
+### Security
+
+- Every dashboard query runs through the scoped Prisma client with a scope resolved
+  from the session's organization — never from a request parameter. A new integration
+  suite proves org A cannot see org B's conversations, invoices, deals, or activity.
+
 **Milestone 4 — Database**
 
 - The data model for the whole product: 50 new tables covering the inbox, knowledge

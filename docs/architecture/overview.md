@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Current as of Milestone 1. Updated at the end of every milestone.
+Current as of Milestone 5. Updated at the end of every milestone.
 
 ---
 
@@ -33,6 +33,13 @@ PostgreSQL
 
 Components never call the database. Enforced by an ESLint rule that forbids importing
 `@prisma/client` outside `src/lib/prisma.ts`.
+
+**Read-only, server-rendered surfaces bypass the Hook row.** The dashboard (Milestone
+5) is a set of server components that call the service directly behind per-widget
+`Suspense` boundaries — there is no client fetch and no React Query provider for it.
+The plan (AD-3) rejected a client fetch for a surface with no mutation or polling. The
+React Query stack stays the convention for interactive surfaces such as the Milestone-6
+inbox.
 
 ---
 

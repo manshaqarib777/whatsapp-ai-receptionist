@@ -1,7 +1,15 @@
 'use client';
 
-import type { LucideIcon } from 'lucide-react';
-import { PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
+import {
+  Inbox,
+  LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Settings,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRef, type ReactNode } from 'react';
@@ -40,7 +48,13 @@ import { cn } from '@/lib/utils';
 export type NavItem = {
   href: string;
   label: string;
-  icon: LucideIcon;
+  /**
+   * A Lucide icon component (client-side use, e.g. the design gallery) OR the name
+   * of one of the registered icons. Names exist so a server component can pass the
+   * sections across the serialisation boundary — a component function cannot be
+   * serialised.
+   */
+  icon: LucideIcon | RegisteredIconName;
   /** Unread or pending count. Muted by default — see `urgent`. */
   count?: number;
   /** Only for counts a user must act on now. Colour alone never carries meaning. */
@@ -52,6 +66,23 @@ export type NavSection = {
   label?: string;
   items: NavItem[];
 };
+
+/**
+ * Icons the server layout may reference by name. Deliberately closed: an app nav
+ * has a finite set, and a registry beats a switch scattered across the tree.
+ */
+const ICONS = {
+  'layout-dashboard': LayoutDashboard,
+  inbox: Inbox,
+  users: Users,
+  settings: Settings,
+} as const;
+
+export type RegisteredIconName = keyof typeof ICONS;
+
+export function resolveNavIcon(icon: NavItem['icon']): LucideIcon {
+  return typeof icon === 'string' ? ICONS[icon] : icon;
+}
 
 export function isNavItemActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
@@ -153,6 +184,7 @@ export function SidebarNav({
                   <li key={item.href}>
                     <NavLink
                       item={item}
+                      icon={resolveNavIcon(item.icon)}
                       active={isNavItemActive(pathname, item.href)}
                       collapsed={collapsed}
                       tooltipSide={tooltipSide}
@@ -198,16 +230,18 @@ export function SidebarNav({
 
 function NavLink({
   item,
+  icon,
   active,
   collapsed,
   tooltipSide,
 }: {
   item: NavItem;
+  icon: LucideIcon;
   active: boolean;
   collapsed: boolean;
   tooltipSide: 'left' | 'right';
 }) {
-  const Icon = item.icon;
+  const Icon = icon;
 
   const link = (
     <Link
