@@ -47,6 +47,26 @@ change gets an entry in the same PR.
 - The inbox, contacts, and appointment links on the dashboard lead to deliberate
   "being built" stubs, so every doorway is real without shipping half-built screens.
 
+**Milestone 6 — Inbox**
+
+- A real two-pane inbox at `/inbox` replaces the stub: a conversation list (filterable
+  by status, assignee, and search) beside a message thread with a composer.
+- Agents can reply, archive, pin, assign, and label conversations, add internal notes,
+  attach files, and send voice/emoji messages — every action persisted and reflected
+  in the list without a full reload.
+- The list and thread refresh automatically every few seconds via polling that pauses
+  when the tab is hidden; a typing indicator shows when another agent is composing,
+  and opening a thread marks it read and clears the unread count.
+- Search across message bodies and contacts uses a trigram index; results never cross
+  organizations.
+- Read status is tracked per user with a read-receipt table, so the unread badge is
+  accurate per reader.
+- Heuristic AI suggestions (escalation, complaints, FAQ hits, follow-ups) and a
+  plain-language conversation summary render without any LLM — a deliberate seam for
+  the real AI Engine in Milestone 8.
+- Attachments are stored as files with signed, short-lived download URLs rather than
+  in the database.
+
 ### Changed
 
 - Sidebar navigation icons are passed by name rather than as component references, so

@@ -484,3 +484,64 @@ cache and are index-use evidence, not latency targets — those belong to Milest
 Not covered here: pgvector similarity ordering has no data to rank until Milestone 7
 ingests documents, so the HNSW index is verified as present and correctly typed rather
 than by a ranking assertion.
+
+---
+
+# Schema Change — Milestone 6 (Inbox)
+
+Date: 2026-08-12
+Migration: `prisma/migrations/20260812092315_inbox`
+Plan: `docs/milestones/MILESTONE_06_PLAN.md` (approved)
+Status: Applied (local)
+
+## New Tables
+
+| Table | Purpose |
+|---|---|
+| `conversation_reads` | Per-user read receipt: which user read which conversation, and when. The denormalised `conversations.unread_count` is the org-level aggregate; this is the per-user marker. |
+| `conversation_typing` | Typing indicator. TTL-expiring (`expires_at`); a DB row works across `next start` instances without Redis. Expired rows self-clean on write. |
+| `conversation_summaries` | Conversation Summary. Milestone 6 writes the heuristic summary (`model = 'heuristic'`); Milestone 8's AI Engine writes LLM-generated versions into the same table. One `current` row per conversation. |
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `messages` | Add `read_at timestamptz(3)` | Per-message read marker for the thread UI (per-user receipts live in `conversation_reads`). |
+
+## Enums
+
+`activity_kind` gains `assigned`, `unassigned`, `label_changed`, `archived` — the
+inbox events the activity feed surfaces. Added via `ALTER TYPE` (handled by Prisma
+for multi-value enum additions).
+
+## Hand-written SQL (Prisma cannot express)
+
+- `CREATE EXTENSION "pg_trgm"` + GIN trigram index `idx_messages_body_trgm` on
+  `messages.body` — inbox search (AD-5). Prisma cannot express GIN/trigram, so it
+  lives in the migration with a maintenance-hazard note.
+- `idx_knowledge_chunks_embedding_hnsw` is **recreated** — Prisma's diff proposed
+  dropping it (the known maintenance hazard from 20260802034500); the generated DROP
+  was removed and the index recreated by hand. The drift guard
+  (`scripts/check-schema-drift.ts`) now whitelists both hand-written indexes.
+
+## Indexes
+
+Every FK and WHERE/ORDER BY column, per `DATABASE_RULES.md`: `conversation_reads`
+(conversation_id, user_id) unique + (user_id, last_read_at) + (organization_id);
+`conversation_typing` (conversation_id, user_id) unique + (expires_at) +
+(organization_id); `conversation_summaries` (conversation_id, version) unique +
+(organization_id).
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI; the
+documented restore-from-backup path for any live env (exercised in M25). Note the
+ALTER TYPE additions are not transactional on older Postgres — a rollback re-runs
+the full migration history rather than a single revert.
+
+## Verification
+
+`src/features/inbox/tests/inbox.integration.test.ts` — 15 tests against real
+Postgres: list ordering/filters/pagination, thread messages, read receipts, send
+side effects, labels (cross-org refusal), typing TTL, search isolation, and summary
+persistence. Tenant isolation: org A never sees org B in any query.
