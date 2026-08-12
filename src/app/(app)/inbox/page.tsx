@@ -1,26 +1,34 @@
-import { Inbox } from 'lucide-react';
-import type { Metadata } from 'next';
+import { Suspense } from 'react';
 
-import { EmptyState } from '@/components/states';
+import { ConversationList } from '@/features/inbox/components/conversation-list';
 import { requireOrg } from '@/server/auth-context';
+import { LoadingState } from '@/components/states';
 
-export const metadata: Metadata = { title: 'Inbox' };
+export const metadata = { title: 'Inbox' };
+
+export const dynamic = 'force-dynamic';
 
 /**
- * Inbox doorway — Milestone 6 builds the real inbox.
+ * Inbox — the conversation list pane (AD-1, AD-9).
  *
- * The dashboard's "Recent conversations" and the sidebar's Inbox item link here so
- * the doorways are real (COMPONENT_DESIGN.md §7: everything is a doorway). This
- * deliberate stub keeps the link honest without building future-milestone scope.
+ * The server resolves the session and renders the list shell; the client
+ * `ConversationList` owns filters (URL-driven) and polling (5s). On desktop the
+ * thread renders beside it in the same page; on mobile the list links to
+ * `/inbox/[id]`.
  */
 export default async function InboxPage() {
   await requireOrg();
 
   return (
-    <EmptyState
-      icon={Inbox}
-      title="The inbox is being built"
-      description="Conversations, messages, and replies arrive in Milestone 6. In the meantime, the dashboard shows your recent conversations."
-    />
+    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      <section
+        aria-label="Conversations"
+        className="border-border flex w-full flex-col border-e md:w-96 md:shrink-0"
+      >
+        <Suspense fallback={<LoadingState rows={8} label="Loading conversations" />}>
+          <ConversationList />
+        </Suspense>
+      </section>
+    </div>
   );
 }

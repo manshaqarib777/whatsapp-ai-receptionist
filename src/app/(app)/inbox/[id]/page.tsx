@@ -1,25 +1,48 @@
-import { MessageSquare } from 'lucide-react';
-import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { notFound } from 'next/navigation';
 
-import { EmptyState } from '@/components/states';
+import { ThreadView } from '@/features/inbox/components/thread-view';
+import { InboxService } from '@/features/inbox/services/inbox.service';
 import { requireOrg } from '@/server/auth-context';
+import { LoadingState } from '@/components/states';
 
-export const metadata: Metadata = { title: 'Conversation' };
+export const metadata = { title: 'Conversation' };
+
+export const dynamic = 'force-dynamic';
 
 /**
- * Conversation detail doorway — Milestone 6 builds the real inbox.
+ * Conversation thread — the message pane (AD-1).
  *
- * The dashboard's recent-conversations rows link here. This deliberate stub keeps
- * the doorway real (COMPONENT_DESIGN.md §7) without building future scope.
+ * The server resolves the conversation (404 via notFound() when it is not in the
+ * tenant); the client `ThreadView` polls it every 4s and owns the composer,
+ * actions, suggestions, and summary.
  */
-export default async function ConversationDetailPage() {
-  await requireOrg();
+export default async function ConversationPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { organizationId } = await requireOrg();
+  const { id } = await params;
+
+  // Server-side existence check: a cross-tenant or missing id 404s, never leaks.
+  const service = InboxService.forOrganization(organizationId);
+  try {
+    await service.getConversation(id);
+  } catch {
+    notFound();
+  }
 
   return (
-    <EmptyState
-      icon={MessageSquare}
-      title="The inbox is being built"
-      description="Full conversation threads, replies, and AI suggestions arrive in Milestone 6."
-    />
+    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+      <section
+        aria-label="Conversation"
+        className="border-border flex w-full flex-col md:border-s"
+      >
+        <Suspense fallback={<LoadingState rows={8} label="Loading conversation" />}>
+          <ThreadView conversationId={id} />
+        </Suspense>
+      </section>
+    </div>
   );
 }
