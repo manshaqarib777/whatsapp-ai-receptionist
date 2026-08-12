@@ -337,8 +337,12 @@ export class InboxRepository {
   }
 
   async createLabel(name: string, color: string): Promise<LabelRow> {
+    // Label is branch-scoped, but the inbox scope is org-level. Resolve the
+    // default branch and build a branch-scoped client for this one create —
+    // the only branch-scoped write the inbox makes.
     const branchId = await this.resolveDefaultBranch();
-    const row = await this.db.label.create({
+    const branchDb = forScope({ organizationId: this.organizationId, branchId });
+    const row = await branchDb.label.create({
       data: { organizationId: this.organizationId, branchId, name, color },
       select: { id: true, name: true, color: true },
     });
@@ -419,22 +423,30 @@ export class InboxRepository {
     const conversation = await this.assertConversation(conversationId);
 
     await this.db.$transaction(async (tx) => {
-      // Upsert the per-user read receipt.
-      await tx.conversationRead.upsert({
-        where: {
-          conversationId_userId: { conversationId, userId },
-        },
-        create: {
-          organizationId: this.organizationId,
-          conversationId,
-          userId,
-          lastReadAt: new Date(),
-        },
-        update: { lastReadAt: new Date() },
+      // Per-user read receipt — upsert is refused on scoped models, so
+      // check-then-update/create.
+      const existing = await tx.conversationRead.findFirst({
+        where: { conversationId, userId },
+        select: { id: true },
       });
 
-      // Zero the denormalised counter (only if the reader is the assignee or there
-      // is no assignee — the counter is org-level, so clear it for the org).
+      if (existing) {
+        await tx.conversationRead.updateMany({
+          where: { conversationId, userId },
+          data: { lastReadAt: new Date() },
+        });
+      } else {
+        await tx.conversationRead.create({
+          data: {
+            organizationId: this.organizationId,
+            conversationId,
+            userId,
+            lastReadAt: new Date(),
+          },
+        });
+      }
+
+      // Zero the denormalised counter.
       await tx.conversation.updateMany({
         where: { id: conversationId, unreadCount: { gt: 0 } },
         data: { unreadCount: 0 },
@@ -452,16 +464,27 @@ export class InboxRepository {
 
     await this.db.$transaction(async (tx) => {
       await tx.conversationTyping.deleteMany({ where: { expiresAt: { lt: now } } });
-      await tx.conversationTyping.upsert({
-        where: { conversationId_userId: { conversationId, userId } },
-        create: {
-          organizationId: this.organizationId,
-          conversationId,
-          userId,
-          expiresAt,
-        },
-        update: { expiresAt, startedAt: now },
+
+      const existing = await tx.conversationTyping.findFirst({
+        where: { conversationId, userId },
+        select: { id: true },
       });
+
+      if (existing) {
+        await tx.conversationTyping.updateMany({
+          where: { conversationId, userId },
+          data: { expiresAt, startedAt: now },
+        });
+      } else {
+        await tx.conversationTyping.create({
+          data: {
+            organizationId: this.organizationId,
+            conversationId,
+            userId,
+            expiresAt,
+          },
+        });
+      }
     });
   }
 
