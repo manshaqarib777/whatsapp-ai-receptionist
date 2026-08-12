@@ -47,6 +47,8 @@ model User {
   assignedConversations Conversation[]             @relation("ConversationAssignee")
   authoredMessages      Message[]                  @relation("MessageAuthor")
   conversationNotes     ConversationNote[]         @relation("NoteAuthor")
+  conversationReads     ConversationRead[]         @relation("ConversationReadUser")
+  conversationTyping    ConversationTyping[]       @relation("ConversationTypingUser")
   approvedKnowledge     KnowledgeDocumentVersion[] @relation("KnowledgeApprover")
   resourceProfiles      Resource[]
   activities            Activity[]                 @relation("ActivityActor")
@@ -163,56 +165,59 @@ model Organization {
 
   // Milestone 4. Every business table carries organization_id; Prisma requires
   // the inverse side of each relation to be declared here.
-  branches           Branch[]
-  whatsappAccounts   WhatsappAccount[]
-  contacts           Contact[]
-  companies          Company[]
-  conversations      Conversation[]
-  messages           Message[]
-  messageAttachments MessageAttachment[]
-  labels             Label[]
-  conversationLabels ConversationLabel[]
-  conversationNotes  ConversationNote[]
-  knowledgeSources   KnowledgeSource[]
-  knowledgeDocs      KnowledgeDocument[]
-  knowledgeVersions  KnowledgeDocumentVersion[]
-  knowledgeChunks    KnowledgeChunk[]
-  ingestionJobs      IngestionJob[]
-  promptTemplates    PromptTemplate[]
-  promptVersions     PromptTemplateVersion[]
-  aiRuns             AiRun[]
-  aiRunCitations     AiRunCitation[]
-  services           Service[]
-  resources          Resource[]
-  availabilityRules  AvailabilityRule[]
-  availabilityExc    AvailabilityException[]
-  appointments       Appointment[]
-  apptReminders      AppointmentReminder[]
-  pipelines          Pipeline[]
-  pipelineStages     PipelineStage[]
-  deals              Deal[]
-  tags               Tag[]
-  taggables          Taggable[]
-  activities         Activity[]
-  tasks              Task[]
-  notifications      Notification[]
-  quoteTemplates     QuoteTemplate[]
-  quotes             Quote[]
-  quoteLineItems     QuoteLineItem[]
-  quoteVersions      QuoteVersion[]
-  invoices           Invoice[]
-  invoiceLineItems   InvoiceLineItem[]
-  payments           Payment[]
-  refunds            Refund[]
-  paymentEvents      PaymentEvent[]
-  workflows          Workflow[]
-  workflowVersions   WorkflowVersion[]
-  workflowRuns       WorkflowRun[]
-  workflowRunSteps   WorkflowRunStep[]
-  segments           Segment[]
-  messageTemplates   WhatsappMessageTemplate[]
-  campaigns          Campaign[]
-  campaignRecipients CampaignRecipient[]
+  branches              Branch[]
+  whatsappAccounts      WhatsappAccount[]
+  contacts              Contact[]
+  companies             Company[]
+  conversations         Conversation[]
+  messages              Message[]
+  messageAttachments    MessageAttachment[]
+  labels                Label[]
+  conversationLabels    ConversationLabel[]
+  conversationNotes     ConversationNote[]
+  knowledgeSources      KnowledgeSource[]
+  knowledgeDocs         KnowledgeDocument[]
+  knowledgeVersions     KnowledgeDocumentVersion[]
+  knowledgeChunks       KnowledgeChunk[]
+  ingestionJobs         IngestionJob[]
+  promptTemplates       PromptTemplate[]
+  promptVersions        PromptTemplateVersion[]
+  aiRuns                AiRun[]
+  aiRunCitations        AiRunCitation[]
+  services              Service[]
+  resources             Resource[]
+  availabilityRules     AvailabilityRule[]
+  availabilityExc       AvailabilityException[]
+  appointments          Appointment[]
+  apptReminders         AppointmentReminder[]
+  pipelines             Pipeline[]
+  pipelineStages        PipelineStage[]
+  deals                 Deal[]
+  tags                  Tag[]
+  taggables             Taggable[]
+  activities            Activity[]
+  tasks                 Task[]
+  notifications         Notification[]
+  quoteTemplates        QuoteTemplate[]
+  quotes                Quote[]
+  quoteLineItems        QuoteLineItem[]
+  quoteVersions         QuoteVersion[]
+  invoices              Invoice[]
+  invoiceLineItems      InvoiceLineItem[]
+  payments              Payment[]
+  refunds               Refund[]
+  paymentEvents         PaymentEvent[]
+  workflows             Workflow[]
+  workflowVersions      WorkflowVersion[]
+  workflowRuns          WorkflowRun[]
+  workflowRunSteps      WorkflowRunStep[]
+  segments              Segment[]
+  messageTemplates      WhatsappMessageTemplate[]
+  campaigns             Campaign[]
+  campaignRecipients    CampaignRecipient[]
+  conversationReads     ConversationRead[]
+  conversationTypings   ConversationTyping[]
+  conversationSummaries ConversationSummary[]
 
   @@index([slug])
   @@index([deletedAt])
@@ -634,10 +639,13 @@ model Conversation {
   redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
   version    Int       @default(1)
 
-  messages Message[]
-  labels   ConversationLabel[]
-  notes    ConversationNote[]
-  aiRuns   AiRun[]
+  messages  Message[]
+  labels    ConversationLabel[]
+  notes     ConversationNote[]
+  aiRuns    AiRun[]
+  reads     ConversationRead[]
+  typing    ConversationTyping[]
+  summaries ConversationSummary[]
 
   @@index([organizationId, lastMessageAt])
   @@index([branchId, status])
@@ -645,6 +653,54 @@ model Conversation {
   @@index([assigneeId])
   @@index([whatsappAccountId])
   @@map("conversations")
+}
+
+/// Per-user read receipt. `unreadCount` on Conversation is the denormalised
+/// aggregate; this is the per-user marker that lets the UI show "who has read
+/// this thread". One row per (user, conversation), upserted on read.
+model ConversationRead {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("ConversationReadUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// When this user last read the thread. NULL means "never read".
+  lastReadAt DateTime @default(now()) @map("last_read_at") @db.Timestamptz(3)
+
+  @@unique([conversationId, userId])
+  @@index([userId, lastReadAt])
+  @@index([organizationId])
+  @@map("conversation_reads")
+}
+
+/// Typing indicator. TTL-expiring: the inbox query filters `expiresAt > now()`
+/// and a stale row self-cleans on the next write. A DB row (rather than Redis)
+/// works across `next start` instances without new infrastructure.
+model ConversationTyping {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation("ConversationTypingUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(3)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+
+  @@unique([conversationId, userId])
+  @@index([expiresAt])
+  @@index([organizationId])
+  @@map("conversation_typing")
 }
 
 /// PII: `body`. Redacted, never deleted.
@@ -673,6 +729,10 @@ model Message {
 
   deliveryStatus DeliveryStatus @default(queued) @map("delivery_status")
   failureReason  String?        @map("failure_reason")
+
+  /// When the conversation's assignee/agent read this message (per-user read
+  /// receipts live in ConversationRead; this is the per-message marker).
+  readAt DateTime? @map("read_at") @db.Timestamptz(3)
 
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1118,6 +1178,33 @@ model AiRunCitation {
   @@map("ai_run_citations")
 }
 
+/// Conversation Summary. Milestone 6 renders the heuristic summary; Milestone 8's
+/// AI Engine writes the LLM-generated version into the same table (model = the
+/// generating model, status = lifecycle). One current row per conversation.
+model ConversationSummary {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  summary String @db.Text
+  /// The generating model, e.g. "heuristic" for M6, "anthropic/claude-sonnet-5" for M8.
+  model   String @default("heuristic")
+  version Int    @default(1)
+  status  String @default("current")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  @@unique([conversationId, version])
+  @@index([organizationId])
+  @@map("conversation_summaries")
+}
+
 // ---------------------------------------------------------------------------
 // Scheduling
 // ---------------------------------------------------------------------------
@@ -1361,6 +1448,10 @@ enum ActivityKind {
   meeting
   stage_change
   status_change
+  assigned
+  unassigned
+  label_changed
+  archived
 
   @@map("activity_kind")
 }

@@ -6,15 +6,22 @@
  * database. That makes the diff useless as a review gate: an unreviewed generated
  * migration could silently delete the vector index and nothing would call it out.
  *
+ * Milestone 6 added a second such index: `idx_messages_body_trgm` (a GIN trigram
+ * index on messages.body — Prisma cannot express GIN/trigram either). The guard
+ * whitelists both known drops.
+ *
  * This script runs the diff and fails the build unless the ONLY drift is the known
- * HNSW drop. Any other drift — a table, column, or index the migrations and the
- * datamodel disagree on — is a real problem and stops CI.
+ * HNSW + trgm drops. Any other drift — a table, column, or index the migrations and
+ * the datamodel disagree on — is a real problem and stops CI.
  *
  * Usage: npm run db:check-drift
  */
 import { execFileSync } from 'node:child_process';
 
-const EXPECTED_DRIFT = 'DROP INDEX "idx_knowledge_chunks_embedding_hnsw";';
+const EXPECTED_DRIFT = [
+  'DROP INDEX "idx_knowledge_chunks_embedding_hnsw";',
+  'DROP INDEX "idx_messages_body_trgm";',
+];
 
 let diff: string;
 try {
@@ -50,9 +57,19 @@ const statements = diff
   .join('\n')
   .trim();
 
-if (statements === EXPECTED_DRIFT) {
+if (statements === '') {
+  console.log('No schema drift.');
+  process.exit(0);
+}
+
+const driftStatements = statements
+  .split('\n')
+  .filter((line) => line.trim() !== '')
+  .join('\n');
+
+if (driftStatements === EXPECTED_DRIFT.join('\n')) {
   console.log(
-    'Only known drift present: the HNSW index (Prisma cannot express it — Issue 8). OK.',
+    'Only known drift present: the HNSW + trgm indexes (Prisma cannot express them). OK.',
   );
   process.exit(0);
 }
