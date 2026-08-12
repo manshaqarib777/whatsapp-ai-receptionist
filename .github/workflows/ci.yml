@@ -69,6 +69,13 @@ jobs:
         # here costs a second and keeps CI identical to a developer's database.
         run: npm run db:seed
 
+      - name: Check schema drift
+        # Prisma cannot express the HNSW index, so `migrate diff` proposes dropping it
+        # on every run (Milestone 4, Issue 8). This step fails the build if the diff
+        # contains ANYTHING beyond that known drop — an unreviewed generated migration
+        # can no longer silently delete the vector index.
+        run: npm run db:check-drift
+
       - name: Typecheck
         run: npm run typecheck
 

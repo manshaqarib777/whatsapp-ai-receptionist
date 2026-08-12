@@ -7,7 +7,7 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 3 — Design System.** Complete, awaiting visual review.
+**Milestone 4 — Database.** Complete.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
@@ -16,8 +16,11 @@ is in [`docs/milestones/`](docs/milestones/).
 What exists so far: the foundation (tooling, database, configuration, logging, error
 handling, health checks, CI), a complete multi-tenant authentication system — sign-up,
 sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and an
-append-only audit log — and a token-driven design system every later screen is built
-from.
+append-only audit log — a token-driven design system every later screen is built from,
+and the persistent data model the whole product runs on: 50 tables covering the inbox,
+knowledge base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows, and
+campaigns, with tenant isolation enforced in one place, soft delete, audit, history,
+optimistic-lock versioning, a right-to-erasure path, and a deterministic demo seed.
 
 Browse the components at **<http://localhost:3000/design>** while the development
 server is running. It is a development tool, not a product page, and 404s in a
@@ -154,7 +157,9 @@ names every offending variable. `process.env` is read nowhere else — enforced 
 | `npm run db:up` / `db:down` | Start / stop Postgres |
 | `npm run db:migrate` | Create and apply a migration |
 | `npm run db:deploy` | Apply migrations (CI/production) |
+| `npm run db:generate` | Regenerate the Prisma client |
 | `npm run db:seed` | Seed the database |
+| `npm run db:check-drift` | Fail unless the only schema drift is the known HNSW drop |
 | `npm run db:studio` | Prisma Studio |
 
 Integration tests require Postgres to be running. They **fail** rather than skip when

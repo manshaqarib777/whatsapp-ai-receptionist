@@ -22,6 +22,7 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
+    "db:check-drift": "tsx scripts/check-schema-drift.ts",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "prepare": "husky"
   },
