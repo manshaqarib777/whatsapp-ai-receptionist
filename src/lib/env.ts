@@ -111,6 +111,16 @@ const serverSchema = z.object({
     .transform((value) => value === 'enabled'),
 
   /**
+   * Local object-storage directory for message attachments (AD-6).
+   *
+   * The schema stores a `storage_key`, never a blob, so the blob lives wherever
+   * this points. Local development writes under `./storage` (gitignored); a
+   * production deployment swaps in real object storage behind the same
+   * `src/lib/storage.ts` interface.
+   */
+  STORAGE_DIR: z.string().min(1).default('./storage'),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */

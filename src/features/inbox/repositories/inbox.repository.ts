@@ -517,6 +517,29 @@ export class InboxRepository {
     };
   }
 
+  /** Attaches a stored file to an existing message. */
+  async attachToMessage(
+    messageId: string,
+    input: { storageKey: string; mimeType: string; sizeBytes: bigint; fileName?: string },
+  ): Promise<void> {
+    const message = await this.db.message.findFirst({
+      where: { id: messageId },
+      select: { id: true },
+    });
+    if (!message) throw new NotFoundError('Message not found.');
+
+    await this.db.messageAttachment.create({
+      data: {
+        organizationId: this.organizationId,
+        messageId,
+        storageKey: input.storageKey,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+        fileName: input.fileName ?? null,
+      },
+    });
+  }
+
   // -- Summary ---------------------------------------------------------------
 
   async getSummary(conversationId: string): Promise<SummaryRow | null> {

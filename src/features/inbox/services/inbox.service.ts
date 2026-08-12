@@ -1,7 +1,6 @@
 import {
   InboxRepository,
   type ConversationDetail,
-  type ConversationRow,
   type InboxListFilter,
   type MessageRow,
   type NoteRow,
@@ -205,11 +204,59 @@ export class InboxService {
     return this.repo.search(q);
   }
 
-  async sendMessage(input: { conversationId: string; authorId: string; body: string }) {
+  async sendMessage(input: {
+    conversationId: string;
+    authorId: string;
+    body: string;
+    contentType?: string;
+  }) {
     return this.repo.sendMessage(input);
   }
 
   async createNote(conversationId: string, authorId: string, body: string) {
     return this.repo.createNote(conversationId, authorId, body);
+  }
+
+  async markRead(conversationId: string, userId: string): Promise<void> {
+    return this.repo.markRead(conversationId, userId);
+  }
+
+  async setTyping(conversationId: string, userId: string): Promise<void> {
+    return this.repo.setTyping(conversationId, userId);
+  }
+
+  async archiveConversation(conversationId: string, archive: boolean): Promise<void> {
+    return this.repo.archiveConversation(conversationId, archive);
+  }
+
+  async updateConversation(input: {
+    conversationId: string;
+    assigneeId?: string | null;
+    isPinned?: boolean;
+  }): Promise<void> {
+    return this.repo.updateConversation(input);
+  }
+
+  async addLabel(conversationId: string, labelId: string): Promise<void> {
+    return this.repo.addLabel(conversationId, labelId);
+  }
+
+  async removeLabel(conversationId: string, labelId: string): Promise<void> {
+    return this.repo.removeLabel(conversationId, labelId);
+  }
+
+  async createLabel(name: string, color: string) {
+    return this.repo.createLabel(name, color);
+  }
+
+  async listLabels() {
+    return this.repo.listLabels();
+  }
+
+  async attachToMessage(
+    messageId: string,
+    input: { storageKey: string; mimeType: string; sizeBytes: bigint; fileName?: string },
+  ): Promise<void> {
+    return this.repo.attachToMessage(messageId, input);
   }
 }
