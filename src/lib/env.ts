@@ -134,6 +134,19 @@ const serverSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
 
   /**
+   * LLM provider for the AI Engine (Milestone 8, AD-2).
+   *
+   * `openai` — chat completions via the OpenAI SDK. Requires OPENAI_API_KEY.
+   * `local` — a deterministic rule-based provider. No key, unit-testable, used
+   * by the test suite and seed. Answers are NOT semantically rich — the real
+   * provider is required for live replies. Per-turn `ai_runs` record the
+   * "provider/model" string so a switch is a documented decision with an eval.
+   */
+  LLM_PROVIDER: z.enum(['openai', 'local']).default('local'),
+  LLM_CLASSIFY_MODEL: z.string().min(1).default('anthropic/claude-haiku-4-5'),
+  LLM_REPLY_MODEL: z.string().min(1).default('anthropic/claude-sonnet-5'),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */

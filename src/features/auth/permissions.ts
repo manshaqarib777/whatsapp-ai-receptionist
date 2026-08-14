@@ -52,6 +52,19 @@ export const PERMISSIONS = [
   'knowledge:read',
   'knowledge:write',
   'knowledge:approve',
+
+  // AI Engine — Milestone 8.
+  'ai:read',
+  'ai:manage',
+  'ai:run',
+
+  // Appointments — Milestone 9.
+  'appointment:read',
+  'appointment:write',
+
+  // CRM — Milestone 10.
+  'crm:read',
+  'crm:write',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -86,6 +99,13 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'knowledge:read',
     'knowledge:write',
     'knowledge:approve',
+    'ai:read',
+    'ai:manage',
+    'ai:run',
+    'appointment:read',
+    'appointment:write',
+    'crm:read',
+    'crm:write',
   ],
 
   admin: [
@@ -110,6 +130,13 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'knowledge:read',
     'knowledge:write',
     'knowledge:approve',
+    'ai:read',
+    'ai:manage',
+    'ai:run',
+    'appointment:read',
+    'appointment:write',
+    'crm:read',
+    'crm:write',
   ],
 
   member: [
@@ -125,6 +152,13 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'knowledge:read',
     'knowledge:write',
     // NOT knowledge:approve — approval is admin/owner-only.
+    'ai:read',
+    // NOT ai:manage — template activation is admin/owner-only.
+    'ai:run',
+    'appointment:read',
+    'appointment:write',
+    'crm:read',
+    'crm:write',
   ],
 
   viewer: [
@@ -134,6 +168,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:read',
     'settings:read',
     'knowledge:read',
+    'ai:read',
+    'appointment:read',
+    'crm:read',
   ],
 };
 

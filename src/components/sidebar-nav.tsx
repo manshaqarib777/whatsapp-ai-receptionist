@@ -2,12 +2,15 @@
 
 import {
   BookOpen,
+  Briefcase,
+  Calendar,
   Inbox,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
   Settings,
+  Sparkles,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -76,8 +79,11 @@ const ICONS = {
   'layout-dashboard': LayoutDashboard,
   inbox: Inbox,
   users: Users,
-  settings: Settings,
   'book-open': BookOpen,
+  sparkles: Sparkles,
+  calendar: Calendar,
+  briefcase: Briefcase,
+  settings: Settings,
 } as const;
 
 export type RegisteredIconName = keyof typeof ICONS;

@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { seedCommerce } from './seed/commerce';
 import { seedContacts } from './seed/contacts';
 import { seedCrm } from './seed/crm';
+import { seedAi } from './seed/ai';
 import { seedInbox } from './seed/inbox';
 import { seedKnowledge } from './seed/knowledge';
 import { seedScheduling } from './seed/scheduling';
@@ -135,6 +136,7 @@ async function main() {
   const crm = await seedCrm(prisma, tenants, contacts, random);
   const commerce = await seedCommerce(prisma, tenants, contacts, crm.dealIds);
   const knowledge = await seedKnowledge(prisma, tenants);
+  const ai = await seedAi(prisma, tenants);
 
   const contactTotal =
     contacts.riyadhContacts.length +
@@ -153,6 +155,7 @@ async function main() {
       `  deals           ${crm.dealIds.length} across 5 pipeline stages, plus 5 lost`,
       `  quotes          ${commerce.quoteIds.length}   invoices ${commerce.invoiceIds.length}`,
       `  knowledge       ${knowledge.sourceIds.length} sources, ${knowledge.documentIds.length} documents (FAQ + policy approved, HR draft gated)`,
+      `  ai              ${ai.templateIds.length} prompt templates, ${ai.runIds.length} runs`,
       `  in              ${Date.now() - started}ms`,
     ].join('\n'),
   );
