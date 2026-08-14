@@ -55,6 +55,19 @@ async function fetchJson<T>(url: string): Promise<T> {
   return payload.data;
 }
 
+/**
+ * The API serialises Dates to ISO strings over JSON; the row types declare
+ * `Date`. Rehydrate the fields the components call date methods on, or a row
+ * crashes with `lastMessageAt.toISOString is not a function`.
+ */
+function rehydrateConversationRows(rows: ConversationRow[]): ConversationRow[] {
+  return rows.map((row) => ({
+    ...row,
+    lastMessageAt: new Date(row.lastMessageAt),
+    typing: row.typing.map((t) => ({ ...t, expiresAt: new Date(t.expiresAt) })),
+  }));
+}
+
 async function sendJson<T>(
   url: string,
   method: 'POST' | 'PATCH' | 'DELETE',
@@ -95,7 +108,12 @@ export function useConversations(params: Record<string, unknown> = {}) {
 
   return useQuery({
     queryKey: inboxKeys.conversations(params),
-    queryFn: () => fetchJson<ConversationListResponse>(`/api/inbox/conversations${qs ? `?${qs}` : ''}`),
+    queryFn: async () => {
+      const data = await fetchJson<ConversationListResponse>(
+        `/api/inbox/conversations${qs ? `?${qs}` : ''}`,
+      );
+      return { ...data, rows: rehydrateConversationRows(data.rows) };
+    },
     refetchInterval: (query) => (query.state.data ? 5000 : false),
   });
 }
@@ -111,7 +129,13 @@ export type ThreadResponse = {
   conversation: ConversationDetail;
   messages: MessageRow[];
   notes: NoteRow[];
-  summary: { summary: string; model: string; version: number; status: string; updatedAt: Date };
+  summary: {
+    summary: string;
+    model: string;
+    version: number;
+    status: string;
+    updatedAt: Date;
+  };
   suggestions: {
     kind: 'escalate' | 'resolve' | 'reply' | 'follow-up' | 'label' | 'faq';
     title: string;
@@ -124,15 +148,42 @@ export type ThreadResponse = {
 export function useThread(id: string) {
   return useQuery({
     queryKey: inboxKeys.thread(id),
-    queryFn: () => fetchJson<ThreadResponse>(`/api/inbox/conversations/${id}`),
+    queryFn: async () => {
+      const data = await fetchJson<ThreadResponse>(`/api/inbox/conversations/${id}`);
+      return rehydrateThread(data);
+    },
     refetchInterval: (query) => (query.state.data ? 4000 : false),
   });
+}
+
+/**
+ * Rehydrates the Date fields on a thread response (see rehydrateConversationRows).
+ */
+function rehydrateThread(data: ThreadResponse): ThreadResponse {
+  return {
+    ...data,
+    conversation: {
+      ...data.conversation,
+      lastMessageAt: new Date(data.conversation.lastMessageAt),
+    },
+    messages: data.messages.map((message) => ({
+      ...message,
+      createdAt: new Date(message.createdAt),
+      readAt: message.readAt ? new Date(message.readAt) : null,
+    })),
+    notes: data.notes.map((note) => ({ ...note, createdAt: new Date(note.createdAt) })),
+    summary: { ...data.summary, updatedAt: new Date(data.summary.updatedAt) },
+    typing: data.typing.map((t) => ({ ...t, expiresAt: new Date(t.expiresAt) })),
+  };
 }
 
 export function useLabels() {
   return useQuery({
     queryKey: inboxKeys.labels(),
-    queryFn: () => fetchJson<LabelRow[]>('/api/inbox/labels'),
+    queryFn: async () => {
+      const data = await fetchJson<{ labels: LabelRow[] }>('/api/inbox/labels');
+      return data.labels;
+    },
   });
 }
 
@@ -157,9 +208,13 @@ export function useSendMessage(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: string) =>
-      sendJson<MessageRow>(`/api/inbox/conversations/${conversationId}/messages`, 'POST', {
-        body,
-      }),
+      sendJson<MessageRow>(
+        `/api/inbox/conversations/${conversationId}/messages`,
+        'POST',
+        {
+          body,
+        },
+      ),
     onSuccess: () => invalidateInbox(queryClient),
   });
 }
@@ -168,7 +223,9 @@ export function useCreateNote(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: string) =>
-      sendJson<NoteRow>(`/api/inbox/conversations/${conversationId}/notes`, 'POST', { body }),
+      sendJson<NoteRow>(`/api/inbox/conversations/${conversationId}/notes`, 'POST', {
+        body,
+      }),
     onSuccess: () => invalidateInbox(queryClient),
   });
 }
@@ -176,7 +233,8 @@ export function useCreateNote(conversationId: string) {
 export function useMarkRead(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => sendJson<void>(`/api/inbox/conversations/${conversationId}/read`, 'POST'),
+    mutationFn: () =>
+      sendJson<void>(`/api/inbox/conversations/${conversationId}/read`, 'POST'),
     onSuccess: () => invalidateInbox(queryClient),
   });
 }
@@ -184,7 +242,8 @@ export function useMarkRead(conversationId: string) {
 export function useSetTyping(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => sendJson<void>(`/api/inbox/conversations/${conversationId}/typing`, 'POST'),
+    mutationFn: () =>
+      sendJson<void>(`/api/inbox/conversations/${conversationId}/typing`, 'POST'),
     onSuccess: () => {
       // Only the typing state changes; no need to blow away the whole cache.
       void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(conversationId) });
@@ -196,7 +255,9 @@ export function useArchiveConversation(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (archive: boolean) =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}/archive`, 'POST', { archive }),
+      sendJson<void>(`/api/inbox/conversations/${conversationId}/archive`, 'POST', {
+        archive,
+      }),
     onSuccess: () => invalidateInbox(queryClient),
   });
 }
@@ -214,7 +275,9 @@ export function useAddLabel(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (labelId: string) =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}/labels`, 'POST', { labelId }),
+      sendJson<void>(`/api/inbox/conversations/${conversationId}/labels`, 'POST', {
+        labelId,
+      }),
     onSuccess: () => invalidateInbox(queryClient),
   });
 }

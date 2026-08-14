@@ -8,7 +8,7 @@ import { ConversationRow } from '@/features/inbox/components/conversation-row';
 import { useConversations } from '@/features/inbox/hooks/use-inbox';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 /**
  * The inbox conversation list (AD-9).
@@ -61,7 +61,9 @@ export function ConversationList() {
       <div className="border-b p-3">
         <Tabs
           value={filter.status ?? 'all'}
-          onValueChange={(status) => apply({ ...filter, status: status === 'all' ? undefined : status })}
+          onValueChange={(status) =>
+            apply({ ...filter, status: status === 'all' ? undefined : status })
+          }
         >
           <TabsList className="w-full">
             <TabsTrigger value="all">All</TabsTrigger>
@@ -69,11 +71,25 @@ export function ConversationList() {
             <TabsTrigger value="unread">Unread</TabsTrigger>
             <TabsTrigger value="archived">Archived</TabsTrigger>
           </TabsList>
+          {/* Radix triggers emit aria-controls pointing at a panel; without a
+              TabsContent per value, axe flags aria-valid-attr-value (critical).
+              The panels are visually hidden — the shared list below renders. */}
+          {['all', 'open', 'unread', 'archived'].map((value) => (
+            <TabsContent
+              key={value}
+              value={value}
+              className="hidden"
+              aria-hidden="true"
+            />
+          ))}
         </Tabs>
 
         <form onSubmit={submitSearch} className="mt-3 flex gap-2">
           <div className="relative flex-1">
-            <Search aria-hidden="true" className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2" />
+            <Search
+              aria-hidden="true"
+              className="text-muted-foreground absolute start-3 top-1/2 size-4 -translate-y-1/2"
+            />
             <Input
               aria-label="Search conversations"
               value={q}

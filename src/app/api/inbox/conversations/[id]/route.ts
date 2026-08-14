@@ -1,9 +1,12 @@
-import { requirePermission } from '@/server/auth-context';
+import { requireOrg, requirePermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { InboxService } from '@/features/inbox/services/inbox.service';
 import { updateConversationSchema } from '@/features/inbox/validators/inbox.validators';
 
 /**
+ * GET  /api/inbox/conversations/[id] — the full thread (conversation, messages,
+ * notes, summary, suggestions, typing), read by `useThread`.
+ *
  * PATCH /api/inbox/conversations/[id]
  *
  * Updates assignee and/or pinned state. Requires `conversation:write`; assigning
@@ -11,6 +14,19 @@ import { updateConversationSchema } from '@/features/inbox/validators/inbox.vali
  */
 
 type Params = { id: string };
+
+export const GET = withApiHandler(
+  'GET /api/inbox/conversations/[id]',
+  async (_request, { correlationId }, routeParams: RouteParams<Params>) => {
+    const { organizationId } = await requireOrg();
+    const { id } = await routeParams.params;
+
+    const service = InboxService.forOrganization(organizationId);
+    const thread = await service.getThread(id);
+
+    return jsonSuccess(thread, { correlationId });
+  },
+);
 
 export const PATCH = withApiHandler(
   'PATCH /api/inbox/conversations/[id]',
