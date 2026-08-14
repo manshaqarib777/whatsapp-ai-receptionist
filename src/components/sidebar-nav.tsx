@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BookOpen,
   Inbox,
   LayoutDashboard,
   PanelLeftClose,
@@ -76,6 +77,7 @@ const ICONS = {
   inbox: Inbox,
   users: Users,
   settings: Settings,
+  'book-open': BookOpen,
 } as const;
 
 export type RegisteredIconName = keyof typeof ICONS;

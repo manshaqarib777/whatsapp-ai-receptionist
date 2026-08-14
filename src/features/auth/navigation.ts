@@ -19,6 +19,7 @@ export const APP_NAV_SECTIONS: NavSection[] = [
       { href: '/dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
       { href: '/inbox', label: 'Inbox', icon: 'inbox' },
       { href: '/contacts', label: 'Contacts', icon: 'users' },
+      { href: '/knowledge', label: 'Knowledge', icon: 'book-open' },
       { href: '/settings', label: 'Settings', icon: 'settings' },
     ],
   },

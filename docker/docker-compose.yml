@@ -22,5 +22,29 @@ services:
       timeout: 5s
       retries: 10
 
+  # Milestone 7: the knowledge ingestion worker (AD-3). A DB-polled worker that
+  # claims queued ingestion_jobs and parses/chunks/embeds them. No Redis — the
+  # database is the queue. Also runnable directly with `npm run knowledge:work`.
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: war_knowledge_worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://war_dev:war_dev_password@postgres:5432/war_dev?schema=public
+      NODE_ENV: development
+      LOG_LEVEL: info
+      EMBEDDING_PROVIDER: local
+      STORAGE_DIR: /app/storage
+      AUTH_SECRET: worker-only-local-secret-32-characters-long
+    volumes:
+      - war_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   war_postgres_data:
+  # Shared with the app so uploads written by the API are visible to the worker.
+  war_storage:

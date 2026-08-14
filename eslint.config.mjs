@@ -132,7 +132,10 @@ const eslintConfig = defineConfig([
                                 what a scope is built from.
        auth/audit-log.service.ts     Pre-dates the extension; takes organizationId
                                 as a required argument and filters on it.
-       health/health.service.ts      `SELECT 1` liveness probe, touches no tenant row. */
+       health/health.service.ts      `SELECT 1` liveness probe, touches no tenant row.
+       knowledge/lib/retrieval.ts    Raw-SQL pgvector seam (M7 AD-6): every statement
+                                self-scopes from the Scope argument, because the
+                                scoped extension cannot inject into raw SQL. */
   {
     files: [
       'src/lib/auth.ts',
@@ -140,6 +143,7 @@ const eslintConfig = defineConfig([
       'src/features/auth/services/organization.service.ts',
       'src/features/auth/services/audit-log.service.ts',
       'src/features/health/services/health.service.ts',
+      'src/features/knowledge/lib/retrieval.ts',
     ],
     rules: { 'no-restricted-imports': 'off' },
   },

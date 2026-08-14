@@ -121,6 +121,19 @@ const serverSchema = z.object({
   STORAGE_DIR: z.string().min(1).default('./storage'),
 
   /**
+   * Embedding provider for the knowledge base (Milestone 7, AD-2).
+   *
+   * `openai` — text-embedding-3-small (1536-dim, matches the schema's
+   * `vector(1536)`). Requires OPENAI_API_KEY.
+   * `local` — a deterministic hash embedder. No key, unit-testable, used by the
+   * test suite and seed so they never depend on an external service. Vectors are
+   * NOT semantically meaningful — the real key is required for live ingestion.
+   */
+  EMBEDDING_PROVIDER: z.enum(['openai', 'local']).default('local'),
+  EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */
@@ -163,6 +176,16 @@ const envSchema = serverSchema.merge(clientSchema).superRefine((env, ctx) => {
       code: 'custom',
       path: ['SMTP_USER'],
       message: 'SMTP_USER is required when SMTP_PASSWORD is set.',
+    });
+  }
+
+  // The OpenAI embedding provider is unusable without its key; fail at boot
+  // rather than at the first ingestion.
+  if (env.EMBEDDING_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['OPENAI_API_KEY'],
+      message: 'OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai.',
     });
   }
 

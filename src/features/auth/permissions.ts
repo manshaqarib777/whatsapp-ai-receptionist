@@ -47,6 +47,11 @@ export const PERMISSIONS = [
   // Settings
   'settings:read',
   'settings:update',
+
+  // Knowledge base — Milestone 7.
+  'knowledge:read',
+  'knowledge:write',
+  'knowledge:approve',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -78,6 +83,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:delete',
     'settings:read',
     'settings:update',
+    'knowledge:read',
+    'knowledge:write',
+    'knowledge:approve',
   ],
 
   admin: [
@@ -99,6 +107,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:delete',
     'settings:read',
     'settings:update',
+    'knowledge:read',
+    'knowledge:write',
+    'knowledge:approve',
   ],
 
   member: [
@@ -111,6 +122,9 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:read',
     'contact:write',
     'settings:read',
+    'knowledge:read',
+    'knowledge:write',
+    // NOT knowledge:approve — approval is admin/owner-only.
   ],
 
   viewer: [
@@ -119,6 +133,7 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'conversation:read',
     'contact:read',
     'settings:read',
+    'knowledge:read',
   ],
 };
 
