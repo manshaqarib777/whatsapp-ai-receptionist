@@ -173,8 +173,67 @@ export async function seedCrm(
   }
 
   await seedWork(prisma, tenants);
+  await seedBeaconCrm(prisma, tenants);
 
   return { pipeline: pipeline.id, stageIds, tagIds, dealIds };
+}
+
+/**
+ * Cross-tenant beacon: a deal and a task in the second org. The isolation
+ * integration test uses it to prove org A never sees org B's CRM rows.
+ */
+async function seedBeaconCrm(prisma: PrismaClient, tenants: SeededTenants) {
+  const pipeline = await prisma.pipeline.create({
+    data: {
+      id: seedId('beacon-pipeline', 1),
+      organizationId: tenants.beacon.id,
+      branchId: tenants.beacon.main,
+      name: 'Vehicle sales',
+      isDefault: true,
+      createdAt: SEED_NOW,
+      updatedAt: SEED_NOW,
+    },
+  });
+
+  const stage = await prisma.pipelineStage.create({
+    data: {
+      id: seedId('beacon-stage', 1),
+      organizationId: tenants.beacon.id,
+      pipelineId: pipeline.id,
+      name: 'Enquiry',
+      position: 0,
+      winProbability: '0.200',
+      createdAt: SEED_NOW,
+      updatedAt: SEED_NOW,
+    },
+  });
+
+  await prisma.deal.create({
+    data: {
+      id: seedId('beacon-deal', 1),
+      organizationId: tenants.beacon.id,
+      branchId: tenants.beacon.main,
+      stageId: stage.id,
+      title: 'Fleet sale — Northstar Logistics',
+      valueAmount: '250000.0000',
+      valueCurrency: 'GBP',
+      status: 'open',
+      createdAt: daysFromNow(-3),
+      updatedAt: SEED_NOW,
+    },
+  });
+
+  await prisma.task.create({
+    data: {
+      id: seedId('beacon-task', 1),
+      organizationId: tenants.beacon.id,
+      branchId: tenants.beacon.main,
+      title: 'Prepare fleet proposal',
+      status: 'open',
+      createdAt: daysFromNow(-2),
+      updatedAt: SEED_NOW,
+    },
+  });
 }
 
 /** Tasks and notifications — Milestone 5's dashboard, seeded here with the schema. */
