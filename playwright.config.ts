@@ -42,7 +42,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: 0,
-  workers: process.env['CI'] ? 1 : undefined,
+  // One worker locally and in CI. The suite starts a production build and every
+  // test boots its own org + fixtures against one Postgres; 4-way parallelism
+  // (this box) stalled data-fetch tests randomly across ai/inbox/knowledge.
+  // The house rule forbids retrying flakes into passing, so the suite is capped
+  // to the deterministic configuration CI already uses.
+  workers: 1,
   reporter: process.env['CI'] ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     baseURL: BASE_URL,

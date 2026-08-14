@@ -28,6 +28,74 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 11 — Quotation System**
+
+- A quotation system at `/quotes`: a status-filtered quote list, a create dialog
+  with live VAT preview (15% default, overridable per line), and a quote detail
+  page with line items, totals, the status lifecycle, and version history.
+- The lifecycle is real and versioned: draft → send snapshots the full quote to a
+  `QuoteVersion` (so the accepted/rejected document is the exact one the customer
+  saw) → accepted / rejected / expired. Only a draft can be edited; only a sent
+  quote can be accepted, rejected, or expired; an accepted quote cannot return to
+  draft.
+- Quotes are numbered sequentially per organization (`Q-1000`, `Q-1001`, …).
+- VAT math is stored, not recomputed: each line keeps its rate AND amount at write
+  time, so a historical quote never silently reprices at today's rate.
+- Templates are manageable per branch (`/quotes/templates`) with branding; the
+  footer flows into the PDF.
+- A dependency-free PDF export renders the quote with a line-item table, VAT
+  breakdown, totals, validity, and branding footer — inline in the browser.
+- The quote API is fully tenant-scoped: every query runs through `forScope`, and
+  the integration suite proves org A can never see org B's quotes.
+
+**Milestone 10 — CRM**
+
+- A CRM at `/crm`: a pipeline board with per-stage columns and deal cards, a deal
+  drawer with timeline + stage moves + close (won/lost) + notes/calls/emails/
+  meetings, a companies list with create, a tag manager, and a tasks list with
+  create + complete.
+- Deals are leads and deals in one table: a deal in an early stage is a lead;
+  moving between stages and closing (`won`/`lost` with `closedAt`) is the core
+  lifecycle, and every mutation writes an `Activity` to the deal's timeline
+  through one `recordActivity` seam.
+- Tags are polymorphic (`taggables`): the same join table labels deals, contacts,
+  and conversations, and re-tagging a subject is idempotent (unique constraint).
+- Tasks gain their M10 surface — the M5 `tasks` table is now manageable with
+  status transitions and due dates.
+- Automation: simple rule-based triggers (new deal → auto-assign, deal value ≥
+  threshold → add a tag, company created → default tag) evaluated by a DB-polled
+  worker (`npm run crm:work`). Rule application is idempotent, guarded by
+  activity/tag markers so a re-run cannot double-apply.
+- Pipeline stages carry win probability for the weighted forecasting that arrives
+  at Milestone 15; the board surfaces it per stage.
+- The CRM is fully tenant-scoped: every query runs through `forScope`, and the
+  seed includes a cross-tenant beacon deal/task that org A can never see.
+
+**Milestone 9 — Appointment Engine**
+
+- An appointment engine at `/appointments`: a calendar of the next 14 days, a
+  booking form that lists real open slots per resource, services and resources
+  management, and an appointment detail page with reschedule and cancel (with a
+  confirm step).
+- Availability is computed from weekly rules plus exceptions, in the appointment's
+  timezone, and the database's exclusion constraint is the authoritative
+  double-booking backstop — a race surfaces as a clean 409.
+- Recurring appointments use an RRULE subset (`FREQ=WEEKLY|DAILY` with `COUNT` or
+  `UNTIL`); a series is a parent appointment with children linked by
+  `recurrenceParentId`, and editing or cancelling one occurrence creates an
+  exception rather than materialising every future instance.
+- Reminders are scheduled per booking (24h and 1h before) into
+  `appointment_reminders`; a DB-polled worker (`npm run reminders:work`) marks due
+  reminders sent/failed. Delivery is a no-op stub until the WhatsApp messaging
+  milestone.
+- Rescheduling links the replacement appointment back to the original via
+  `rescheduledFromId` and marks the original rescheduled, so the history is
+  navigable.
+- Appointment timezone is recorded per booking (the intent) and validated;
+  availability is computed in that zone then stored as UTC instants.
+- The dashboard's upcoming appointments now open a real detail page instead of a
+  stub.
+
 **Milestone 7 — Knowledge Base**
 
 - A knowledge base at `/knowledge` with sources, documents, version timelines, and

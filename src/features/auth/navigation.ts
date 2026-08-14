@@ -23,6 +23,7 @@ export const APP_NAV_SECTIONS: NavSection[] = [
       { href: '/ai', label: 'AI', icon: 'sparkles' },
       { href: '/appointments', label: 'Appointments', icon: 'calendar' },
       { href: '/crm', label: 'CRM', icon: 'briefcase' },
+      { href: '/quotes', label: 'Quotes', icon: 'file-text' },
       { href: '/settings', label: 'Settings', icon: 'settings' },
     ],
   },

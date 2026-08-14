@@ -4,6 +4,7 @@ import {
   BookOpen,
   Briefcase,
   Calendar,
+  FileText,
   Inbox,
   LayoutDashboard,
   PanelLeftClose,
@@ -83,6 +84,7 @@ const ICONS = {
   sparkles: Sparkles,
   calendar: Calendar,
   briefcase: Briefcase,
+  'file-text': FileText,
   settings: Settings,
 } as const;
 

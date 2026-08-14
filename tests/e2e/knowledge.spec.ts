@@ -270,6 +270,10 @@ test.describe('knowledge base', () => {
   test('an FAQ is not searchable until approved (the approval gate)', async ({
     page,
   }) => {
+    // The FAQ ingest, search (live embedding + pgvector), and submit/approve
+    // round-trips compound under parallel load; the other knowledge tests use
+    // the same ceiling (see the axe test below).
+    test.setTimeout(120_000);
     const seeded = await openKnowledge(page);
 
     try {
