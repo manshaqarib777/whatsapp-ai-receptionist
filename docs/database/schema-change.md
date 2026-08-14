@@ -545,3 +545,60 @@ the full migration history rather than a single revert.
 Postgres: list ordering/filters/pagination, thread messages, read receipts, send
 side effects, labels (cross-org refusal), typing TTL, search isolation, and summary
 persistence. Tenant isolation: org A never sees org B in any query.
+
+---
+
+# Schema Change — Milestone 7 (Knowledge Base)
+
+Date: 2026-08-12
+Migration: `prisma/migrations/20260812185009_knowledge`
+Plan: `docs/milestones/MILESTONE_07_PLAN.md` (approved)
+Status: Applied (local)
+
+The M4 schema already designed the five knowledge tables (`knowledge_sources`,
+`knowledge_documents`, `knowledge_document_versions`, `knowledge_chunks`,
+`ingestion_jobs`). This migration is the minimal delta that makes the feature
+work, exactly as the plan's Database Impact section specified.
+
+## Enums
+
+`knowledge_source_kind` gains `pdf`, `docx`, `csv` — the PRD lists them as
+distinct source kinds. Added via `ALTER TYPE` (Prisma handles multi-value enum
+additions).
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `knowledge_documents` | Add `file_name`, `mime_type`, `storage_key`, `size_bytes` | Blob reference for uploads (house pattern from `message_attachments`); the blob never lives in Postgres |
+| `knowledge_document_versions` | Add `chunk_count Int?`, `checksum String?` | Derived count + content hash for re-ingestion dedupe / change detection |
+| `ingestion_jobs` | Add `progress Int?` (default 0), `document_id UUID?`, `version_id UUID?` | Progress reporting + job → produced document/version links |
+
+The new FKs (`ingestion_jobs.document_id`, `.version_id`) are `ON DELETE SET
+NULL` — a document purge must not take its job history with it.
+
+## Hand-written SQL (Prisma cannot express)
+
+- **`idx_knowledge_chunks_content_trgm`** — GIN trigram index on
+  `knowledge_chunks.content` for keyword search (plan AD-6). Prisma cannot express
+  GIN/trigram, so it lives in the migration with a maintenance note: a future
+  `migrate dev` diff proposes dropping it — strip that DROP and recreate.
+- **`idx_knowledge_chunks_embedding_hnsw` recreated** — Prisma's diff proposed
+  dropping it (the known maintenance hazard from `20260802034500_constraints`);
+  the generated DROP was removed and the index recreated by hand. The drift guard
+  (`scripts/check-schema-drift.ts`) whitelists both hand-written indexes.
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI; the
+documented restore-from-backup path for any live env (exercised in M25). Note the
+ALTER TYPE additions are not transactional on older Postgres — a rollback re-runs
+the full migration history rather than a single revert.
+
+## Verification
+
+`src/features/knowledge/tests/knowledge.integration.test.ts` — against real
+Postgres + pgvector: source CRUD, upload → job claim → parse → chunk → embed →
+draft version, approval transition sets `currentVersionId`, retrieval returns only
+approved current versions, **org A never retrieves org B** (the mandated raw-SQL
+scoping test), job success/failure + progress, version archive.

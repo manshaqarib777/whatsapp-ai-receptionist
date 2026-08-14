@@ -28,6 +28,28 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 7 — Knowledge Base**
+
+- A knowledge base at `/knowledge` with sources, documents, version timelines, and
+  search — upload a PDF/DOCX/CSV, enter FAQs, or ingest a website, and the AI can
+  cite what it knows.
+- Uploaded files are stored as blobs (never in Postgres), parsed in a background
+  worker (OCR via tesseract.js for scanned PDFs), chunked into ~800-token
+  overlapping pieces, embedded, and indexed — the database is the queue, so no
+  Redis or external service is required until Milestone 24.
+- Documents are versioned with an approval gate: a new upload creates a draft
+  version, only an approved version becomes "current", and retrieval (vector +
+  keyword) can only ever cite approved current versions. The seed includes a draft
+  HR handbook that search must NOT surface.
+- Embeddings come from the new AI Gateway: OpenAI `text-embedding-3-small` when
+  `OPENAI_API_KEY` is set, with a deterministic local hash embedder as the default
+  so tests, CI, and the seed need no key. The per-chunk `embeddingModel` makes a
+  later provider switch a re-embedding job, not a redesign.
+- Ingestion status is tracked in `ingestion_jobs` and polled in the UI, so a job
+  that fails reports its error instead of silently vanishing.
+- Knowledge approval is admin/owner-only (`knowledge:approve`); members can read
+  and write; viewers can read.
+
 **Milestone 5 — Dashboard**
 
 - A real dashboard at `/dashboard` replaces the Milestone-2 placeholder: a greeting
@@ -78,6 +100,23 @@ change gets an entry in the same PR.
   crashed with a client-side error on every dashboard load.
 
 ### Fixed
+
+- The inbox conversation list crashed with `lastMessageAt.toISOString is not a
+  function` whenever it was rendered from the API: dates arrive as ISO strings
+  over JSON, and the row and message components called date methods on them. The
+  hooks now rehydrate date fields.
+- Opening a conversation thread showed an error boundary: the thread view polled
+  `GET /api/inbox/conversations/[id]`, which only implemented `PATCH`. The GET
+  handler now returns the full thread (conversation, messages, notes, summary,
+  suggestions, typing).
+- The thread's label list crashed with `(j.data ?? []).map is not a function`:
+  the labels endpoint returns `{ labels }` but the hook treated it as a bare
+  array.
+- The inbox filter tabs carried `aria-controls` pointing at panels that did not
+  exist, which axe flagged as a critical `aria-valid-attr-value` violation. Each
+  tab now has a real (hidden) panel.
+
+**Milestone 5 — Dashboard**
 
 - A runtime crash on every authenticated page: the server layout passed Lucide icon
   component references into the client app shell, which React cannot serialise. The

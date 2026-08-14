@@ -53,10 +53,7 @@ type SeededOrg = {
  * will scope by) with the exact rows the widget assertions need. Returns the
  * org/branch/contact ids for cleanup.
  */
-async function seedDemoOrg(
-  email: string,
-  organizationId: string,
-): Promise<SeededOrg> {
+async function seedDemoOrg(email: string, organizationId: string): Promise<SeededOrg> {
   const connectionString = process.env['DATABASE_URL'] ?? '';
   if (!connectionString) throw new Error('DATABASE_URL is required for E2E seeding.');
   const adapter = new PrismaPg({ connectionString });
@@ -188,11 +185,19 @@ async function cleanupOrg(seeded: SeededOrg): Promise<void> {
   const client = new PrismaClient({ adapter });
 
   try {
-    await client.conversation.deleteMany({ where: { organizationId: seeded.organizationId } });
+    await client.conversation.deleteMany({
+      where: { organizationId: seeded.organizationId },
+    });
     await client.invoice.deleteMany({ where: { organizationId: seeded.organizationId } });
-    await client.activity.deleteMany({ where: { organizationId: seeded.organizationId } });
-    await client.notification.deleteMany({ where: { organizationId: seeded.organizationId } });
-    await client.whatsappAccount.deleteMany({ where: { organizationId: seeded.organizationId } });
+    await client.activity.deleteMany({
+      where: { organizationId: seeded.organizationId },
+    });
+    await client.notification.deleteMany({
+      where: { organizationId: seeded.organizationId },
+    });
+    await client.whatsappAccount.deleteMany({
+      where: { organizationId: seeded.organizationId },
+    });
     await client.contact.deleteMany({ where: { organizationId: seeded.organizationId } });
     await client.branch.deleteMany({ where: { organizationId: seeded.organizationId } });
     await client.member.deleteMany({ where: { organizationId: seeded.organizationId } });
@@ -255,7 +260,9 @@ async function openDashboard(page: Page): Promise<SeededOrg> {
 
   // Land on the dashboard.
   await page.goto('/dashboard');
-  await expect(page.getByRole('heading', { name: /good (morning|afternoon|evening)/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /good (morning|afternoon|evening)/i }),
+  ).toBeVisible();
 
   return seeded;
 }
@@ -297,7 +304,8 @@ test.describe('dashboard', () => {
     try {
       // Recent conversations link to /inbox/[id], now a real thread (M6).
       await page.getByRole('link', { name: 'E2E Contact' }).first().click();
-      await expect(page.getByText('Hello')).toBeVisible();
+      // Exact match — the heuristic summary also contains "Hello".
+      await expect(page.getByText('Hello', { exact: true })).toBeVisible();
     } finally {
       await cleanupOrg(seeded);
     }
