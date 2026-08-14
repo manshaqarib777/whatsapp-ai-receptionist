@@ -45,7 +45,11 @@ async function makeOrg(orgLabel: string): Promise<string> {
   return org.id;
 }
 
-async function makeBranch(orgId: string, label: string, isDefault: boolean): Promise<string> {
+async function makeBranch(
+  orgId: string,
+  label: string,
+  isDefault: boolean,
+): Promise<string> {
   const branch = await prisma.branch.create({
     data: {
       organizationId: orgId,
@@ -59,7 +63,11 @@ async function makeBranch(orgId: string, label: string, isDefault: boolean): Pro
   return branch.id;
 }
 
-async function makeContact(orgId: string, branchId: string, phone: string): Promise<string> {
+async function makeContact(
+  orgId: string,
+  branchId: string,
+  phone: string,
+): Promise<string> {
   const contact = await prisma.contact.create({
     data: {
       organizationId: orgId,
@@ -186,8 +194,20 @@ describe('conversation KPIs', () => {
 
     // Org A: two inside, one outside. Org B: one inside.
     await makeConversation(f.orgA, f.branchA, f.contactA, waA, RANGE.from);
-    await makeConversation(f.orgA, f.branchA, f.contactA, waA, new Date(RANGE.to.getTime() - 1000));
-    await makeConversation(f.orgA, f.branchA, f.contactA, waA, new Date(NOW.getTime() - 120 * DAY));
+    await makeConversation(
+      f.orgA,
+      f.branchA,
+      f.contactA,
+      waA,
+      new Date(RANGE.to.getTime() - 1000),
+    );
+    await makeConversation(
+      f.orgA,
+      f.branchA,
+      f.contactA,
+      waA,
+      new Date(NOW.getTime() - 120 * DAY),
+    );
     await makeConversation(f.orgB, f.branchB, f.contactB, waB, RANGE.from);
 
     await expect(repoA.countNewConversations(RANGE)).resolves.toBe(2);
@@ -200,10 +220,19 @@ describe('conversation KPIs', () => {
 });
 
 describe('response time aggregation', () => {
-  async function seedConversationWithGap(orgId: string, gapMinutes: number): Promise<void> {
+  async function seedConversationWithGap(
+    orgId: string,
+    gapMinutes: number,
+  ): Promise<void> {
     const wa = await makeWhatsappAccount(orgId, f.orgA === orgId ? f.branchA : f.branchB);
     const contact = orgId === f.orgA ? f.contactA : f.contactB;
-    const conv = await makeConversation(orgId, orgId === f.orgA ? f.branchA : f.branchB, contact, wa, RANGE.from);
+    const conv = await makeConversation(
+      orgId,
+      orgId === f.orgA ? f.branchA : f.branchB,
+      contact,
+      wa,
+      RANGE.from,
+    );
 
     const inboundAt = new Date(RANGE.from.getTime() + 60_000);
     await prisma.message.create({
@@ -364,8 +393,20 @@ describe('row-list reads', () => {
     const wa = await makeWhatsappAccount(f.orgA, f.branchA);
     const waB = await makeWhatsappAccount(f.orgB, f.branchB);
 
-    const first = await makeConversation(f.orgA, f.branchA, f.contactA, wa, new Date(NOW.getTime() - 2 * DAY));
-    const second = await makeConversation(f.orgA, f.branchA, f.contactA, wa, new Date(NOW.getTime() - 1 * DAY));
+    const first = await makeConversation(
+      f.orgA,
+      f.branchA,
+      f.contactA,
+      wa,
+      new Date(NOW.getTime() - 2 * DAY),
+    );
+    const second = await makeConversation(
+      f.orgA,
+      f.branchA,
+      f.contactA,
+      wa,
+      new Date(NOW.getTime() - 1 * DAY),
+    );
     const archived = await prisma.conversation.create({
       data: {
         organizationId: f.orgA,
@@ -379,13 +420,21 @@ describe('row-list reads', () => {
       select: { id: true },
     });
     // Org B's conversation must never surface.
-    await makeConversation(f.orgB, f.branchB, f.contactB, waB, new Date(NOW.getTime() - 1 * DAY));
+    await makeConversation(
+      f.orgB,
+      f.branchB,
+      f.contactB,
+      waB,
+      new Date(NOW.getTime() - 1 * DAY),
+    );
 
     const recent = await repoFor(f.orgA).recentConversations(5);
 
     expect(recent.map((c) => c.id)).toEqual([second, first]);
     expect(recent.map((c) => c.id)).not.toContain(archived.id);
-    expect(recent[0]?.contactDisplayName).toBe(`Contact ${f.contactA && '+966500000001'}`);
+    expect(recent[0]?.contactDisplayName).toBe(
+      `Contact ${f.contactA && '+966500000001'}`,
+    );
   });
 
   it('limits upcoming appointments to booked/confirmed and sorts by start', async () => {
@@ -421,9 +470,13 @@ describe('row-list reads', () => {
       return appointment.id;
     }
 
-    const later = await seedAppointment(new Date(NOW.getTime() + 3 * DAY), 'booked');
-    const sooner = await seedAppointment(new Date(NOW.getTime() + 1 * DAY), 'confirmed');
-    await seedAppointment(new Date(NOW.getTime() + 2 * DAY), 'cancelled');
+    // The query filters `startsAt >= now()` (the real clock), so these must be
+    // anchored to the real current time — the fixed `NOW` drifts into the past
+    // the day after it was written and the fixtures stop being "upcoming".
+    const realNow = Date.now();
+    const later = await seedAppointment(new Date(realNow + 3 * DAY), 'booked');
+    const sooner = await seedAppointment(new Date(realNow + 1 * DAY), 'confirmed');
+    await seedAppointment(new Date(realNow + 2 * DAY), 'cancelled');
 
     const upcoming = await repoFor(f.orgA).upcomingAppointments(5);
 
