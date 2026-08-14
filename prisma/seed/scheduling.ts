@@ -112,6 +112,34 @@ export async function seedScheduling(
     resources,
   );
 
+  // Reminder rows for the upcoming confirmed appointment (24h and 1h before),
+  // so the M9 reminder worker has due work and the status column is real.
+  const upcoming = await prisma.appointment.findFirst({
+    where: {
+      organizationId: tenants.northwind.id,
+      status: 'confirmed',
+      startsAt: { gt: SEED_NOW },
+    },
+    orderBy: { startsAt: 'asc' },
+    select: { id: true, startsAt: true },
+  });
+  if (upcoming) {
+    for (const [index, leadHours] of [24, 1].entries()) {
+      await prisma.appointmentReminder.create({
+        data: {
+          id: seedId('reminder', index + 1),
+          organizationId: tenants.northwind.id,
+          appointmentId: upcoming.id,
+          sendAt: new Date(upcoming.startsAt.getTime() - leadHours * 3_600_000),
+          channel: 'whatsapp',
+          status: 'scheduled',
+          createdAt: SEED_NOW,
+          updatedAt: SEED_NOW,
+        },
+      });
+    }
+  }
+
   return { services, resources, appointments };
 }
 
