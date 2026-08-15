@@ -9,6 +9,7 @@ import { seedInbox } from './seed/inbox';
 import { seedKnowledge } from './seed/knowledge';
 import { seedScheduling } from './seed/scheduling';
 import { seedTenants } from './seed/tenants';
+import { seedWorkflows } from './seed/workflows';
 import { createRandom, seedId } from './seed/support';
 
 /**
@@ -137,6 +138,7 @@ async function main() {
   const commerce = await seedCommerce(prisma, tenants, contacts, crm.dealIds);
   const knowledge = await seedKnowledge(prisma, tenants);
   const ai = await seedAi(prisma, tenants);
+  const workflows = await seedWorkflows(prisma, tenants);
 
   const contactTotal =
     contacts.riyadhContacts.length +
@@ -156,6 +158,7 @@ async function main() {
       `  quotes          ${commerce.quoteIds.length}   invoices ${commerce.invoiceIds.length}`,
       `  knowledge       ${knowledge.sourceIds.length} sources, ${knowledge.documentIds.length} documents (FAQ + policy approved, HR draft gated)`,
       `  ai              ${ai.templateIds.length} prompt templates, ${ai.runIds.length} runs`,
+      `  workflows       ${workflows.workflowIds.length} (one enabled with a version, one draft), ${workflows.runIds.length} run`,
       `  in              ${Date.now() - started}ms`,
     ].join('\n'),
   );

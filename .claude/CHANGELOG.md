@@ -28,6 +28,23 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 13 — Workflow Builder**
+
+- A workflow builder at `/workflows`: a workflow list with create + enable/
+  disable toggles, and a builder page that edits the node graph (trigger →
+  conditions → actions → delays) with a live validation summary.
+- The graph is versioned: every save writes a new immutable `WorkflowVersion`
+  with an incremented number, so a published graph is never mutated in place.
+  Enabling a workflow requires at least one saved version (else 409).
+- Server-side graph validation is the authority: unknown node references,
+  non-binary condition branches, branch labels on non-condition edges, and
+  duplicate variable names are all refused (409) rather than saved.
+- Manual test runs write a `WorkflowRun` plus one `WorkflowRunStep` per node,
+  walking the graph along the true path; delay nodes land `pending` with a
+  `scheduledFor` for the scheduler to pick up.
+- The workflow API is fully tenant-scoped: every query runs through `forScope`,
+  and the integration suite proves org A can never see org B's workflows.
+
 **Milestone 12 — Invoicing and Payments**
 
 - An invoicing system at `/invoices`: a status-filtered invoice list, a create
