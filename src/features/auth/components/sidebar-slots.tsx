@@ -29,7 +29,10 @@ import {
  * that nav, so reading the attribute from the nearest ancestor is how it stays in
  * sync with `AppShell`'s internal collapse state without changing the M3 shell.
  */
-function useSidebarCollapsed(): { collapsed: boolean; ref: React.RefObject<HTMLDivElement | null> } {
+function useSidebarCollapsed(): {
+  collapsed: boolean;
+  ref: React.RefObject<HTMLDivElement | null>;
+} {
   const ref = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -39,7 +42,8 @@ function useSidebarCollapsed(): { collapsed: boolean; ref: React.RefObject<HTMLD
     update();
 
     const observer = new MutationObserver(update);
-    if (nav) observer.observe(nav, { attributes: true, attributeFilter: ['data-collapsed'] });
+    if (nav)
+      observer.observe(nav, { attributes: true, attributeFilter: ['data-collapsed'] });
 
     return () => observer.disconnect();
   }, []);
@@ -152,7 +156,12 @@ export function SidebarAccountMenu({ user }: { user: AuthUser }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label="Account menu" className="w-full gap-2 px-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Account menu"
+          className="w-full gap-2 px-2"
+        >
           <Avatar className="size-6 shrink-0">
             <AvatarFallback className="text-xs">{initials(user.name)}</AvatarFallback>
           </Avatar>
@@ -164,7 +173,9 @@ export function SidebarAccountMenu({ user }: { user: AuthUser }) {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <span className="block text-sm font-medium">{user.name}</span>
-          <span className="text-muted-foreground block truncate text-xs">{user.email}</span>
+          <span className="text-muted-foreground block truncate text-xs">
+            {user.email}
+          </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 

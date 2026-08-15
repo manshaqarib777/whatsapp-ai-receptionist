@@ -23,11 +23,7 @@ const EMOJI = ['😀', '👍', '🙏', '🎉', '❤️', '😂', '😊', '👋',
 const TYPING_THROTTLE_MS = 1000;
 
 /** Throttles an action to once per window; returns true when it ran. */
-function throttled(
-  lastRun: { current: number },
-  now: number,
-  windowMs: number,
-): boolean {
+function throttled(lastRun: { current: number }, now: number, windowMs: number): boolean {
   if (now - lastRun.current < windowMs) return false;
   lastRun.current = now;
   return true;
@@ -119,7 +115,7 @@ export function Composer({ conversationId }: { conversationId: string }) {
             }
           }}
           placeholder="Type a message…"
-          className="min-h-10 max-h-32 flex-1"
+          className="max-h-32 min-h-10 flex-1"
           rows={1}
         />
 

@@ -6,6 +6,9 @@ import { requireOrg } from '@/server/auth-context';
 
 export const metadata: Metadata = { title: 'Contact' };
 
+// requireOrg reads the session; never statically prerender this page.
+export const dynamic = 'force-dynamic';
+
 /**
  * Contact detail doorway — Milestone 10 builds the real CRM.
  *

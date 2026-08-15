@@ -61,7 +61,9 @@ export class CrmService {
   // Deals — the core lifecycle
   // -------------------------------------------------------------------------
 
-  async listDeals(filter: { stageId?: string; status?: DealStatus } = {}): Promise<DealRow[]> {
+  async listDeals(
+    filter: { stageId?: string; status?: DealStatus } = {},
+  ): Promise<DealRow[]> {
     return this.repo.listDeals(filter);
   }
 
@@ -179,13 +181,21 @@ export class CrmService {
     return this.repo.createTag({ branchId, ...input });
   }
 
-  async assignTag(tagId: string, taggableType: TaggableType, taggableId: string): Promise<void> {
+  async assignTag(
+    tagId: string,
+    taggableType: TaggableType,
+    taggableId: string,
+  ): Promise<void> {
     // The subject must exist in this org before it can be tagged.
     await this.assertSubjectExists(taggableType, taggableId);
     await this.repo.assignTag(tagId, taggableType, taggableId);
   }
 
-  async removeTag(tagId: string, taggableType: TaggableType, taggableId: string): Promise<void> {
+  async removeTag(
+    tagId: string,
+    taggableType: TaggableType,
+    taggableId: string,
+  ): Promise<void> {
     await this.repo.removeTag(tagId, taggableType, taggableId);
   }
 
@@ -205,7 +215,10 @@ export class CrmService {
   // Activities — the single recording seam
   // -------------------------------------------------------------------------
 
-  async listActivities(subjectType: TaggableType, subjectId: string): Promise<ActivityRow[]> {
+  async listActivities(
+    subjectType: TaggableType,
+    subjectId: string,
+  ): Promise<ActivityRow[]> {
     return this.repo.listActivities(subjectType, subjectId);
   }
 

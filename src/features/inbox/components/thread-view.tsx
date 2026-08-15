@@ -71,18 +71,21 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
   }
 
   function toggleArchive() {
-    archive.mutate(
-      conversation.status !== 'archived',
-      { onError: () => toast.error('Could not update the conversation.') },
-    );
+    archive.mutate(conversation.status !== 'archived', {
+      onError: () => toast.error('Could not update the conversation.'),
+    });
   }
 
   function toggleLabel(labelId: string) {
     const has = conversation.labels.some((l) => l.id === labelId);
     if (has) {
-      removeLabel.mutate(labelId, { onError: () => toast.error('Could not update labels.') });
+      removeLabel.mutate(labelId, {
+        onError: () => toast.error('Could not update labels.'),
+      });
     } else {
-      addLabel.mutate(labelId, { onError: () => toast.error('Could not update labels.') });
+      addLabel.mutate(labelId, {
+        onError: () => toast.error('Could not update labels.'),
+      });
     }
   }
 
@@ -92,8 +95,12 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
       <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="truncate text-sm font-semibold">{conversation.contactDisplayName}</h2>
-            {conversation.isEscalated ? <Badge variant="destructive">Escalated</Badge> : null}
+            <h2 className="truncate text-sm font-semibold">
+              {conversation.contactDisplayName}
+            </h2>
+            {conversation.isEscalated ? (
+              <Badge variant="destructive">Escalated</Badge>
+            ) : null}
             {conversation.isPinned ? (
               <Badge variant="outline">
                 <Pin aria-hidden="true" className="size-3" /> Pinned
@@ -102,7 +109,9 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
           </div>
           <p className="text-muted-foreground truncate text-xs">
             {conversation.contactPhone}
-            {conversation.assigneeName ? ` · ${conversation.assigneeName}` : ' · Unassigned'}
+            {conversation.assigneeName
+              ? ` · ${conversation.assigneeName}`
+              : ' · Unassigned'}
           </p>
           <div className="mt-1 flex flex-wrap gap-1">
             {conversation.labels.map((label) => (
@@ -110,7 +119,7 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
                 key={label.id}
                 type="button"
                 onClick={() => toggleLabel(label.id)}
-                className="hover:bg-muted rounded-full focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
+                className="hover:bg-muted focus-visible:ring-ring rounded-full focus-visible:ring-2 focus-visible:outline-none"
                 aria-label={`Remove label ${label.name}`}
               >
                 <Badge variant="outline" className="cursor-pointer">
@@ -145,7 +154,9 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
               )}
               {conversation.status === 'archived' ? 'Unarchive' : 'Archive'}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => toast.info('Assignments ship in this milestone.')}>
+            <DropdownMenuItem
+              onClick={() => toast.info('Assignments ship in this milestone.')}
+            >
               <User aria-hidden="true" className="size-4" />
               Assign…
             </DropdownMenuItem>
@@ -163,7 +174,7 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
 
       {/* Suggestions */}
       {suggestions.length > 0 ? (
-        <div className="border-b bg-muted/30 px-4 py-2">
+        <div className="bg-muted/30 border-b px-4 py-2">
           <p className="text-muted-foreground mb-1.5 text-xs font-medium">Suggestions</p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((suggestion) => (
@@ -217,7 +228,9 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
           <ul className="space-y-1">
             {notes.map((note) => (
               <li key={note.id} className="text-muted-foreground text-xs">
-                <span className="text-foreground font-medium">{note.authorName ?? 'Agent'}:</span>{' '}
+                <span className="text-foreground font-medium">
+                  {note.authorName ?? 'Agent'}:
+                </span>{' '}
                 {note.body}
               </li>
             ))}

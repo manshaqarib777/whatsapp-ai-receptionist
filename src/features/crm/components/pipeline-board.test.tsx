@@ -17,8 +17,22 @@ const PIPELINE = {
   name: 'Treatment plans',
   isDefault: true,
   stages: [
-    { id: 'stage-1', pipelineId: 'pipeline-1', name: 'New enquiry', position: 0, winProbability: 0.1, dealCount: 1 },
-    { id: 'stage-2', pipelineId: 'pipeline-1', name: 'Qualified', position: 1, winProbability: 0.4, dealCount: 0 },
+    {
+      id: 'stage-1',
+      pipelineId: 'pipeline-1',
+      name: 'New enquiry',
+      position: 0,
+      winProbability: 0.1,
+      dealCount: 1,
+    },
+    {
+      id: 'stage-2',
+      pipelineId: 'pipeline-1',
+      name: 'Qualified',
+      position: 1,
+      winProbability: 0.4,
+      dealCount: 0,
+    },
   ],
 };
 
@@ -61,7 +75,8 @@ function mockFetch() {
     'fetch',
     vi.fn((url: string) => {
       const u = String(url);
-      if (u.includes('/api/crm/pipelines')) return Promise.resolve(ok({ data: { pipelines: [PIPELINE] } }));
+      if (u.includes('/api/crm/pipelines'))
+        return Promise.resolve(ok({ data: { pipelines: [PIPELINE] } }));
       if (u.includes('/api/crm/deals')) {
         const deals = u.includes('stageId=stage-2') ? [] : [DEAL];
         return Promise.resolve(ok({ data: { deals } }));
@@ -104,7 +119,9 @@ describe('PipelineBoard', () => {
   it('shows an error state with retry', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })),
+      vi.fn(() =>
+        Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
+      ),
     );
     renderWithQuery(<PipelineBoard />);
 

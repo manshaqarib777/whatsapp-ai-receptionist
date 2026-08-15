@@ -37,6 +37,15 @@ export function LoginForm({ providers }: { providers: string[] }) {
   const searchParams = useSearchParams();
   const next = safeRedirect(searchParams.get('next'), DEFAULT_REDIRECT);
 
+  /**
+   * Better Auth appends ?error=... to the callback URL when a sign-in attempt
+   * cannot complete. The only code the app expects today is the magic-link
+   * plugin's `new_user_signup_disabled` — a link was sent for an address with
+   * no account, and magic links never auto-provision (disableSignUp). Reading
+   * it here keeps the message off the sign-in screen for every normal visit.
+   */
+  const signupDisabled = searchParams.get('error') === 'new_user_signup_disabled';
+
   const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -130,6 +139,21 @@ export function LoginForm({ providers }: { providers: string[] }) {
           Welcome back. Enter your details to continue.
         </p>
       </div>
+
+      {signupDisabled ? (
+        <Alert role="status">
+          <AlertDescription>
+            That sign-in link was sent to an address with no account. Create one first,
+            then use the link or sign in with your password.{' '}
+            <Link
+              href="/signup"
+              className="text-foreground focus-visible:ring-ring rounded underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Create an account
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {formError ? (
         <Alert variant="destructive">

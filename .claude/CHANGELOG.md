@@ -28,6 +28,30 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 12 — Invoicing and Payments**
+
+- An invoicing system at `/invoices`: a status-filtered invoice list, a create
+  dialog with a live VAT preview (standalone or from an accepted quote), and an
+  invoice detail page with line items, totals, payment history, refunds, and a
+  PDF download.
+- The lifecycle is real: draft → issued → partially_paid → paid / overdue /
+  void, with `mark_paid` as the manual override for cash/offline payments.
+  Only a draft can be edited; a paid or void invoice cannot be voided.
+- Invoices are numbered sequentially per organization (`INV-1000`, `INV-1001`, …)
+  and can be created from a quote exactly once — the quote's stored rate+amount
+  columns are copied verbatim, never recomputed.
+- Payments record against an invoice through a gateway seam: Stripe is the first
+  real adapter (test-mode), and HyperPay/PayTabs/STC Pay/Apple Pay are registered
+  `unconfigured` adapters behind the same interface.
+- A webhook journal captures every gateway event with unique `gatewayPaymentId` /
+  `gatewayEventId` keys, so a retried webhook is a structural no-op — a replay can
+  never double-charge. The journal never stores card data, keeping the system out
+  of PCI scope.
+- Refunds record against a succeeded payment with a reason and recompute the
+  invoice's `amountPaid` downward.
+- The invoice API is fully tenant-scoped: every query runs through `forScope`,
+  and the integration suite proves org A can never see org B's invoices.
+
 **Milestone 11 — Quotation System**
 
 - A quotation system at `/quotes`: a status-filtered quote list, a create dialog

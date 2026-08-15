@@ -53,7 +53,9 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
   const addActivity = useAddActivity();
 
   const [newStageId, setNewStageId] = useState<string>('');
-  const [activityKind, setActivityKind] = useState<'note' | 'call' | 'email' | 'meeting'>('note');
+  const [activityKind, setActivityKind] = useState<'note' | 'call' | 'email' | 'meeting'>(
+    'note',
+  );
   const [activityBody, setActivityBody] = useState('');
 
   if (isPending && !data) {
@@ -92,7 +94,11 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
 
   const submitActivity = () => {
     if (!activityBody.trim()) return;
-    addActivity.mutate({ dealId: deal.id, kind: activityKind, body: activityBody.trim() });
+    addActivity.mutate({
+      dealId: deal.id,
+      kind: activityKind,
+      body: activityBody.trim(),
+    });
     setActivityBody('');
   };
 
@@ -108,7 +114,15 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
 
         <div className="space-y-5 overflow-y-auto py-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={deal.status === 'open' ? 'default' : deal.status === 'won' ? 'secondary' : 'destructive'}>
+            <Badge
+              variant={
+                deal.status === 'open'
+                  ? 'default'
+                  : deal.status === 'won'
+                    ? 'secondary'
+                    : 'destructive'
+              }
+            >
               {deal.status}
             </Badge>
             {deal.tags.map((tag) => (
@@ -157,7 +171,11 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" disabled={!newStageId || move.isPending} onClick={submitMove}>
+                <Button
+                  size="sm"
+                  disabled={!newStageId || move.isPending}
+                  onClick={submitMove}
+                >
                   {move.isPending ? 'Moving…' : 'Move deal'}
                 </Button>
               </div>
@@ -186,7 +204,10 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="activity-kind">Add activity</Label>
-              <Select value={activityKind} onValueChange={(v) => setActivityKind(v as typeof activityKind)}>
+              <Select
+                value={activityKind}
+                onValueChange={(v) => setActivityKind(v as typeof activityKind)}
+              >
                 <SelectTrigger id="activity-kind">
                   <SelectValue />
                 </SelectTrigger>
@@ -208,7 +229,11 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
                 rows={3}
               />
             </div>
-            <Button size="sm" disabled={!activityBody.trim() || addActivity.isPending} onClick={submitActivity}>
+            <Button
+              size="sm"
+              disabled={!activityBody.trim() || addActivity.isPending}
+              onClick={submitActivity}
+            >
               {addActivity.isPending ? 'Adding…' : 'Add activity'}
             </Button>
           </div>
@@ -216,7 +241,10 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
           <div className="space-y-3">
             <h3 className="text-sm font-semibold">Timeline</h3>
             {activities.length === 0 ? (
-              <EmptyState title="No activity yet" description="Notes and stage changes appear here." />
+              <EmptyState
+                title="No activity yet"
+                description="Notes and stage changes appear here."
+              />
             ) : (
               <ol className="relative space-y-4 border-s ps-4">
                 {activities.map((activity) => (
@@ -233,7 +261,9 @@ export function DealDrawer({ dealId, onClose }: { dealId: string; onClose: () =>
                       <p className="text-muted-foreground text-sm">{activity.body}</p>
                     ) : null}
                     {activity.actorName ? (
-                      <p className="text-muted-foreground text-xs">by {activity.actorName}</p>
+                      <p className="text-muted-foreground text-xs">
+                        by {activity.actorName}
+                      </p>
                     ) : null}
                   </li>
                 ))}

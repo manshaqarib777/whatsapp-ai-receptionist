@@ -74,7 +74,10 @@ export function evaluateRules(event: CrmEvent, rules: CrmAutomationRules): RuleA
         assigneeId: rules.autoAssignNewDealTo,
       });
     }
-    if (rules.highValueDealThreshold > 0 && event.deal.valueAmount >= rules.highValueDealThreshold) {
+    if (
+      rules.highValueDealThreshold > 0 &&
+      event.deal.valueAmount >= rules.highValueDealThreshold
+    ) {
       actions.push({
         kind: 'tag',
         taggableType: 'deal',
@@ -128,10 +131,15 @@ export async function applyAction(
       const tagged = await repo.hasTag(tag.id, action.taggableType, action.taggableId);
       if (tagged) return;
       await repo.assignTag(tag.id, action.taggableType, action.taggableId);
-      await service.recordActivity(action.taggableId, action.taggableType, 'label_changed', {
-        body: `Auto-tagged "${action.tagName}" by automation rule`,
-        actor: null,
-      });
+      await service.recordActivity(
+        action.taggableId,
+        action.taggableType,
+        'label_changed',
+        {
+          body: `Auto-tagged "${action.tagName}" by automation rule`,
+          actor: null,
+        },
+      );
       return;
     }
   }

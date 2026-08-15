@@ -14,7 +14,10 @@ import { useQuotes, type QuoteStatus } from '@/features/quotations/hooks/use-quo
  * Quote list (M11) — status-filtered, with the create-quote doorway.
  */
 
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const STATUS_VARIANTS: Record<
+  string,
+  'default' | 'secondary' | 'destructive' | 'outline'
+> = {
   draft: 'outline',
   sent: 'default',
   accepted: 'secondary',
@@ -22,7 +25,14 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
   expired: 'outline',
 };
 
-const STATUS_FILTERS: (QuoteStatus | 'all')[] = ['all', 'draft', 'sent', 'accepted', 'rejected', 'expired'];
+const STATUS_FILTERS: (QuoteStatus | 'all')[] = [
+  'all',
+  'draft',
+  'sent',
+  'accepted',
+  'rejected',
+  'expired',
+];
 
 export function QuoteList() {
   const [status, setStatus] = useState<QuoteStatus | 'all'>('all');
@@ -71,7 +81,9 @@ export function QuoteList() {
                 href={`/quotes/${quote.id}`}
                 className="hover:bg-muted focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 focus-visible:ring-2 focus-visible:outline-none"
               >
-                <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'}>{quote.status}</Badge>
+                <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'}>
+                  {quote.status}
+                </Badge>
                 <span className="font-medium">{quote.number}</span>
                 <span className="text-muted-foreground text-sm">
                   {quote.contactName ?? quote.contactId}

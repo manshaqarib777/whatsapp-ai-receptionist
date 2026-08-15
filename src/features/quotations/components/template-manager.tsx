@@ -15,7 +15,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useCreateTemplate, useQuoteTemplates } from '@/features/quotations/hooks/use-quotations';
+import {
+  useCreateTemplate,
+  useQuoteTemplates,
+} from '@/features/quotations/hooks/use-quotations';
 
 /**
  * Quote templates (M11) — name, body template, and a branding footer.
@@ -57,7 +60,9 @@ export function TemplateManager() {
                 {template.bodyTemplate}
               </p>
               {template.branding?.footer ? (
-                <p className="text-muted-foreground mt-1 text-xs">Footer: {template.branding.footer}</p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Footer: {template.branding.footer}
+                </p>
               ) : null}
             </li>
           ))}
@@ -146,7 +151,10 @@ function CreateTemplateDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={!name.trim() || !bodyTemplate.trim() || create.isPending} onClick={submit}>
+          <Button
+            disabled={!name.trim() || !bodyTemplate.trim() || create.isPending}
+            onClick={submit}
+          >
             {create.isPending ? 'Creating…' : 'Create template'}
           </Button>
         </DialogFooter>

@@ -127,8 +127,18 @@ describe('quote creation (VAT + numbering)', () => {
 
   it('numbers quotes sequentially', async () => {
     const service = QuotationsService.forOrganization(f.orgA);
-    const first = await service.createQuote({ contactId: f.contactId, lineItems: [LINES[0] as { description: string; quantity: number; unitPriceAmount: number }] });
-    const second = await service.createQuote({ contactId: f.contactId, lineItems: [LINES[0] as { description: string; quantity: number; unitPriceAmount: number }] });
+    const first = await service.createQuote({
+      contactId: f.contactId,
+      lineItems: [
+        LINES[0] as { description: string; quantity: number; unitPriceAmount: number },
+      ],
+    });
+    const second = await service.createQuote({
+      contactId: f.contactId,
+      lineItems: [
+        LINES[0] as { description: string; quantity: number; unitPriceAmount: number },
+      ],
+    });
 
     const firstNum = Number(first.number.replace('Q-', ''));
     const secondNum = Number(second.number.replace('Q-', ''));
@@ -191,7 +201,11 @@ describe('editing (draft only)', () => {
     await service.transition(quote.id, 'send');
 
     await expect(
-      service.updateQuote(quote.id, { lineItems: [LINES[0] as { description: string; quantity: number; unitPriceAmount: number }] }),
+      service.updateQuote(quote.id, {
+        lineItems: [
+          LINES[0] as { description: string; quantity: number; unitPriceAmount: number },
+        ],
+      }),
     ).rejects.toThrow(ConflictError);
   });
 
@@ -200,9 +214,7 @@ describe('editing (draft only)', () => {
     const quote = await service.createQuote({ contactId: f.contactId, lineItems: LINES });
 
     const updated = await service.updateQuote(quote.id, {
-      lineItems: [
-        { description: 'Root canal only', quantity: 1, unitPriceAmount: 1450 },
-      ],
+      lineItems: [{ description: 'Root canal only', quantity: 1, unitPriceAmount: 1450 }],
     });
 
     expect(updated.lineItems).toHaveLength(1);

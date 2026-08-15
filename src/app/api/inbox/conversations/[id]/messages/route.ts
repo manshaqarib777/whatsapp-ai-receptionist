@@ -1,7 +1,10 @@
 import { requireOrg, requirePermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { InboxService } from '@/features/inbox/services/inbox.service';
-import { messagesQuerySchema, sendMessageSchema } from '@/features/inbox/validators/inbox.validators';
+import {
+  messagesQuerySchema,
+  sendMessageSchema,
+} from '@/features/inbox/validators/inbox.validators';
 
 /**
  * GET  /api/inbox/conversations/[id]/messages?before=&limit= — cursor-paged history

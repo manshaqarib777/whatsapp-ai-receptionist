@@ -19,7 +19,9 @@ async function fetchJson<T>(url: string): Promise<T> {
     cache: 'no-store',
   });
   if (!response.ok) {
-    const error = new Error(`Request failed (${response.status})`) as Error & { status?: number };
+    const error = new Error(`Request failed (${response.status})`) as Error & {
+      status?: number;
+    };
     error.status = response.status;
     throw error;
   }
@@ -38,7 +40,9 @@ async function sendJson<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    const error = new Error(`Request failed (${response.status})`) as Error & { status?: number };
+    const error = new Error(`Request failed (${response.status})`) as Error & {
+      status?: number;
+    };
     error.status = response.status;
     throw error;
   }
@@ -113,9 +117,10 @@ export function useQuote(id: string) {
   return useQuery({
     queryKey: quoteKeys.detail(id),
     queryFn: () =>
-      fetchJson<{ quote: Quote; versions: { versionNumber: number; createdAt: string }[] }>(
-        `/api/quotes/${id}`,
-      ),
+      fetchJson<{
+        quote: Quote;
+        versions: { versionNumber: number; createdAt: string }[];
+      }>(`/api/quotes/${id}`),
     enabled: id.length > 0,
   });
 }
@@ -148,8 +153,13 @@ export function useCreateQuote() {
 export function useTransitionQuote() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; action: 'send' | 'accept' | 'reject' | 'expire' | 'mark_draft' }) =>
-      sendJson<{ quote: Quote }>(`/api/quotes/${input.id}`, 'PATCH', { action: input.action }),
+    mutationFn: (input: {
+      id: string;
+      action: 'send' | 'accept' | 'reject' | 'expire' | 'mark_draft';
+    }) =>
+      sendJson<{ quote: Quote }>(`/api/quotes/${input.id}`, 'PATCH', {
+        action: input.action,
+      }),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: quoteKeys.detail(variables.id) });
       void queryClient.invalidateQueries({ queryKey: quoteKeys.list() });

@@ -25,7 +25,10 @@ type Conversation = {
   branchId: string;
 };
 
-const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+const STATUS_VARIANT: Record<
+  string,
+  'default' | 'secondary' | 'outline' | 'destructive'
+> = {
   open: 'default',
   pending: 'secondary',
   resolved: 'outline',
@@ -41,7 +44,11 @@ function formatTime(date: Date): string {
   }).format(date);
 }
 
-export function RecentConversations({ conversations }: { conversations: Conversation[] }) {
+export function RecentConversations({
+  conversations,
+}: {
+  conversations: Conversation[];
+}) {
   const columns: ColumnDef<Conversation, unknown>[] = [
     {
       accessorKey: 'contactDisplayName',
@@ -68,7 +75,11 @@ export function RecentConversations({ conversations }: { conversations: Conversa
       accessorKey: 'unreadCount',
       header: 'Unread',
       cell: ({ row }) => (
-        <span className={row.original.unreadCount > 0 ? 'font-semibold' : 'text-muted-foreground'}>
+        <span
+          className={
+            row.original.unreadCount > 0 ? 'font-semibold' : 'text-muted-foreground'
+          }
+        >
           {row.original.unreadCount}
         </span>
       ),

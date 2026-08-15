@@ -34,10 +34,7 @@ type SeededOrg = {
   dealId: string;
 };
 
-async function seedCrmOrg(
-  email: string,
-  organizationId: string,
-): Promise<SeededOrg> {
+async function seedCrmOrg(email: string, organizationId: string): Promise<SeededOrg> {
   const connectionString = process.env['DATABASE_URL'] ?? '';
   if (!connectionString) throw new Error('DATABASE_URL is required for E2E seeding.');
   const adapter = new PrismaPg({ connectionString });

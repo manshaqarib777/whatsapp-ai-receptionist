@@ -15,10 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  useCompanies,
-  useCreateCompany,
-} from '@/features/crm/hooks/use-crm';
+import { useCompanies, useCreateCompany } from '@/features/crm/hooks/use-crm';
 
 /**
  * Companies list + create dialog (M10).
@@ -54,7 +51,10 @@ export function CompanyList() {
       ) : (
         <ul className="bg-card divide-border divide-y rounded-xl border">
           {companies.map((company) => (
-            <li key={company.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+            <li
+              key={company.id}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3"
+            >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{company.name}</p>
                 {company.vatNumber ? (
@@ -103,7 +103,9 @@ function CreateCompanyDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add company</DialogTitle>
-          <DialogDescription>Companies link contacts and deals together.</DialogDescription>
+          <DialogDescription>
+            Companies link contacts and deals together.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">

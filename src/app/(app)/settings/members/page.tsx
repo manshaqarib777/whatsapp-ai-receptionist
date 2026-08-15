@@ -6,6 +6,10 @@ import { requirePermission } from '@/server/auth-context';
 
 export const metadata: Metadata = { title: 'Members' };
 
+// Session + permission reads make this page request-time only; it must never
+// be statically prerendered (a prerender has no session headers).
+export const dynamic = 'force-dynamic';
+
 export default async function MembersSettingsPage() {
   // Authorization happens HERE, server-side. The table receives only what this
   // user is permitted to see.

@@ -57,7 +57,10 @@ describe('evaluateRules — deal.created', () => {
   });
 
   it('tags a deal above the high-value threshold', () => {
-    const rules: CrmAutomationRules = { ...DEFAULT_RULES, highValueDealThreshold: 10_000 };
+    const rules: CrmAutomationRules = {
+      ...DEFAULT_RULES,
+      highValueDealThreshold: 10_000,
+    };
     const deal = makeDeal({ valueAmount: 12_000 });
 
     const actions = evaluateRules({ type: 'deal.created', deal }, rules);

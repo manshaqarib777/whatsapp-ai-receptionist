@@ -39,9 +39,7 @@ export function ConversationRow({ conversation }: { conversation: ConversationRo
       aria-current={active ? 'page' : undefined}
       className={cn(
         'focus-visible:ring-ring flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-start transition-colors focus-visible:ring-2 focus-visible:outline-none',
-        active
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-          : 'hover:bg-muted',
+        active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-muted',
       )}
     >
       <div className="min-w-0 flex-1">
@@ -70,13 +68,17 @@ export function ConversationRow({ conversation }: { conversation: ConversationRo
           {hasTyping ? (
             <span className="text-primary italic">typing…</span>
           ) : (
-            conversation.preview ?? 'No messages yet'
+            (conversation.preview ?? 'No messages yet')
           )}
         </p>
 
         <div className="mt-1 flex items-center gap-1.5">
           {conversation.labels.slice(0, 2).map((label) => (
-            <Badge key={label.id} variant="outline" className="text-muted-foreground text-[0.6875rem]">
+            <Badge
+              key={label.id}
+              variant="outline"
+              className="text-muted-foreground text-[0.6875rem]"
+            >
               {label.name}
             </Badge>
           ))}
@@ -84,7 +86,10 @@ export function ConversationRow({ conversation }: { conversation: ConversationRo
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <time className="text-muted-foreground text-xs tabular-nums" dateTime={conversation.lastMessageAt.toISOString()}>
+        <time
+          className="text-muted-foreground text-xs tabular-nums"
+          dateTime={conversation.lastMessageAt.toISOString()}
+        >
           {formatRelativeTime(conversation.lastMessageAt)}
         </time>
         {conversation.unreadCount > 0 ? (

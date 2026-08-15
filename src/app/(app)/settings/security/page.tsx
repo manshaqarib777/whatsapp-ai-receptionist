@@ -5,6 +5,10 @@ import { requireAuth } from '@/server/auth-context';
 
 export const metadata: Metadata = { title: 'Security' };
 
+// Session reads make this page request-time only; it must never be statically
+// prerendered (a prerender has no session headers).
+export const dynamic = 'force-dynamic';
+
 export default async function SecuritySettingsPage() {
   const { user } = await requireAuth();
 

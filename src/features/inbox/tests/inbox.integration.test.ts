@@ -52,7 +52,11 @@ async function makeOrg(orgLabel: string): Promise<string> {
   return org.id;
 }
 
-async function makeBranch(orgId: string, label: string, isDefault: boolean): Promise<string> {
+async function makeBranch(
+  orgId: string,
+  label: string,
+  isDefault: boolean,
+): Promise<string> {
   const branch = await prisma.branch.create({
     data: {
       organizationId: orgId,
@@ -66,7 +70,11 @@ async function makeBranch(orgId: string, label: string, isDefault: boolean): Pro
   return branch.id;
 }
 
-async function makeContact(orgId: string, branchId: string, phone: string): Promise<string> {
+async function makeContact(
+  orgId: string,
+  branchId: string,
+  phone: string,
+): Promise<string> {
   const contact = await prisma.contact.create({
     data: {
       organizationId: orgId,
@@ -102,7 +110,12 @@ async function makeConversation(
   branchId: string,
   contactId: string,
   waId: string,
-  input: { status?: string; isPinned?: boolean; unreadCount?: number; lastMessageAt?: Date } = {},
+  input: {
+    status?: string;
+    isPinned?: boolean;
+    unreadCount?: number;
+    lastMessageAt?: Date;
+  } = {},
 ): Promise<string> {
   const conversation = await prisma.conversation.create({
     data: {
@@ -302,7 +315,9 @@ describe('thread + messages', () => {
     const updated = await prisma.conversation.findFirst({ where: { id: conv } });
     expect(updated?.unreadCount).toBe(0);
 
-    const read = await prisma.conversationRead.findFirst({ where: { conversationId: conv } });
+    const read = await prisma.conversationRead.findFirst({
+      where: { conversationId: conv },
+    });
     expect(read).not.toBeNull();
   });
 
@@ -324,9 +339,7 @@ describe('thread + messages', () => {
 
     const updated = await prisma.conversation.findFirst({ where: { id: conv } });
     expect(updated?.unreadCount).toBe(0);
-    expect(updated?.lastMessageAt.getTime()).toBeGreaterThan(
-      Date.now() - 10 * DAY,
-    );
+    expect(updated?.lastMessageAt.getTime()).toBeGreaterThan(Date.now() - 10 * DAY);
   });
 
   it('404s on a conversation from another org', async () => {

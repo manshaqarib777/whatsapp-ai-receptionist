@@ -58,15 +58,27 @@ export function TaskList() {
       </div>
 
       {tasks.length === 0 ? (
-        <EmptyState title="No tasks yet" description="Create a task to track follow-ups." />
+        <EmptyState
+          title="No tasks yet"
+          description="Create a task to track follow-ups."
+        />
       ) : (
         <ul className="bg-card divide-border divide-y rounded-xl border">
           {tasks.map((task) => (
-            <li key={task.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+            <li
+              key={task.id}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3"
+            >
               <Badge variant={task.status === 'done' ? 'secondary' : 'outline'}>
                 {STATUS_LABELS[task.status] ?? task.status}
               </Badge>
-              <span className={task.status === 'done' ? 'text-muted-foreground min-w-0 flex-1 line-through' : 'min-w-0 flex-1 text-sm font-medium'}>
+              <span
+                className={
+                  task.status === 'done'
+                    ? 'text-muted-foreground min-w-0 flex-1 line-through'
+                    : 'min-w-0 flex-1 text-sm font-medium'
+                }
+              >
                 {task.title}
               </span>
               {task.dueAt ? (
@@ -133,7 +145,9 @@ function CreateTaskDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New task</DialogTitle>
-          <DialogDescription>Tasks track follow-ups across the practice.</DialogDescription>
+          <DialogDescription>
+            Tasks track follow-ups across the practice.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">

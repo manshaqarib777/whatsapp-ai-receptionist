@@ -6,7 +6,12 @@ import { z } from 'zod';
  * details.
  */
 
-export const conversationStatusSchema = z.enum(['open', 'pending', 'resolved', 'archived']);
+export const conversationStatusSchema = z.enum([
+  'open',
+  'pending',
+  'resolved',
+  'archived',
+]);
 
 export const inboxListQuerySchema = z.object({
   status: conversationStatusSchema.optional(),
@@ -23,7 +28,9 @@ export const inboxListQuerySchema = z.object({
 
 export const sendMessageSchema = z.object({
   body: z.string().trim().min(1, 'Message cannot be empty.').max(4000),
-  contentType: z.enum(['text', 'image', 'audio', 'video', 'document', 'location', 'sticker']).optional(),
+  contentType: z
+    .enum(['text', 'image', 'audio', 'video', 'document', 'location', 'sticker'])
+    .optional(),
 });
 
 export const createNoteSchema = z.object({

@@ -2,6 +2,16 @@ import { forScope } from '@/lib/db/scoped-prisma';
 import type { Scope } from '@/lib/db/scope';
 import { resolveScope } from '@/server/scope';
 
+import type {
+  ActivityFeedItem,
+  ConversationSeriesPoint,
+  DateRange,
+  NotificationRow,
+  RecentConversation,
+  RevenueSeriesPoint,
+  UpcomingAppointment,
+} from './dashboard.types';
+
 /**
  * Dashboard data access.
  *
@@ -17,51 +27,6 @@ import { resolveScope } from '@/server/scope';
  * raw counts, sums, and bounded row lists means the expensive decisions live where
  * they can be unit-tested without a database.
  */
-
-export type DateRange = { from: Date; to: Date };
-
-export type ConversationSeriesPoint = { date: Date; count: number };
-export type RevenueSeriesPoint = { date: Date; amount: number };
-
-export type RecentConversation = {
-  id: string;
-  contactDisplayName: string;
-  contactLocale: string;
-  status: string;
-  unreadCount: number;
-  lastMessageAt: Date;
-  branchId: string;
-};
-
-export type UpcomingAppointment = {
-  id: string;
-  contactDisplayName: string;
-  startsAt: Date;
-  endsAt: Date;
-  status: string;
-  branchId: string;
-};
-
-export type ActivityFeedItem = {
-  id: string;
-  kind: string;
-  subjectType: string;
-  subjectId: string;
-  body: string | null;
-  actorName: string | null;
-  createdAt: Date;
-};
-
-export type DashboardCounts = {
-  newConversations: number;
-  previousNewConversations: number;
-  responseTimeSeconds: number | null;
-  previousResponseTimeSeconds: number | null;
-  openRevenueAmount: number;
-  previousOpenRevenueAmount: number;
-  openDeals: number;
-  previousOpenDeals: number;
-};
 
 /**
  * One repository instance bound to one tenant scope.
@@ -332,11 +297,14 @@ export class DashboardRepository {
   }
 }
 
-export type NotificationRow = {
-  id: string;
-  kind: string;
-  title: string;
-  body: string | null;
-  readAt: Date | null;
-  createdAt: Date;
-};
+// Re-export the shared types so consumers keep one import surface.
+export type {
+  ActivityFeedItem,
+  ConversationSeriesPoint,
+  DashboardCounts,
+  DateRange,
+  NotificationRow,
+  RecentConversation,
+  RevenueSeriesPoint,
+  UpcomingAppointment,
+} from './dashboard.types';

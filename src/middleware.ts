@@ -13,7 +13,18 @@ import { NextResponse, type NextRequest } from 'next/server';
  * entirely is still rejected (MILESTONE_02_PLAN.md, Risk 8).
  */
 
-const PROTECTED_PREFIXES = ['/dashboard', '/settings', '/onboarding', '/inbox', '/contacts', '/appointments'];
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/settings',
+  '/onboarding',
+  '/inbox',
+  '/contacts',
+  '/appointments',
+  '/crm',
+  '/quotes',
+  '/invoices',
+  '/workflows',
+];
 
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -46,5 +57,9 @@ export const config = {
     '/inbox/:path*',
     '/contacts/:path*',
     '/appointments/:path*',
+    '/crm/:path*',
+    '/quotes/:path*',
+    '/invoices/:path*',
+    '/workflows/:path*',
   ],
 };

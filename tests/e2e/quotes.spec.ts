@@ -34,10 +34,7 @@ type SeededOrg = {
   quoteId: string;
 };
 
-async function seedQuoteOrg(
-  email: string,
-  organizationId: string,
-): Promise<SeededOrg> {
+async function seedQuoteOrg(email: string, organizationId: string): Promise<SeededOrg> {
   const connectionString = process.env['DATABASE_URL'] ?? '';
   if (!connectionString) throw new Error('DATABASE_URL is required for E2E seeding.');
   const adapter = new PrismaPg({ connectionString });
@@ -106,7 +103,10 @@ async function seedQuoteOrg(
   }
 }
 
-async function cleanupOrg(seeded: SeededOrg, createdQuoteId?: string | null): Promise<void> {
+async function cleanupOrg(
+  seeded: SeededOrg,
+  createdQuoteId?: string | null,
+): Promise<void> {
   const connectionString = process.env['DATABASE_URL'] ?? '';
   if (!connectionString) throw new Error('DATABASE_URL is required for cleanup.');
   const adapter = new PrismaPg({ connectionString });
@@ -200,11 +200,15 @@ test.describe('quotes', () => {
     // create landed in the active org before the switch settled.
     let createdQuoteId: string | null = null;
     page.on('response', (response) => {
-      if (response.url().includes('/api/quotes') && response.request().method() === 'POST') {
+      if (
+        response.url().includes('/api/quotes') &&
+        response.request().method() === 'POST'
+      ) {
         void response
           .json()
           .then((payload) => {
-            const id = (payload as { data?: { quote?: { id?: string } } })?.data?.quote?.id;
+            const id = (payload as { data?: { quote?: { id?: string } } })?.data?.quote
+              ?.id;
             if (id) createdQuoteId = id;
           })
           .catch(() => undefined);

@@ -62,7 +62,10 @@ describe('RecentConversations', () => {
   it('provides a View all doorway to the inbox', () => {
     render(<RecentConversations conversations={CONVERSATIONS} />);
 
-    expect(screen.getByRole('link', { name: 'View all' })).toHaveAttribute('href', '/inbox');
+    expect(screen.getByRole('link', { name: 'View all' })).toHaveAttribute(
+      'href',
+      '/inbox',
+    );
   });
 
   it('has a screen-reader caption on the table', () => {

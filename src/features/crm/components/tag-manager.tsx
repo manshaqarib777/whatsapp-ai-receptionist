@@ -60,7 +60,10 @@ export function TagManager() {
       </div>
 
       {tags.length === 0 ? (
-        <EmptyState title="No tags yet" description="Create a tag to label deals and contacts." />
+        <EmptyState
+          title="No tags yet"
+          description="Create a tag to label deals and contacts."
+        />
       ) : (
         <ul className="flex flex-wrap gap-2">
           {tags.map((tag) => (
@@ -106,7 +109,9 @@ function CreateTagDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New tag</DialogTitle>
-          <DialogDescription>Tags label deals and contacts across the CRM.</DialogDescription>
+          <DialogDescription>
+            Tags label deals and contacts across the CRM.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">

@@ -47,7 +47,9 @@ describe('RangePicker', () => {
   it('groups the toggle as a labelled control', () => {
     const { container } = render(<RangePicker value="30d" />);
 
-    expect(container.querySelector('[role="group"][aria-label="Date range"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[role="group"][aria-label="Date range"]'),
+    ).toBeInTheDocument();
   });
 
   it('persists a new range through the API and refreshes', async () => {

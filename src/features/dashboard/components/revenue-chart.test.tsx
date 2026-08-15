@@ -20,7 +20,10 @@ const DATA = [
 describe('RevenueChart', () => {
   it('renders the title and a summary of the period', () => {
     render(
-      <RevenueChart data={DATA} summary="Invoiced revenue per day in the period; 250 in total." />,
+      <RevenueChart
+        data={DATA}
+        summary="Invoiced revenue per day in the period; 250 in total."
+      />,
     );
 
     expect(
@@ -30,7 +33,12 @@ describe('RevenueChart', () => {
   });
 
   it('renders an empty state with guidance instead of a bare "no data"', () => {
-    render(<RevenueChart data={[]} summary="Invoiced revenue per day in the period; 0 in total." />);
+    render(
+      <RevenueChart
+        data={[]}
+        summary="Invoiced revenue per day in the period; 0 in total."
+      />,
+    );
 
     // Exactly one — the description and the empty body must not duplicate.
     expect(
@@ -43,7 +51,10 @@ describe('RevenueChart', () => {
 
   it('exposes the chart with a screen-reader summary when there is data', async () => {
     const { container } = render(
-      <RevenueChart data={DATA} summary="Invoiced revenue per day in the period; 250 in total." />,
+      <RevenueChart
+        data={DATA}
+        summary="Invoiced revenue per day in the period; 250 in total."
+      />,
     );
 
     expect(screen.getByLabelText(/250 in total/i)).toBeInTheDocument();

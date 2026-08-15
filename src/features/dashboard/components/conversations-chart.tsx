@@ -1,6 +1,12 @@
 import { TrendChart } from '@/components/charts';
 import type { ChartConfig } from '@/components/ui/chart';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 /**
  * Conversations over time — the dashboard's primary chart.

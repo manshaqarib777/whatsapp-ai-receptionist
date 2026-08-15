@@ -55,7 +55,9 @@ async function makeBranch(orgId: string, label: string): Promise<string> {
   return branch.id;
 }
 
-async function seedPipeline(orgId: string): Promise<{ pipelineId: string; stageIds: string[] }> {
+async function seedPipeline(
+  orgId: string,
+): Promise<{ pipelineId: string; stageIds: string[] }> {
   const service = CrmService.forOrganization(orgId);
   const pipeline = await service.createPipeline({
     name: 'Sales',
@@ -110,7 +112,7 @@ describe('pipelines (AD-1/AD-2)', () => {
     const pipelines = await service.listPipelines();
 
     expect(pipelines).toHaveLength(1);
-    const [pipeline] = pipelines as [typeof pipelines[number]];
+    const [pipeline] = pipelines as [(typeof pipelines)[number]];
     expect(pipeline?.stages.map((s) => s.name)).toEqual([
       'New enquiry',
       'Qualified',
@@ -160,9 +162,9 @@ describe('deal lifecycle (AD-2/AD-3)', () => {
     expect(won.status).toBe('won');
     expect(won.closedAt).not.toBeNull();
 
-    await expect(service.moveDealToStage(deal.id, f.stageIds[1] as string)).rejects.toThrow(
-      ConflictError,
-    );
+    await expect(
+      service.moveDealToStage(deal.id, f.stageIds[1] as string),
+    ).rejects.toThrow(ConflictError);
   });
 
   it('refuses to close an already-closed deal', async () => {
@@ -247,7 +249,16 @@ describe('automation (AD-5)', () => {
     });
 
     const actions = evaluateRules({ type: 'deal.created', deal }, rules);
-    await applyAction(service, repo, actions[0] as { kind: 'tag'; taggableType: 'deal'; taggableId: string; tagName: string });
+    await applyAction(
+      service,
+      repo,
+      actions[0] as {
+        kind: 'tag';
+        taggableType: 'deal';
+        taggableId: string;
+        tagName: string;
+      },
+    );
 
     const tags = await prisma.taggable.count({
       where: { taggableType: 'deal', taggableId: deal.id },
@@ -255,7 +266,16 @@ describe('automation (AD-5)', () => {
     expect(tags).toBe(1);
 
     // Re-running the same action must not double-apply.
-    await applyAction(service, repo, actions[0] as { kind: 'tag'; taggableType: 'deal'; taggableId: string; tagName: string });
+    await applyAction(
+      service,
+      repo,
+      actions[0] as {
+        kind: 'tag';
+        taggableType: 'deal';
+        taggableId: string;
+        tagName: string;
+      },
+    );
     const tagsAfter = await prisma.taggable.count({
       where: { taggableType: 'deal', taggableId: deal.id },
     });

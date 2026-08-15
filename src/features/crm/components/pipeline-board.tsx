@@ -80,7 +80,10 @@ function StageColumn({
   const deals = data?.deals ?? [];
 
   return (
-    <section aria-label={stage.name} className="bg-muted/40 flex flex-col rounded-xl border p-3">
+    <section
+      aria-label={stage.name}
+      className="bg-muted/40 flex flex-col rounded-xl border p-3"
+    >
       <header className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{stage.name}</h3>
         <span className="text-muted-foreground text-xs tabular-nums">{deals.length}</span>
@@ -117,7 +120,7 @@ function DealCard({
       <button
         type="button"
         onClick={() => onOpen(deal.id)}
-        className="hover:text-foreground text-start text-sm font-medium focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
+        className="hover:text-foreground focus-visible:ring-ring text-start text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
       >
         {deal.title}
       </button>
@@ -140,7 +143,12 @@ function DealCard({
       ) : null}
 
       <div className="relative">
-        <Button size="sm" variant="outline" className="w-full" onClick={() => setMenuOpen((v) => !v)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full"
+          onClick={() => setMenuOpen((v) => !v)}
+        >
           Move…
         </Button>
         {menuOpen ? (
@@ -155,7 +163,7 @@ function DealCard({
                   move.mutate({ id: deal.id, stageId: stage.id });
                   setMenuOpen(false);
                 }}
-                className="hover:bg-muted w-full rounded-md px-2 py-1.5 text-start text-sm focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
+                className="hover:bg-muted focus-visible:ring-ring w-full rounded-md px-2 py-1.5 text-start text-sm focus-visible:ring-2 focus-visible:outline-none"
               >
                 {stage.name}
               </button>

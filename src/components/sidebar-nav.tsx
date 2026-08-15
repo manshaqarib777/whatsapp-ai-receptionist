@@ -9,25 +9,23 @@ import {
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
+  Receipt,
   Search,
   Settings,
   Sparkles,
   Users,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRef, type ReactNode } from 'react';
 
 import { useDirection } from '@/hooks/use-direction';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+
+import { NavLink } from './nav-link';
 
 /**
  * Application sidebar.
@@ -85,6 +83,8 @@ const ICONS = {
   calendar: Calendar,
   briefcase: Briefcase,
   'file-text': FileText,
+  receipt: Receipt,
+  workflow: Workflow,
   settings: Settings,
 } as const;
 
@@ -235,74 +235,5 @@ export function SidebarNav({
         ) : null}
       </nav>
     </TooltipProvider>
-  );
-}
-
-function NavLink({
-  item,
-  icon,
-  active,
-  collapsed,
-  tooltipSide,
-}: {
-  item: NavItem;
-  icon: LucideIcon;
-  active: boolean;
-  collapsed: boolean;
-  tooltipSide: 'left' | 'right';
-}) {
-  const Icon = icon;
-
-  const link = (
-    <Link
-      href={item.href}
-      // The route decides this, not a click handler — so it survives a reload.
-      aria-current={active ? 'page' : undefined}
-      // Collapsed, the visible label is gone; the tooltip text becomes the name.
-      aria-label={collapsed ? item.label : undefined}
-      className={cn(
-        'focus-visible:ring-ring flex h-9 items-center gap-3 rounded-md text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none',
-        collapsed ? 'justify-center px-0' : 'px-2',
-        active
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-          : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground font-normal',
-      )}
-    >
-      <Icon
-        aria-hidden="true"
-        className={cn('size-4 shrink-0', active && 'text-sidebar-accent-foreground')}
-      />
-
-      {!collapsed ? (
-        <>
-          <span className="flex-1 truncate">{item.label}</span>
-          {typeof item.count === 'number' ? (
-            <span
-              className={cn(
-                'rounded-full px-1.5 py-0.5 text-xs tabular-nums',
-                item.urgent
-                  ? 'bg-destructive/10 text-destructive font-medium'
-                  : 'bg-muted text-muted-foreground',
-              )}
-            >
-              {item.count}
-              <span className="sr-only"> {item.urgent ? 'urgent items' : 'items'}</span>
-            </span>
-          ) : null}
-        </>
-      ) : null}
-    </Link>
-  );
-
-  if (!collapsed) return link;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side={tooltipSide}>
-        {item.label}
-        {typeof item.count === 'number' ? ` (${item.count})` : ''}
-      </TooltipContent>
-    </Tooltip>
   );
 }

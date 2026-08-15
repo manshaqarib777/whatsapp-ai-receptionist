@@ -63,7 +63,10 @@ describe('ActivityFeed', () => {
   it('offers a View all doorway', () => {
     render(<ActivityFeed activities={ACTIVITIES} />);
 
-    expect(screen.getByRole('link', { name: 'View all' })).toHaveAttribute('href', '/contacts');
+    expect(screen.getByRole('link', { name: 'View all' })).toHaveAttribute(
+      'href',
+      '/contacts',
+    );
   });
 
   it('renders an empty state with guidance', () => {

@@ -47,7 +47,11 @@ describe('NotificationsBell', () => {
 
     render(<NotificationsBell />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Notifications, 1 unread' }),
+      ).toBeInTheDocument(),
+    );
     vi.unstubAllGlobals();
   });
 
@@ -57,7 +61,9 @@ describe('NotificationsBell', () => {
 
     render(<NotificationsBell />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument(),
+    );
     vi.unstubAllGlobals();
   });
 
@@ -67,11 +73,17 @@ describe('NotificationsBell', () => {
     const user = userEvent.setup();
     render(<NotificationsBell />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Notifications, 1 unread' }),
+      ).toBeInTheDocument(),
+    );
     await user.click(screen.getByRole('button', { name: 'Notifications, 1 unread' }));
 
     expect(await screen.findByText('Conversation escalated to you')).toBeInTheDocument();
-    expect(await screen.findByText('Appointment cancelled by customer')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Appointment cancelled by customer'),
+    ).toBeInTheDocument();
     vi.unstubAllGlobals();
   });
 
@@ -81,7 +93,9 @@ describe('NotificationsBell', () => {
     const user = userEvent.setup();
     render(<NotificationsBell />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument(),
+    );
     await user.click(screen.getByRole('button', { name: 'Notifications' }));
 
     expect(await screen.findByText('You are all caught up.')).toBeInTheDocument();
@@ -93,7 +107,11 @@ describe('NotificationsBell', () => {
 
     const { container } = render(<NotificationsBell />);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Notifications, 1 unread' }),
+      ).toBeInTheDocument(),
+    );
 
     expect(await axe(container)).toHaveNoViolations();
     vi.unstubAllGlobals();

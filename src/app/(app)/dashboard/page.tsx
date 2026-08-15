@@ -19,7 +19,13 @@ import {
 } from '@/features/dashboard/services/dashboard.service';
 import { requireOrg } from '@/server/auth-context';
 import { cookies } from 'next/headers';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
@@ -69,15 +75,24 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Suspense
           fallback={
-            <CardSkeleton title="Conversations over time" description="Loading conversations…" />
+            <CardSkeleton
+              title="Conversations over time"
+              description="Loading conversations…"
+            />
           }
         >
           <div className="lg:col-span-2">
-            <ConversationsSection organizationId={organizationId} range={range} rangeValue={rangeValue} />
+            <ConversationsSection
+              organizationId={organizationId}
+              range={range}
+              rangeValue={rangeValue}
+            />
           </div>
         </Suspense>
 
-        <Suspense fallback={<CardSkeleton title="Activity" description="Loading activity…" />}>
+        <Suspense
+          fallback={<CardSkeleton title="Activity" description="Loading activity…" />}
+        >
           <ActivitySection organizationId={organizationId} />
         </Suspense>
       </div>
@@ -85,20 +100,28 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Suspense
           fallback={
-            <CardSkeleton title="Upcoming appointments" description="Loading appointments…" />
+            <CardSkeleton
+              title="Upcoming appointments"
+              description="Loading appointments…"
+            />
           }
         >
           <AppointmentsSection organizationId={organizationId} />
         </Suspense>
 
-        <Suspense fallback={<CardSkeleton title="Revenue" description="Loading revenue…" />}>
+        <Suspense
+          fallback={<CardSkeleton title="Revenue" description="Loading revenue…" />}
+        >
           <RevenueSection organizationId={organizationId} range={range} />
         </Suspense>
       </div>
 
       <Suspense
         fallback={
-          <CardSkeleton title="Recent conversations" description="Loading conversations…" />
+          <CardSkeleton
+            title="Recent conversations"
+            description="Loading conversations…"
+          />
         }
       >
         <RecentConversationsSection organizationId={organizationId} />
@@ -164,7 +187,11 @@ async function RevenueSection({
   );
 }
 
-async function RecentConversationsSection({ organizationId }: { organizationId: string }) {
+async function RecentConversationsSection({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
   const conversations = await getRecentConversations(organizationId);
   return <RecentConversations conversations={conversations} />;
 }
@@ -177,7 +204,12 @@ function CardSkeleton({ title, description }: { title: string; description: stri
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div role="status" aria-busy="true" aria-label={description} className="space-y-3">
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label={description}
+          className="space-y-3"
+        >
           <Skeleton className="h-4 w-1/3" />
           <Skeleton className="h-40 w-full" />
           <Skeleton className="h-4 w-1/2" />

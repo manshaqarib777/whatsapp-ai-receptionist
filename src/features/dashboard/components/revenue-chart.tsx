@@ -1,6 +1,12 @@
 import { TrendChart } from '@/components/charts';
 import type { ChartConfig } from '@/components/ui/chart';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 /**
  * Revenue chart — cumulative invoice value issued across the range.
@@ -27,7 +33,9 @@ export function RevenueChart({ data, summary }: RevenueChartProps) {
       <CardHeader>
         <CardTitle>Revenue</CardTitle>
         <CardDescription>
-          {total > 0 ? 'Invoiced value in this period' : 'No invoices issued yet in this period.'}
+          {total > 0
+            ? 'Invoiced value in this period'
+            : 'No invoices issued yet in this period.'}
         </CardDescription>
       </CardHeader>
       <CardContent>

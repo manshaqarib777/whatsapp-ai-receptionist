@@ -7,7 +7,13 @@ import { z } from 'zod';
  * details.
  */
 
-export const quoteStatusSchema = z.enum(['draft', 'sent', 'accepted', 'rejected', 'expired']);
+export const quoteStatusSchema = z.enum([
+  'draft',
+  'sent',
+  'accepted',
+  'rejected',
+  'expired',
+]);
 
 export const lineItemSchema = z.object({
   description: z.string().trim().min(1, 'A description is required.').max(2000),

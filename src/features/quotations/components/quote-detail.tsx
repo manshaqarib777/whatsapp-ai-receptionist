@@ -13,7 +13,10 @@ import { useQuote, useTransitionQuote } from '@/features/quotations/hooks/use-qu
  * reject / expire), a PDF download, and the version history.
  */
 
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const STATUS_VARIANTS: Record<
+  string,
+  'default' | 'secondary' | 'destructive' | 'outline'
+> = {
   draft: 'outline',
   sent: 'default',
   accepted: 'secondary',
@@ -34,9 +37,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
 
   const quote = data?.quote;
   if (!quote) {
-    return (
-      <EmptyState title="Quote not found" description="It may have been removed." />
-    );
+    return <EmptyState title="Quote not found" description="It may have been removed." />;
   }
   const versions = data?.versions ?? [];
 
@@ -51,9 +52,13 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
     <div className="space-y-6">
       <section className="bg-card text-card-foreground rounded-xl border p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'}>{quote.status}</Badge>
+          <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'}>
+            {quote.status}
+          </Badge>
           <span className="font-medium">{quote.number}</span>
-          <span className="text-muted-foreground text-sm">{quote.contactName ?? quote.contactId}</span>
+          <span className="text-muted-foreground text-sm">
+            {quote.contactName ?? quote.contactId}
+          </span>
         </div>
 
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
@@ -63,12 +68,17 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
           </div>
           <div>
             <dt className="text-muted-foreground text-xs">Valid until</dt>
-            <dd>{quote.validUntil ? format(new Date(quote.validUntil), 'd MMM yyyy') : '—'}</dd>
+            <dd>
+              {quote.validUntil ? format(new Date(quote.validUntil), 'd MMM yyyy') : '—'}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground text-xs">Total</dt>
             <dd className="font-semibold tabular-nums">
-              {quote.totalAmount.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+              {quote.totalAmount.toLocaleString('en', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{' '}
               {quote.currency}
             </dd>
           </div>
@@ -92,13 +102,22 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
                   <td className="py-2">{line.description}</td>
                   <td className="py-2 text-end tabular-nums">{line.quantity}</td>
                   <td className="py-2 text-end tabular-nums">
-                    {line.unitPriceAmount.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {line.unitPriceAmount.toLocaleString('en', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
                   <td className="py-2 text-end tabular-nums">
-                    {line.taxAmount.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {line.taxAmount.toLocaleString('en', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
                   <td className="py-2 text-end tabular-nums">
-                    {line.lineTotalAmount.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {line.lineTotalAmount.toLocaleString('en', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </td>
                 </tr>
               ))}
@@ -106,7 +125,7 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
           </table>
         </div>
 
-        <dl className="mt-4 ms-auto w-full max-w-xs space-y-1 text-sm">
+        <dl className="ms-auto mt-4 w-full max-w-xs space-y-1 text-sm">
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Subtotal</dt>
             <dd className="tabular-nums">{quote.subtotalAmount.toFixed(2)}</dd>
@@ -136,13 +155,25 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
           ) : null}
           {isSent ? (
             <>
-              <Button variant="outline" disabled={transition.isPending} onClick={() => act('accept')}>
+              <Button
+                variant="outline"
+                disabled={transition.isPending}
+                onClick={() => act('accept')}
+              >
                 Accept
               </Button>
-              <Button variant="outline" disabled={transition.isPending} onClick={() => act('reject')}>
+              <Button
+                variant="outline"
+                disabled={transition.isPending}
+                onClick={() => act('reject')}
+              >
                 Reject
               </Button>
-              <Button variant="outline" disabled={transition.isPending} onClick={() => act('expire')}>
+              <Button
+                variant="outline"
+                disabled={transition.isPending}
+                onClick={() => act('expire')}
+              >
                 Expire
               </Button>
             </>
@@ -159,7 +190,10 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
             {versions.map((version) => (
-              <li key={version.versionNumber} className="text-muted-foreground flex justify-between">
+              <li
+                key={version.versionNumber}
+                className="text-muted-foreground flex justify-between"
+              >
                 <span>Version {version.versionNumber}</span>
                 <span>{format(new Date(version.createdAt), 'd MMM yyyy, HH:mm')}</span>
               </li>

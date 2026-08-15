@@ -45,7 +45,14 @@ describe('CompanyList', () => {
         ok({
           data: {
             companies: [
-              { id: 'c1', name: 'Alrajhi Logistics', vatNumber: '300123', createdAt: '2026-08-01', contactCount: 2, dealCount: 1 },
+              {
+                id: 'c1',
+                name: 'Alrajhi Logistics',
+                vatNumber: '300123',
+                createdAt: '2026-08-01',
+                contactCount: 2,
+                dealCount: 1,
+              },
             ],
           },
         }),
@@ -59,7 +66,10 @@ describe('CompanyList', () => {
   });
 
   it('shows an empty state', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { companies: [] } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { companies: [] } })),
+    );
     renderWithQuery(<CompanyList />);
 
     expect(await screen.findByText('No companies yet')).toBeInTheDocument();
@@ -99,13 +109,14 @@ describe('TagManager', () => {
   });
 
   it('creates a tag through the dialog', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { tags: [] } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { tags: [] } })),
+    );
     renderWithQuery(<TagManager />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'New tag' }));
-    expect(
-      await screen.findByRole('heading', { name: 'New tag' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'New tag' })).toBeInTheDocument();
 
     await userEvent.type(screen.getByLabelText('Name'), 'VIP');
     await userEvent.click(screen.getByRole('button', { name: 'Create tag' }));
@@ -153,13 +164,18 @@ describe('TaskList', () => {
     );
     renderWithQuery(<TaskList />);
 
-    expect(await screen.findByText('Call back about the crown fitting')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Call back about the crown fitting'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Amina Farouk')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Complete' })).toBeInTheDocument();
   });
 
   it('shows an empty state', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { tasks: [] } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { tasks: [] } })),
+    );
     renderWithQuery(<TaskList />);
 
     expect(await screen.findByText('No tasks yet')).toBeInTheDocument();

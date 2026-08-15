@@ -17,7 +17,10 @@ export default async function CrmCompaniesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Companies" description="Organisations linked to contacts and deals." />
+      <PageHeader
+        title="Companies"
+        description="Organisations linked to contacts and deals."
+      />
       <Suspense fallback={<LoadingState rows={5} label="Loading companies" />}>
         <CompanyList />
       </Suspense>

@@ -11,7 +11,9 @@ import type { ConversationDetail } from '@/features/inbox/repositories/inbox.rep
  * Unit tests for the heuristic AI (AD-8) — pure functions, no database.
  */
 
-const conversation = (overrides: Partial<ConversationDetail> = {}): ConversationDetail => ({
+const conversation = (
+  overrides: Partial<ConversationDetail> = {},
+): ConversationDetail => ({
   id: 'conv-1',
   contactId: 'contact-1',
   contactDisplayName: 'Sara',
@@ -38,34 +40,33 @@ const message = (body: string, direction = 'inbound', contentType = 'text') => (
 
 describe('suggestActions', () => {
   it('suggests escalation for an escalated conversation', () => {
-    const suggestions = suggestActions(
-      conversation({ isEscalated: true }),
-      [message('hello')],
-    );
+    const suggestions = suggestActions(conversation({ isEscalated: true }), [
+      message('hello'),
+    ]);
 
     expect(suggestions.some((s) => s.kind === 'escalate')).toBe(true);
   });
 
   it('suggests a reply when there are unread messages', () => {
-    const suggestions = suggestActions(
-      conversation({ unreadCount: 2 }),
-      [message('hello')],
-    );
+    const suggestions = suggestActions(conversation({ unreadCount: 2 }), [
+      message('hello'),
+    ]);
 
     expect(suggestions.some((s) => s.kind === 'reply')).toBe(true);
   });
 
   it('suggests resolving a quiet open conversation', () => {
-    const suggestions = suggestActions(
-      conversation({ status: 'open', unreadCount: 0 }),
-      [message('thanks!')],
-    );
+    const suggestions = suggestActions(conversation({ status: 'open', unreadCount: 0 }), [
+      message('thanks!'),
+    ]);
 
     expect(suggestions.some((s) => s.kind === 'resolve')).toBe(true);
   });
 
   it('flags complaint keywords', () => {
-    const suggestions = suggestActions(conversation(), [message('I am very unhappy with the service')]);
+    const suggestions = suggestActions(conversation(), [
+      message('I am very unhappy with the service'),
+    ]);
 
     expect(suggestions.some((s) => s.kind === 'follow-up')).toBe(true);
   });

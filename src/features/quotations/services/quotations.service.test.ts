@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeTotals, DEFAULT_VAT_RATE } from '@/features/quotations/services/quotations.service';
+import {
+  computeTotals,
+  DEFAULT_VAT_RATE,
+} from '@/features/quotations/services/quotations.service';
 import { renderQuotePdf } from '@/features/quotations/services/pdf';
 import type { QuoteRow } from '@/features/quotations/repositories/quotations.repository';
 
@@ -70,7 +73,12 @@ describe('computeTotals (VAT math)', () => {
   it('honours a per-line rate (mixed rates)', () => {
     const totals = computeTotals([
       { description: 'Zero-rated', quantity: 1, unitPriceAmount: 100, taxRate: 0 },
-      { description: 'Standard', quantity: 1, unitPriceAmount: 100, taxRate: DEFAULT_VAT_RATE },
+      {
+        description: 'Standard',
+        quantity: 1,
+        unitPriceAmount: 100,
+        taxRate: DEFAULT_VAT_RATE,
+      },
     ]);
 
     expect(totals.subtotalAmount).toBe(200);

@@ -51,7 +51,11 @@ export function computeTotals(lines: QuoteLineInput[]): QuoteTotals {
     subtotal = round4(subtotal + lineSubtotal);
     tax = round4(tax + lineTax);
   }
-  return { subtotalAmount: subtotal, taxAmount: tax, totalAmount: round4(subtotal + tax) };
+  return {
+    subtotalAmount: subtotal,
+    taxAmount: tax,
+    totalAmount: round4(subtotal + tax),
+  };
 }
 
 function round4(value: number): number {
@@ -111,9 +115,13 @@ export class QuotationsService {
         quantity: line.quantity,
         unitPriceAmount: line.unitPriceAmount,
         taxRate: line.taxRate ?? DEFAULT_VAT_RATE,
-        taxAmount: round4(round4(line.unitPriceAmount * line.quantity) * (line.taxRate ?? DEFAULT_VAT_RATE)),
+        taxAmount: round4(
+          round4(line.unitPriceAmount * line.quantity) *
+            (line.taxRate ?? DEFAULT_VAT_RATE),
+        ),
         lineTotalAmount: round4(
-          round4(line.unitPriceAmount * line.quantity) * (1 + (line.taxRate ?? DEFAULT_VAT_RATE)),
+          round4(line.unitPriceAmount * line.quantity) *
+            (1 + (line.taxRate ?? DEFAULT_VAT_RATE)),
         ),
       })),
       subtotalAmount: totals.subtotalAmount,
@@ -135,7 +143,9 @@ export class QuotationsService {
   ): Promise<QuoteRow> {
     const quote = await this.repo.getQuote(id);
     if (quote.status !== 'draft') {
-      throw new ConflictError('Only a draft quote can be edited. Revise from a new draft instead.');
+      throw new ConflictError(
+        'Only a draft quote can be edited. Revise from a new draft instead.',
+      );
     }
 
     if (input.lineItems) {
@@ -159,9 +169,13 @@ export class QuotationsService {
           quantity: line.quantity,
           unitPriceAmount: line.unitPriceAmount,
           taxRate: line.taxRate ?? DEFAULT_VAT_RATE,
-          taxAmount: round4(round4(line.unitPriceAmount * line.quantity) * (line.taxRate ?? DEFAULT_VAT_RATE)),
+          taxAmount: round4(
+            round4(line.unitPriceAmount * line.quantity) *
+              (line.taxRate ?? DEFAULT_VAT_RATE),
+          ),
           lineTotalAmount: round4(
-            round4(line.unitPriceAmount * line.quantity) * (1 + (line.taxRate ?? DEFAULT_VAT_RATE)),
+            round4(line.unitPriceAmount * line.quantity) *
+              (1 + (line.taxRate ?? DEFAULT_VAT_RATE)),
           ),
         })),
       );
@@ -184,7 +198,10 @@ export class QuotationsService {
    * Status transitions. `send` snapshots the current quote to a version first,
    * so the accepted/rejected document is the exact one the customer saw.
    */
-  async transition(id: string, action: 'send' | 'accept' | 'reject' | 'expire' | 'mark_draft'): Promise<QuoteRow> {
+  async transition(
+    id: string,
+    action: 'send' | 'accept' | 'reject' | 'expire' | 'mark_draft',
+  ): Promise<QuoteRow> {
     const quote = await this.repo.getQuote(id);
     const now = new Date();
 
@@ -226,7 +243,9 @@ export class QuotationsService {
     }
   }
 
-  async listVersions(id: string): Promise<{ versionNumber: number; snapshot: unknown; createdAt: Date }[]> {
+  async listVersions(
+    id: string,
+  ): Promise<{ versionNumber: number; snapshot: unknown; createdAt: Date }[]> {
     await this.repo.getQuote(id);
     return this.repo.listVersions(id);
   }

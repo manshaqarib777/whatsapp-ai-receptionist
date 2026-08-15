@@ -69,6 +69,14 @@ export const PERMISSIONS = [
   // Quotes — Milestone 11.
   'quote:read',
   'quote:write',
+
+  // Invoices — Milestone 12.
+  'invoice:read',
+  'invoice:write',
+
+  // Workflows — Milestone 13.
+  'workflow:read',
+  'workflow:write',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -112,6 +120,10 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'crm:write',
     'quote:read',
     'quote:write',
+    'invoice:read',
+    'invoice:write',
+    'workflow:read',
+    'workflow:write',
   ],
 
   admin: [
@@ -145,6 +157,10 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'crm:write',
     'quote:read',
     'quote:write',
+    'invoice:read',
+    'invoice:write',
+    'workflow:read',
+    'workflow:write',
   ],
 
   member: [
@@ -169,6 +185,10 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'crm:write',
     'quote:read',
     'quote:write',
+    'invoice:read',
+    'invoice:write',
+    'workflow:read',
+    'workflow:write',
   ],
 
   viewer: [
@@ -182,6 +202,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'appointment:read',
     'crm:read',
     'quote:read',
+    'invoice:read',
+    'workflow:read',
   ],
 };
 

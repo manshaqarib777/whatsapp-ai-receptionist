@@ -17,7 +17,10 @@ export default async function QuoteTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Quote templates" description="Body and branding for generated quotes." />
+      <PageHeader
+        title="Quote templates"
+        description="Body and branding for generated quotes."
+      />
       <Suspense fallback={<LoadingState rows={3} label="Loading templates" />}>
         <TemplateManager />
       </Suspense>

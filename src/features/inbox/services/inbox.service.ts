@@ -24,12 +24,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export type SuggestionKind =
-  | 'escalate'
-  | 'resolve'
-  | 'reply'
-  | 'follow-up'
-  | 'label'
-  | 'faq';
+  'escalate' | 'resolve' | 'reply' | 'follow-up' | 'label' | 'faq';
 
 export type Suggestion = {
   kind: SuggestionKind;
@@ -39,8 +34,23 @@ export type Suggestion = {
   action: string;
 };
 
-const FAQ_KEYWORDS = ['price', 'pricing', 'cost', 'open', 'hours', 'location', 'appointment'];
-const COMPLAINT_KEYWORDS = ['complaint', 'refund', 'unhappy', 'angry', 'wrong', 'terrible'];
+const FAQ_KEYWORDS = [
+  'price',
+  'pricing',
+  'cost',
+  'open',
+  'hours',
+  'location',
+  'appointment',
+];
+const COMPLAINT_KEYWORDS = [
+  'complaint',
+  'refund',
+  'unhappy',
+  'angry',
+  'wrong',
+  'terrible',
+];
 
 /**
  * Rule-based suggestions for a conversation. Pure and unit-testable. Returns at
@@ -67,7 +77,8 @@ export function suggestActions(
     suggestions.push({
       kind: 'follow-up',
       title: 'Possible complaint',
-      description: 'The last message mentions dissatisfaction. Offer a clear resolution path.',
+      description:
+        'The last message mentions dissatisfaction. Offer a clear resolution path.',
       action: 'Draft empathetic reply',
     });
   }

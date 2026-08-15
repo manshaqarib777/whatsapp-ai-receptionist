@@ -9,7 +9,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 export const crmKeys = {
   all: ['crm'] as const,
   pipelines: () => [...crmKeys.all, 'pipelines'] as const,
-  deals: (filter: Record<string, string> = {}) => [...crmKeys.all, 'deals', filter] as const,
+  deals: (filter: Record<string, string> = {}) =>
+    [...crmKeys.all, 'deals', filter] as const,
   deal: (id: string) => [...crmKeys.all, 'deals', id] as const,
   companies: () => [...crmKeys.all, 'companies'] as const,
   tags: () => [...crmKeys.all, 'tags'] as const,
@@ -22,7 +23,9 @@ async function fetchJson<T>(url: string): Promise<T> {
     cache: 'no-store',
   });
   if (!response.ok) {
-    const error = new Error(`Request failed (${response.status})`) as Error & { status?: number };
+    const error = new Error(`Request failed (${response.status})`) as Error & {
+      status?: number;
+    };
     error.status = response.status;
     throw error;
   }
@@ -41,7 +44,9 @@ async function sendJson<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    const error = new Error(`Request failed (${response.status})`) as Error & { status?: number };
+    const error = new Error(`Request failed (${response.status})`) as Error & {
+      status?: number;
+    };
     error.status = response.status;
     throw error;
   }
@@ -138,14 +143,16 @@ export function useDeals(filter: Record<string, string> = {}) {
   const query = params.toString();
   return useQuery({
     queryKey: crmKeys.deals(filter),
-    queryFn: () => fetchJson<{ deals: Deal[] }>(`/api/crm/deals${query ? `?${query}` : ''}`),
+    queryFn: () =>
+      fetchJson<{ deals: Deal[] }>(`/api/crm/deals${query ? `?${query}` : ''}`),
   });
 }
 
 export function useDeal(id: string) {
   return useQuery({
     queryKey: crmKeys.deal(id),
-    queryFn: () => fetchJson<{ deal: Deal; activities: Activity[] }>(`/api/crm/deals/${id}`),
+    queryFn: () =>
+      fetchJson<{ deal: Deal; activities: Activity[] }>(`/api/crm/deals/${id}`),
     enabled: id.length > 0,
   });
 }
@@ -200,7 +207,9 @@ export function useMoveDeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { id: string; stageId: string }) =>
-      sendJson<{ deal: Deal }>(`/api/crm/deals/${input.id}`, 'PATCH', { stageId: input.stageId }),
+      sendJson<{ deal: Deal }>(`/api/crm/deals/${input.id}`, 'PATCH', {
+        stageId: input.stageId,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: crmKeys.deals() });
       void queryClient.invalidateQueries({ queryKey: crmKeys.pipelines() });
@@ -212,7 +221,9 @@ export function useCloseDeal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: { id: string; status: 'won' | 'lost' }) =>
-      sendJson<{ deal: Deal }>(`/api/crm/deals/${input.id}`, 'PATCH', { status: input.status }),
+      sendJson<{ deal: Deal }>(`/api/crm/deals/${input.id}`, 'PATCH', {
+        status: input.status,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: crmKeys.deals() });
       void queryClient.invalidateQueries({ queryKey: crmKeys.pipelines() });
@@ -223,7 +234,11 @@ export function useCloseDeal() {
 export function useAddActivity() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { dealId: string; kind: 'note' | 'call' | 'email' | 'meeting'; body: string }) =>
+    mutationFn: (input: {
+      dealId: string;
+      kind: 'note' | 'call' | 'email' | 'meeting';
+      body: string;
+    }) =>
       sendJson<{ activity: Activity }>(
         `/api/crm/deals/${input.dealId}/activities`,
         'POST',
@@ -260,7 +275,11 @@ export function useCreateTag() {
 export function useAssignTag() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { tagId: string; taggableType: 'contact' | 'deal' | 'conversation'; taggableId: string }) =>
+    mutationFn: (input: {
+      tagId: string;
+      taggableType: 'contact' | 'deal' | 'conversation';
+      taggableId: string;
+    }) =>
       sendJson<{ ok: true }>(`/api/crm/tags/${input.tagId}/assign`, 'POST', {
         taggableType: input.taggableType,
         taggableId: input.taggableId,
@@ -286,8 +305,13 @@ export function useCreateTask() {
 export function useUpdateTaskStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; status: 'open' | 'in_progress' | 'done' | 'cancelled' }) =>
-      sendJson<{ task: Task }>(`/api/crm/tasks/${input.id}`, 'PATCH', { status: input.status }),
+    mutationFn: (input: {
+      id: string;
+      status: 'open' | 'in_progress' | 'done' | 'cancelled';
+    }) =>
+      sendJson<{ task: Task }>(`/api/crm/tasks/${input.id}`, 'PATCH', {
+        status: input.status,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: crmKeys.tasks() });
     },

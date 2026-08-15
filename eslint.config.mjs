@@ -135,7 +135,12 @@ const eslintConfig = defineConfig([
        health/health.service.ts      `SELECT 1` liveness probe, touches no tenant row.
        knowledge/lib/retrieval.ts    Raw-SQL pgvector seam (M7 AD-6): every statement
                                 self-scopes from the Scope argument, because the
-                                scoped extension cannot inject into raw SQL. */
+                                scoped extension cannot inject into raw SQL.
+       invoices/services/webhook.ts  Payment webhook entry (M12): runs BEFORE a
+                                tenant scope exists — the gateway verifies via its
+                                own signature and the owning org is derived from a
+                                globally-unique gatewayPaymentId, so the lookup
+                                cannot return another tenant's row. */
   {
     files: [
       'src/lib/auth.ts',
@@ -144,6 +149,7 @@ const eslintConfig = defineConfig([
       'src/features/auth/services/audit-log.service.ts',
       'src/features/health/services/health.service.ts',
       'src/features/knowledge/lib/retrieval.ts',
+      'src/features/invoices/services/webhook.ts',
     ],
     rules: { 'no-restricted-imports': 'off' },
   },

@@ -30,7 +30,13 @@ function escapeText(text: string): string {
 }
 
 /** One text line at (x, y) in PDF points, y from the TOP of the page. */
-function textLine(x: number, y: number, text: string, size = BODY, color = '0 0 0'): string {
+function textLine(
+  x: number,
+  y: number,
+  text: string,
+  size = BODY,
+  color = '0 0 0',
+): string {
   return `BT /F1 ${size} Tf ${color} rg ${x.toFixed(2)} ${(PAGE_HEIGHT - y).toFixed(2)} Td (${escapeText(text)}) Tj ET`;
 }
 
@@ -50,7 +56,10 @@ function formatDate(date: Date | null): string {
  * with VAT, totals (subtotal / VAT / total), validity, and a footer from the
  * template branding when present.
  */
-export function renderQuotePdf(quote: QuoteRow, branding?: { footer?: string | null } | null): Buffer {
+export function renderQuotePdf(
+  quote: QuoteRow,
+  branding?: { footer?: string | null } | null,
+): Buffer {
   const pages: string[][] = [[]];
   let y = MARGIN;
   const currentPage = () => pages[pages.length - 1] as string[];
@@ -83,21 +92,35 @@ export function renderQuotePdf(quote: QuoteRow, branding?: { footer?: string | n
     }
     push(textLine(MARGIN, y, line.description.slice(0, 52), BODY));
     push(textLine(MARGIN + 300, y, String(line.quantity), BODY));
-    push(textLine(MARGIN + 350, y, formatMoney(line.unitPriceAmount, quote.currency), BODY));
-    push(textLine(MARGIN + 430, y, formatMoney(line.lineTotalAmount, quote.currency), BODY));
+    push(
+      textLine(MARGIN + 350, y, formatMoney(line.unitPriceAmount, quote.currency), BODY),
+    );
+    push(
+      textLine(MARGIN + 430, y, formatMoney(line.lineTotalAmount, quote.currency), BODY),
+    );
     y += LINE_HEIGHT;
   }
 
   // Totals
   y += LINE_HEIGHT;
   push(textLine(MARGIN + 350, y, 'Subtotal', BODY));
-  push(textLine(MARGIN + 430, y, formatMoney(quote.subtotalAmount, quote.currency), BODY));
+  push(
+    textLine(MARGIN + 430, y, formatMoney(quote.subtotalAmount, quote.currency), BODY),
+  );
   y += LINE_HEIGHT;
   push(textLine(MARGIN + 350, y, 'VAT', BODY));
   push(textLine(MARGIN + 430, y, formatMoney(quote.taxAmount, quote.currency), BODY));
   y += LINE_HEIGHT;
   push(textLine(MARGIN + 350, y, 'Total', BODY, headerColor));
-  push(textLine(MARGIN + 430, y, formatMoney(quote.totalAmount, quote.currency), BODY, headerColor));
+  push(
+    textLine(
+      MARGIN + 430,
+      y,
+      formatMoney(quote.totalAmount, quote.currency),
+      BODY,
+      headerColor,
+    ),
+  );
   y += 2 * LINE_HEIGHT;
 
   push(textLine(MARGIN, y, `Valid until: ${formatDate(quote.validUntil)}`, SMALL, muted));
@@ -148,7 +171,12 @@ function buildPdf(pages: string[][]): Buffer {
   // Font object (always after all pages, referenced as 4 0 R above)
   const fontObjectIndex = 3 + pages.length * 2 + 1;
   objects[fontObjectIndex - 1] = {
-    dict: { Type: '/Font', Subtype: '/Type1', BaseFont: '/Helvetica', Encoding: '/WinAnsiEncoding' },
+    dict: {
+      Type: '/Font',
+      Subtype: '/Type1',
+      BaseFont: '/Helvetica',
+      Encoding: '/WinAnsiEncoding',
+    },
   };
 
   let pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
@@ -156,7 +184,10 @@ function buildPdf(pages: string[][]): Buffer {
 
   objects.forEach((obj, index) => {
     offsets.push(Buffer.byteLength(pdf, 'latin1'));
-    const body = obj.stream !== undefined ? `${serializeDict(obj.dict)}\nstream\n${obj.stream}\nendstream` : serializeDict(obj.dict);
+    const body =
+      obj.stream !== undefined
+        ? `${serializeDict(obj.dict)}\nstream\n${obj.stream}\nendstream`
+        : serializeDict(obj.dict);
     pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
   });
 

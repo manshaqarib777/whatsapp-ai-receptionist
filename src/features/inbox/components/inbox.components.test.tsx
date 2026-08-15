@@ -8,7 +8,10 @@ import { Composer } from '@/features/inbox/components/composer';
 import { ConversationList } from '@/features/inbox/components/conversation-list';
 import { formatRelativeTime } from '@/features/inbox/components/conversation-row';
 import { MessageBubble } from '@/features/inbox/components/message-bubble';
-import type { ConversationRow, MessageRow } from '@/features/inbox/repositories/inbox.repository';
+import type {
+  ConversationRow,
+  MessageRow,
+} from '@/features/inbox/repositories/inbox.repository';
 
 /**
  * Inbox component tests — every state per .claude/UI_RULES.md (loading, error,
@@ -95,9 +98,7 @@ describe('ConversationList', () => {
   it('renders conversations from the API', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(() =>
-        ok({ data: { rows: [conversationRow], nextCursor: null } }),
-      ),
+      vi.fn(() => ok({ data: { rows: [conversationRow], nextCursor: null } })),
     );
 
     renderWithQuery(<ConversationList />);
@@ -122,7 +123,9 @@ describe('ConversationList', () => {
   it('shows an error state with retry on failure', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })),
+      vi.fn(() =>
+        Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
+      ),
     );
 
     renderWithQuery(<ConversationList />);
@@ -232,7 +235,10 @@ describe('MessageBubble', () => {
 describe('Composer', () => {
   it('sends a message and clears the input', async () => {
     const user = userEvent.setup();
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { id: 'msg-new' } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { id: 'msg-new' } })),
+    );
 
     renderWithQuery(<Composer conversationId="conv-1" />);
 
@@ -247,7 +253,10 @@ describe('Composer', () => {
 
   it('reports typing to the server on input', async () => {
     const user = userEvent.setup();
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { ok: true } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { ok: true } })),
+    );
 
     renderWithQuery(<Composer conversationId="conv-1" />);
 
@@ -259,7 +268,10 @@ describe('Composer', () => {
 
   it('inserts emoji from the picker', async () => {
     const user = userEvent.setup();
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { ok: true } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { ok: true } })),
+    );
 
     renderWithQuery(<Composer conversationId="conv-1" />);
 

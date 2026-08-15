@@ -30,7 +30,9 @@ const POLL_INTERVAL_MS = 30_000;
 const LOOKBACK_MS = 7 * 86_400_000;
 
 /** Processes all due events for every organization. Returns the action count. */
-export async function processDueAutomation(rules: CrmAutomationRules = DEFAULT_RULES): Promise<number> {
+export async function processDueAutomation(
+  rules: CrmAutomationRules = DEFAULT_RULES,
+): Promise<number> {
   // Enumerating organizations is a pre-scope read (there is no tenant yet), the
   // same sanctioned pattern as the auth-context session resolution.
   const { prisma } = await import('@/lib/prisma');
@@ -70,7 +72,11 @@ export async function processOrganization(
   // Recent companies without the default tag.
   const companies = await repo.listRecentCompanies(since);
   for (const company of companies) {
-    const event = { type: 'company.created' as const, companyId: company.id, companyName: company.name };
+    const event = {
+      type: 'company.created' as const,
+      companyId: company.id,
+      companyName: company.name,
+    };
     for (const action of evaluateRules(event, rules)) {
       if (action.kind === 'noop') continue;
       await applyAction(service, repo, action);
@@ -81,7 +87,9 @@ export async function processOrganization(
   return applied;
 }
 
-export async function runCrmAutomationWorker(options: RunAutomationOptions = {}): Promise<void> {
+export async function runCrmAutomationWorker(
+  options: RunAutomationOptions = {},
+): Promise<void> {
   const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   logger.info('crm automation worker started');
 

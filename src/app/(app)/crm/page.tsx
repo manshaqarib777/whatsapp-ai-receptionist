@@ -18,10 +18,7 @@ export default async function CrmPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="CRM"
-        description="Pipelines, deals, companies, and tags."
-      />
+      <PageHeader title="CRM" description="Pipelines, deals, companies, and tags." />
       <Suspense fallback={<LoadingState rows={6} label="Loading pipeline" />}>
         <PipelineBoard />
       </Suspense>

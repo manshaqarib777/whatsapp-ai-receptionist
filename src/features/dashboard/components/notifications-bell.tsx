@@ -70,7 +70,7 @@ export function NotificationsBell() {
             {unread > 0 ? (
               <Badge
                 aria-hidden="true"
-                className="bg-destructive text-destructive-foreground absolute -top-2 -end-2 flex size-4 min-w-4 items-center justify-center rounded-full p-0 text-[10px] font-semibold"
+                className="bg-destructive text-destructive-foreground absolute -end-2 -top-2 flex size-4 min-w-4 items-center justify-center rounded-full p-0 text-[10px] font-semibold"
               >
                 {unread}
               </Badge>
@@ -84,16 +84,17 @@ export function NotificationsBell() {
         <DropdownMenuSeparator />
 
         {loading ? (
-          <p className="text-muted-foreground px-3 py-4 text-center text-sm">
-            Loading…
-          </p>
+          <p className="text-muted-foreground px-3 py-4 text-center text-sm">Loading…</p>
         ) : notifications.length === 0 ? (
           <p className="text-muted-foreground px-3 py-4 text-center text-sm">
             You are all caught up.
           </p>
         ) : (
           notifications.map((notification) => (
-            <DropdownMenuItem key={notification.id} className="flex-col items-start gap-0.5">
+            <DropdownMenuItem
+              key={notification.id}
+              className="flex-col items-start gap-0.5"
+            >
               <span className="text-sm font-medium">{notification.title}</span>
               {notification.body ? (
                 <span className="text-muted-foreground line-clamp-2 text-xs">

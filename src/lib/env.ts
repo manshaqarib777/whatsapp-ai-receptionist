@@ -154,6 +154,14 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GITHUB_CLIENT_ID: z.string().min(1).optional(),
   GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /**
+   * Payment gateways (Milestone 12). Stripe keys are optional: absent keys
+   * degrade the adapter to `configured: false`, and the service refuses with a
+   * clear error instead of a silent no-op. Secrets never reach the client.
+   */
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
 /**

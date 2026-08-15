@@ -40,15 +40,20 @@ export function KpiGrid({
   kpis,
   className,
 }: {
-  kpis: { label: string; value: string; delta: number; deltaLabel: string; sentiment: MetricSentiment; href: string; icon: KpiIcon }[];
+  kpis: {
+    label: string;
+    value: string;
+    delta: number;
+    deltaLabel: string;
+    sentiment: MetricSentiment;
+    href: string;
+    icon: KpiIcon;
+  }[];
   className?: string;
 }) {
   return (
     <div
-      className={cn(
-        'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4',
-        className,
-      )}
+      className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4', className)}
     >
       {kpis.map((kpi) => {
         const Icon = ICONS[kpi.icon];
@@ -76,10 +81,7 @@ export function KpiGrid({
 export function KpiGridSkeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn(
-        'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4',
-        className,
-      )}
+      className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4', className)}
       role="status"
       aria-busy="true"
       aria-label="Loading key metrics"

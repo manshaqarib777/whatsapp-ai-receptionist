@@ -82,7 +82,10 @@ describe('QuoteList', () => {
   });
 
   it('shows an empty state', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => ok({ data: { quotes: [] } })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { quotes: [] } })),
+    );
     renderWithQuery(<QuoteList />);
 
     expect(await screen.findByText('No quotes yet')).toBeInTheDocument();
@@ -91,7 +94,9 @@ describe('QuoteList', () => {
   it('shows an error state with retry', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })),
+      vi.fn(() =>
+        Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
+      ),
     );
     renderWithQuery(<QuoteList />);
 
@@ -123,8 +128,9 @@ describe('QuoteDetail', () => {
     // The total renders with locale grouping in the header and toFixed in the
     // footer; match either by testing every element's text content.
     expect(
-      screen.getAllByText((_, element) => element?.textContent?.includes('197.50') ?? false)
-        .length,
+      screen.getAllByText(
+        (_, element) => element?.textContent?.includes('197.50') ?? false,
+      ).length,
     ).toBeGreaterThan(0);
   });
 
@@ -164,7 +170,9 @@ describe('QuoteDetail', () => {
   it('shows an error state', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) })),
+      vi.fn(() =>
+        Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
+      ),
     );
     renderWithQuery(<QuoteDetail quoteId="missing" />);
 

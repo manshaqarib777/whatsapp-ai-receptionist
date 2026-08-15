@@ -82,7 +82,9 @@ export function CreateQuoteDialog({
   };
 
   const updateLine = (index: number, patch: Partial<DraftLine>) => {
-    setLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+    setLines((prev) =>
+      prev.map((line, i) => (i === index ? { ...line, ...patch } : line)),
+    );
   };
 
   return (
@@ -120,11 +122,16 @@ export function CreateQuoteDialog({
           <div className="space-y-2">
             <p className="text-sm font-medium">Line items</p>
             {lines.map((line, index) => (
-              <div key={index} className="grid grid-cols-[1fr_3.5rem_6rem_auto] items-center gap-2">
+              <div
+                key={index}
+                className="grid grid-cols-[1fr_3.5rem_6rem_auto] items-center gap-2"
+              >
                 <Input
                   aria-label={`Line ${index + 1} description`}
                   value={line.description}
-                  onChange={(event) => updateLine(index, { description: event.target.value })}
+                  onChange={(event) =>
+                    updateLine(index, { description: event.target.value })
+                  }
                   placeholder="Description"
                 />
                 <Input
@@ -132,7 +139,9 @@ export function CreateQuoteDialog({
                   type="number"
                   min="0"
                   value={line.quantity}
-                  onChange={(event) => updateLine(index, { quantity: event.target.value })}
+                  onChange={(event) =>
+                    updateLine(index, { quantity: event.target.value })
+                  }
                 />
                 <Input
                   aria-label={`Line ${index + 1} unit price`}
@@ -140,7 +149,9 @@ export function CreateQuoteDialog({
                   min="0"
                   step="0.01"
                   value={line.unitPrice}
-                  onChange={(event) => updateLine(index, { unitPrice: event.target.value })}
+                  onChange={(event) =>
+                    updateLine(index, { unitPrice: event.target.value })
+                  }
                   placeholder="Unit price"
                 />
                 <Button
@@ -188,7 +199,10 @@ export function CreateQuoteDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={!contactId.trim() || parsedLines.length === 0 || create.isPending} onClick={submit}>
+          <Button
+            disabled={!contactId.trim() || parsedLines.length === 0 || create.isPending}
+            onClick={submit}
+          >
             {create.isPending ? 'Creating…' : 'Create quote'}
           </Button>
         </DialogFooter>

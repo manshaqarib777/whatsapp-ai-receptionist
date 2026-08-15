@@ -80,21 +80,31 @@ function previousRange(range: DateRange): DateRange {
 }
 
 /** Count of rows created in a range, used for both the KPI and its baseline. */
-function countCreated(repo: DashboardRepository, range: DateRange, model: 'conversation' | 'deal'): Promise<number> {
-  return model === 'conversation' ? repo.countNewConversations(range) : repo.countOpenDealsIn(range);
+function countCreated(
+  repo: DashboardRepository,
+  range: DateRange,
+  model: 'conversation' | 'deal',
+): Promise<number> {
+  return model === 'conversation'
+    ? repo.countNewConversations(range)
+    : repo.countOpenDealsIn(range);
 }
 
-async function buildKpis(repo: DashboardRepository, range: DateRange): Promise<KpiMetric[]> {
+async function buildKpis(
+  repo: DashboardRepository,
+  range: DateRange,
+): Promise<KpiMetric[]> {
   const prev = previousRange(range);
 
-  const [newConvs, prevNewConvs, responseTime, prevResponseTime, openDeals, prevDeals] = await Promise.all([
-    countCreated(repo, range, 'conversation'),
-    countCreated(repo, prev, 'conversation'),
-    repo.averageResponseTimeSeconds(range),
-    repo.averageResponseTimeSeconds(prev),
-    countCreated(repo, range, 'deal'),
-    countCreated(repo, prev, 'deal'),
-  ]);
+  const [newConvs, prevNewConvs, responseTime, prevResponseTime, openDeals, prevDeals] =
+    await Promise.all([
+      countCreated(repo, range, 'conversation'),
+      countCreated(repo, prev, 'conversation'),
+      repo.averageResponseTimeSeconds(range),
+      repo.averageResponseTimeSeconds(prev),
+      countCreated(repo, range, 'deal'),
+      countCreated(repo, prev, 'deal'),
+    ]);
 
   // Open revenue is a point-in-time stock, not a range flow: the current total of
   // issued/partially-paid/overdue invoices. The delta compares it against the same
@@ -120,7 +130,7 @@ async function buildKpis(repo: DashboardRepository, range: DateRange): Promise<K
       delta:
         responseTime === null || prevResponseTime === null
           ? 0
-          : percentDelta(responseTime, prevResponseTime) ?? 0,
+          : (percentDelta(responseTime, prevResponseTime) ?? 0),
       deltaLabel: 'vs previous period',
       // Down is good for latency.
       sentiment: 'negative',
@@ -182,26 +192,34 @@ export function fillSeries<TInput extends { date: Date }, TOutput extends { date
  * Runs the KPI reads in parallel; the row-list reads are bounded and cheap enough
  * to run concurrently with them.
  */
-export async function getDashboardData(organizationId: string, range: DateRange): Promise<DashboardData> {
+export async function getDashboardData(
+  organizationId: string,
+  range: DateRange,
+): Promise<DashboardData> {
   const repo = DashboardRepository.forOrganization(organizationId);
 
-  const [kpis, recentConversations, upcomingAppointments, activityFeed] = await Promise.all([
-    buildKpis(repo, range),
-    repo.recentConversations(5),
-    repo.upcomingAppointments(5),
-    repo.activityFeed(8),
-  ]);
+  const [kpis, recentConversations, upcomingAppointments, activityFeed] =
+    await Promise.all([
+      buildKpis(repo, range),
+      repo.recentConversations(5),
+      repo.upcomingAppointments(5),
+      repo.activityFeed(8),
+    ]);
 
   const [rawConversationSeries, rawRevenueSeries] = await Promise.all([
     repo.conversationSeries(range),
     repo.revenueSeries(range),
   ]);
 
-  const conversationTrend = fillSeries(rawConversationSeries, range, (date, existing) => ({
-    date,
-    label: formatShortDate(date),
-    conversations: existing?.count ?? 0,
-  }));
+  const conversationTrend = fillSeries(
+    rawConversationSeries,
+    range,
+    (date, existing) => ({
+      date,
+      label: formatShortDate(date),
+      conversations: existing?.count ?? 0,
+    }),
+  );
 
   const revenueTrend = fillSeries(rawRevenueSeries, range, (date, existing) => ({
     date,
@@ -209,7 +227,14 @@ export async function getDashboardData(organizationId: string, range: DateRange)
     revenue: existing?.amount ?? 0,
   }));
 
-  return { kpis, conversationTrend, revenueTrend, recentConversations, upcomingAppointments, activityFeed };
+  return {
+    kpis,
+    conversationTrend,
+    revenueTrend,
+    recentConversations,
+    upcomingAppointments,
+    activityFeed,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +246,10 @@ export async function getDashboardData(organizationId: string, range: DateRange)
 // client, so tenant isolation is identical to the combined read.
 // ---------------------------------------------------------------------------
 
-export async function getKpis(organizationId: string, range: DateRange): Promise<KpiMetric[]> {
+export async function getKpis(
+  organizationId: string,
+  range: DateRange,
+): Promise<KpiMetric[]> {
   return buildKpis(DashboardRepository.forOrganization(organizationId), range);
 }
 
@@ -263,6 +291,8 @@ export async function getUpcomingAppointments(
   return DashboardRepository.forOrganization(organizationId).upcomingAppointments(5);
 }
 
-export async function getActivityFeed(organizationId: string): Promise<ActivityFeedItem[]> {
+export async function getActivityFeed(
+  organizationId: string,
+): Promise<ActivityFeedItem[]> {
   return DashboardRepository.forOrganization(organizationId).activityFeed(8);
 }

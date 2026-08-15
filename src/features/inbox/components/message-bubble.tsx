@@ -29,19 +29,17 @@ function AuthorLabel({ type }: { type: string }) {
 
 export function MessageBubble({ message }: { message: MessageRow }) {
   const inbound = message.direction === 'inbound';
-  const isEmojiOnly = message.contentType === 'text' && !!message.body && /^[\p{Emoji_Presentation}\s]+$/u.test(message.body.trim());
+  const isEmojiOnly =
+    message.contentType === 'text' &&
+    !!message.body &&
+    /^[\p{Emoji_Presentation}\s]+$/u.test(message.body.trim());
 
   const attachment = message.attachments[0];
 
   const time = useMemo(() => formatMessageTime(message.createdAt), [message.createdAt]);
 
   return (
-    <div
-      className={cn(
-        'flex w-full',
-        inbound ? 'justify-start' : 'justify-end',
-      )}
-    >
+    <div className={cn('flex w-full', inbound ? 'justify-start' : 'justify-end')}>
       <div
         className={cn(
           'max-w-[80%] rounded-2xl px-3 py-2 text-sm',
@@ -71,7 +69,7 @@ export function MessageBubble({ message }: { message: MessageRow }) {
         ) : null}
 
         {message.body ? (
-          <p className={cn('whitespace-pre-wrap break-words', isEmojiOnly && 'text-2xl')}>
+          <p className={cn('break-words whitespace-pre-wrap', isEmojiOnly && 'text-2xl')}>
             {message.body}
           </p>
         ) : null}
