@@ -26,6 +26,7 @@ export const APP_NAV_SECTIONS: NavSection[] = [
       { href: '/quotes', label: 'Quotes', icon: 'file-text' },
       { href: '/invoices', label: 'Invoices', icon: 'receipt' },
       { href: '/workflows', label: 'Workflows', icon: 'workflow' },
+      { href: '/broadcast', label: 'Broadcast', icon: 'megaphone' },
       { href: '/settings', label: 'Settings', icon: 'settings' },
     ],
   },

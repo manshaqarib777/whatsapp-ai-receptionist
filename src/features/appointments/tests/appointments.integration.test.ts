@@ -186,12 +186,19 @@ describe('availability (AD-2)', () => {
 describe('booking (AD-3)', () => {
   it('books an appointment and schedules reminders', async () => {
     const service = AppointmentsService.forOrganization(f.orgA);
-    const startsAt = '2026-08-16T09:00:00.000Z';
+    // Reminders are only scheduled when their lead time is still in the
+    // future, so the booking must always be ahead of "now". The fixture's
+    // availability rule is a Sunday 08:00–17:00; book the nearest Sunday 09:00
+    // UTC that has not passed.
+    const now = new Date();
+    const booked = new Date('2026-08-16T09:00:00.000Z');
+    const startsAt =
+      booked > now ? booked : new Date(booked.getTime() + 7 * 24 * 3_600_000);
     const appointment = await service.book({
       contactId: f.contactId,
       serviceId: f.serviceId,
       resourceId: f.resourceId,
-      startsAt,
+      startsAt: startsAt.toISOString(),
       timezone: 'Asia/Riyadh',
     });
 

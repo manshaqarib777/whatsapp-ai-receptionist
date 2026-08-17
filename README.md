@@ -7,7 +7,7 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 4 — Database.** Complete.
+**Milestone 14 — Broadcast System.** Complete.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
@@ -17,17 +17,15 @@ What exists so far: the foundation (tooling, database, configuration, logging, e
 handling, health checks, CI), a complete multi-tenant authentication system — sign-up,
 sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and an
 append-only audit log — a token-driven design system every later screen is built from,
-and the persistent data model the whole product runs on: 50 tables covering the inbox,
+the persistent data model the whole product runs on (50 tables covering the inbox,
 knowledge base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows, and
-campaigns, with tenant isolation enforced in one place, soft delete, audit, history,
-optimistic-lock versioning, a right-to-erasure path, and a deterministic demo seed.
+campaigns), the dashboard and inbox, the knowledge base, the AI engine, the
+appointment engine, CRM, quotations, invoicing and payments, the workflow builder,
+and the broadcast system (campaigns, scheduling, segmentation, templates, analytics).
 
 Browse the components at **<http://localhost:3000/design>** while the development
 server is running. It is a development tool, not a product page, and 404s in a
 production build.
-
-There is no product functionality yet. The dashboard is a placeholder; the real
-dashboard is Milestone 5 and the inbox is Milestone 6.
 
 ---
 

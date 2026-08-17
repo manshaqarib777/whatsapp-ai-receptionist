@@ -5,6 +5,7 @@ import { seedCommerce } from './seed/commerce';
 import { seedContacts } from './seed/contacts';
 import { seedCrm } from './seed/crm';
 import { seedAi } from './seed/ai';
+import { seedBroadcast } from './seed/broadcast';
 import { seedInbox } from './seed/inbox';
 import { seedKnowledge } from './seed/knowledge';
 import { seedScheduling } from './seed/scheduling';
@@ -139,6 +140,7 @@ async function main() {
   const knowledge = await seedKnowledge(prisma, tenants);
   const ai = await seedAi(prisma, tenants);
   const workflows = await seedWorkflows(prisma, tenants);
+  const broadcast = await seedBroadcast(prisma, tenants, contacts.riyadhContacts);
 
   const contactTotal =
     contacts.riyadhContacts.length +
@@ -159,6 +161,7 @@ async function main() {
       `  knowledge       ${knowledge.sourceIds.length} sources, ${knowledge.documentIds.length} documents (FAQ + policy approved, HR draft gated)`,
       `  ai              ${ai.templateIds.length} prompt templates, ${ai.runIds.length} runs`,
       `  workflows       ${workflows.workflowIds.length} (one enabled with a version, one draft), ${workflows.runIds.length} run`,
+      `  broadcast       ${broadcast.campaignIds.length} campaigns (cancelled, scheduled, sent), 1 segment, 1 template`,
       `  in              ${Date.now() - started}ms`,
     ].join('\n'),
   );

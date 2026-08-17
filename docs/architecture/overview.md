@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Current as of Milestone 5. Updated at the end of every milestone.
+Current as of Milestone 14. Updated at the end of every milestone.
 
 ---
 

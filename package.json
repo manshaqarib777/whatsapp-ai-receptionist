@@ -26,6 +26,7 @@
     "knowledge:work": "tsx scripts/knowledge-worker.ts",
     "reminders:work": "tsx scripts/reminders-worker.ts",
     "crm:work": "tsx scripts/crm-automation-worker.ts",
+    "broadcast:work": "tsx scripts/broadcast-worker.ts",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "_prepare_backup": "husky"
   },
@@ -110,7 +111,9 @@
   },
   "overrides": {
     "postcss": "^8.5.25",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "nanoid": "^3.3.18",
+    "hono": "^4.13.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

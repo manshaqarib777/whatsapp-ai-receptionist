@@ -7,6 +7,7 @@ import {
   FileText,
   Inbox,
   LayoutDashboard,
+  Megaphone,
   PanelLeftClose,
   PanelLeftOpen,
   Receipt,
@@ -85,6 +86,7 @@ const ICONS = {
   'file-text': FileText,
   receipt: Receipt,
   workflow: Workflow,
+  megaphone: Megaphone,
   settings: Settings,
 } as const;
 

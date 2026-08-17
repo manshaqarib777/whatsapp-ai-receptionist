@@ -28,6 +28,35 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 14 — Broadcast System**
+
+- A broadcast system at `/broadcast`: a status-filtered campaign list, a create
+  dialog (segment + approved template + optional schedule), and a campaign
+  detail page with the lifecycle actions (schedule, send now, cancel) and
+  analytics derived from the recipient rows (total, sent, delivered, read,
+  failed, delivered rate).
+- Segments are filter trees evaluated against contacts at send time — a
+  question, not a snapshot. The evaluation hard-codes the consent invariants:
+  a contact without consent, or who has opted out, can never be included, and
+  a campaign with zero eligible recipients is refused (422) rather than
+  silently sending nothing. A segment preview returns the eligible count before
+  any send.
+- WhatsApp message templates are manageable per branch with a Meta approval
+  status that gates use: a campaign can only be created against an `approved`
+  template (409 otherwise), and templates are unique per `(branch, name,
+  language)`.
+- Campaigns follow `draft → scheduled → sending → sent / cancelled`. Sending
+  materialises one `CampaignRecipient` per eligible contact (unique
+  `(campaignId, contactId)`, so a re-send cannot duplicate) and records
+  `DeliveryStatus` rows.
+- A DB-polled worker (`npm run broadcast:work`) claims due scheduled or
+  in-flight sending campaigns, marks recipients `sent`, and advances the
+  campaign to `sent`. The WhatsApp send path is the same stub seam as the
+  reminder worker — the status columns are real and integration tested.
+- The broadcast API is fully tenant-scoped: every query runs through `forScope`,
+  and the integration suite proves org A can never see org B's segments,
+  templates, campaigns, or recipients.
+
 **Milestone 13 — Workflow Builder**
 
 - A workflow builder at `/workflows`: a workflow list with create + enable/

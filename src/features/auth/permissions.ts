@@ -77,6 +77,10 @@ export const PERMISSIONS = [
   // Workflows — Milestone 13.
   'workflow:read',
   'workflow:write',
+
+  // Broadcast — Milestone 14.
+  'broadcast:read',
+  'broadcast:write',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -124,6 +128,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'invoice:write',
     'workflow:read',
     'workflow:write',
+    'broadcast:read',
+    'broadcast:write',
   ],
 
   admin: [
@@ -161,6 +167,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'invoice:write',
     'workflow:read',
     'workflow:write',
+    'broadcast:read',
+    'broadcast:write',
   ],
 
   member: [
@@ -189,6 +197,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'invoice:write',
     'workflow:read',
     'workflow:write',
+    'broadcast:read',
+    'broadcast:write',
   ],
 
   viewer: [
@@ -204,6 +214,7 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'quote:read',
     'invoice:read',
     'workflow:read',
+    'broadcast:read',
   ],
 };
 
