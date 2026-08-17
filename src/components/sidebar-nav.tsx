@@ -4,6 +4,7 @@ import {
   BookOpen,
   Briefcase,
   Calendar,
+  ChartColumn,
   FileText,
   Inbox,
   LayoutDashboard,
@@ -87,6 +88,7 @@ const ICONS = {
   receipt: Receipt,
   workflow: Workflow,
   megaphone: Megaphone,
+  'chart-column': ChartColumn,
   settings: Settings,
 } as const;
 

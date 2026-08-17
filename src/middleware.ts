@@ -25,6 +25,7 @@ const PROTECTED_PREFIXES = [
   '/invoices',
   '/workflows',
   '/broadcast',
+  '/analytics',
 ];
 
 export function middleware(request: NextRequest) {
@@ -63,5 +64,6 @@ export const config = {
     '/invoices/:path*',
     '/workflows/:path*',
     '/broadcast/:path*',
+    '/analytics/:path*',
   ],
 };

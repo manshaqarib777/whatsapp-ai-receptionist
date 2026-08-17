@@ -28,6 +28,33 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 15 — Analytics**
+
+- An analytics surface at `/analytics` covering revenue, funnels, conversion,
+  retention, bookings, performance, and forecasting — all derived at read time
+  from existing rows, with no new tables.
+- Revenue: invoiced vs collected vs outstanding vs refunds with a daily
+  invoiced/collected trend, sourced from invoice statuses, `paidAt`, and
+  `amountPaid`.
+- Funnels: the CRM pipeline as a funnel (deals per stage) and a
+  quote → invoice → paid conversion funnel.
+- Conversion: quote acceptance, quote → invoice, invoice → paid, and deal win
+  rates, each `null` when there is no baseline.
+- Retention: contacts by lifecycle stage and a behavioural cohort measure —
+  contacts created in the range who still have activity afterwards.
+- Bookings: appointment volume by status, booking value (service price at
+  booking time), and cancellation/no-show rates.
+- Performance: conversation volume, first-response time, escalation rate,
+  workload per assignee, and campaign delivery counts.
+- Forecasting: the weighted pipeline value (Σ open deal × stage win
+  probability, decomposed per stage — the `winProbability` column planted in
+  the M4 schema) plus a 3-month trailing-average projection explicitly labelled
+  "past trend, not a commitment".
+- The page is a read-only server-rendered surface with per-widget Suspense and
+  a 30d/90d/180d/12m range picker (cookie-persisted). Every chart uses the
+  house primitives with the accessible table fallback; the integration suite
+  proves org A can never see org B's revenue, deals, appointments, or contacts.
+
 **Milestone 14 — Broadcast System**
 
 - A broadcast system at `/broadcast`: a status-filtered campaign list, a create

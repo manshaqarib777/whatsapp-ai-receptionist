@@ -7,7 +7,7 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 14 — Broadcast System.** Complete.
+**Milestone 15 — Analytics.** Complete.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
@@ -21,7 +21,8 @@ the persistent data model the whole product runs on (50 tables covering the inbo
 knowledge base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows, and
 campaigns), the dashboard and inbox, the knowledge base, the AI engine, the
 appointment engine, CRM, quotations, invoicing and payments, the workflow builder,
-and the broadcast system (campaigns, scheduling, segmentation, templates, analytics).
+the broadcast system, and the analytics surface (revenue, funnels, conversion,
+retention, bookings, performance, and forecasting — all derived at read time).
 
 Browse the components at **<http://localhost:3000/design>** while the development
 server is running. It is a development tool, not a product page, and 404s in a
