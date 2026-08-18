@@ -7,7 +7,7 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 15 — Analytics.** Complete.
+**Milestone 16 — Reviews.** Complete.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
@@ -17,12 +17,13 @@ What exists so far: the foundation (tooling, database, configuration, logging, e
 handling, health checks, CI), a complete multi-tenant authentication system — sign-up,
 sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and an
 append-only audit log — a token-driven design system every later screen is built from,
-the persistent data model the whole product runs on (50 tables covering the inbox,
-knowledge base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows, and
-campaigns), the dashboard and inbox, the knowledge base, the AI engine, the
-appointment engine, CRM, quotations, invoicing and payments, the workflow builder,
-the broadcast system, and the analytics surface (revenue, funnels, conversion,
-retention, bookings, performance, and forecasting — all derived at read time).
+the persistent data model the whole product runs on (53 tables covering the inbox,
+knowledge base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows,
+campaigns, and reviews), the dashboard and inbox, the knowledge base, the AI engine,
+the appointment engine, CRM, quotations, invoicing and payments, the workflow builder,
+the broadcast system, the analytics surface (revenue, funnels, conversion, retention,
+bookings, performance, and forecasting), and the reviews system (Google/Facebook
+platforms, review requests, and feedback).
 
 Browse the components at **<http://localhost:3000/design>** while the development
 server is running. It is a development tool, not a product page, and 404s in a

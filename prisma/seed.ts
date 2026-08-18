@@ -8,6 +8,7 @@ import { seedAi } from './seed/ai';
 import { seedBroadcast } from './seed/broadcast';
 import { seedInbox } from './seed/inbox';
 import { seedKnowledge } from './seed/knowledge';
+import { seedReviews } from './seed/reviews';
 import { seedScheduling } from './seed/scheduling';
 import { seedTenants } from './seed/tenants';
 import { seedWorkflows } from './seed/workflows';
@@ -65,6 +66,10 @@ async function clearSeededData() {
   await prisma.workflowRun.deleteMany({ where: org });
   await prisma.workflowVersion.deleteMany({ where: org });
   await prisma.workflow.deleteMany({ where: org });
+
+  await prisma.review.deleteMany({ where: org });
+  await prisma.reviewRequest.deleteMany({ where: org });
+  await prisma.reviewPlatform.deleteMany({ where: org });
 
   await prisma.activity.deleteMany({ where: org });
   await prisma.taggable.deleteMany({ where: org });
@@ -141,6 +146,7 @@ async function main() {
   const ai = await seedAi(prisma, tenants);
   const workflows = await seedWorkflows(prisma, tenants);
   const broadcast = await seedBroadcast(prisma, tenants, contacts.riyadhContacts);
+  const reviews = await seedReviews(prisma, tenants);
 
   const contactTotal =
     contacts.riyadhContacts.length +
@@ -162,6 +168,7 @@ async function main() {
       `  ai              ${ai.templateIds.length} prompt templates, ${ai.runIds.length} runs`,
       `  workflows       ${workflows.workflowIds.length} (one enabled with a version, one draft), ${workflows.runIds.length} run`,
       `  broadcast       ${broadcast.campaignIds.length} campaigns (cancelled, scheduled, sent), 1 segment, 1 template`,
+      `  reviews         ${reviews.platformIds.length} platforms, ${reviews.requestIds.length} request, ${reviews.reviewIds.length} review`,
       `  in              ${Date.now() - started}ms`,
     ].join('\n'),
   );

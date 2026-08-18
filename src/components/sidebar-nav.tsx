@@ -15,6 +15,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Star,
   Users,
   Workflow,
   type LucideIcon,
@@ -89,6 +90,7 @@ const ICONS = {
   workflow: Workflow,
   megaphone: Megaphone,
   'chart-column': ChartColumn,
+  star: Star,
   settings: Settings,
 } as const;
 

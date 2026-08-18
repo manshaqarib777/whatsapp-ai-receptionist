@@ -215,6 +215,9 @@ model Organization {
   messageTemplates      WhatsappMessageTemplate[]
   campaigns             Campaign[]
   campaignRecipients    CampaignRecipient[]
+  reviewPlatforms       ReviewPlatform[]
+  reviewRequests        ReviewRequest[]
+  reviews               Review[]
   conversationReads     ConversationRead[]
   conversationTypings   ConversationTyping[]
   conversationSummaries ConversationSummary[]
@@ -479,6 +482,9 @@ model Branch {
   segments         Segment[]
   messageTemplates WhatsappMessageTemplate[]
   campaigns        Campaign[]
+  reviewPlatforms  ReviewPlatform[]
+  reviewRequests   ReviewRequest[]
+  reviews          Review[]
 
   @@index([organizationId])
   @@index([organizationId, deletedAt])
@@ -566,6 +572,8 @@ model Contact {
   quotes             Quote[]
   invoices           Invoice[]
   campaignRecipients CampaignRecipient[]
+  reviewRequests     ReviewRequest[]
+  reviews            Review[]
 
   @@index([organizationId, phoneNumber])
   @@index([branchId])
@@ -1415,7 +1423,8 @@ model Appointment {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
   version   Int       @default(1)
 
-  reminders AppointmentReminder[]
+  reminders      AppointmentReminder[]
+  reviewRequests ReviewRequest[]
 
   @@index([branchId, startsAt])
   @@index([organizationId, startsAt])
@@ -2302,4 +2311,139 @@ model CampaignRecipient {
   @@index([contactId])
   @@index([organizationId])
   @@map("campaign_recipients")
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 16 — Reviews
+// ---------------------------------------------------------------------------
+
+enum ReviewPlatformProvider {
+  google
+  facebook
+
+  @@map("review_platform_provider")
+}
+
+enum ReviewRequestStatus {
+  created
+  sent
+  responded
+  expired
+  cancelled
+
+  @@map("review_request_status")
+}
+
+/// Google or Facebook as a row. Connection state lives on the adapter seam
+/// (M16 AD-2); the row records which platforms exist and which are connected.
+model ReviewPlatform {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name     String
+  provider ReviewPlatformProvider
+  isConnected Boolean @default(false) @map("is_connected")
+
+  /// A key into the secret store for the OAuth token. NEVER the token itself.
+  credentialsRef String? @map("credentials_ref")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  requests ReviewRequest[]
+  reviews  Review[]
+
+  @@unique([branchId, provider])
+  @@index([organizationId])
+  @@map("review_platforms")
+}
+
+/// A review asked of a contact, triggered by a completed appointment.
+/// Consent is non-negotiable: a request for a non-consenting or opted-out
+/// contact is refused (M16 AD-3), matching the M14 broadcast invariants.
+model ReviewRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  appointmentId String      @map("appointment_id") @db.Uuid
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+
+  platformId String        @map("platform_id") @db.Uuid
+  platform   ReviewPlatform @relation(fields: [platformId], references: [id], onDelete: Restrict)
+
+  status ReviewRequestStatus @default(created)
+
+  sentAt      DateTime? @map("sent_at") @db.Timestamptz(3)
+  respondedAt DateTime? @map("responded_at") @db.Timestamptz(3)
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  review Review?
+
+  @@unique([appointmentId, platformId])
+  @@index([organizationId, status])
+  @@index([contactId])
+  @@index([platformId])
+  @@index([appointmentId])
+  @@map("review_requests")
+}
+
+/// A review a request yielded. Rating is 1–5; a rating below the feedback
+/// threshold (4) is surfaced as needing attention.
+model Review {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  requestId String?       @unique @map("request_id") @db.Uuid
+  request   ReviewRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  platformId String        @map("platform_id") @db.Uuid
+  platform   ReviewPlatform @relation(fields: [platformId], references: [id], onDelete: Restrict)
+
+  rating Int
+  text   String? @db.Text
+
+  /// The platform's own review id, when imported. Unique per organization.
+  externalReviewId String? @map("external_review_id")
+
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  @@index([organizationId, receivedAt])
+  @@index([contactId])
+  @@index([platformId])
+  @@index([requestId])
+  @@index([organizationId, externalReviewId])
+  @@map("reviews")
 }

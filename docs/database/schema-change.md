@@ -602,3 +602,67 @@ Postgres + pgvector: source CRUD, upload → job claim → parse → chunk → e
 draft version, approval transition sets `currentVersionId`, retrieval returns only
 approved current versions, **org A never retrieves org B** (the mandated raw-SQL
 scoping test), job success/failure + progress, version archive.
+
+---
+
+# Schema Change — Milestone 16 (Reviews)
+
+Date: 2026-08-16
+Migrations: `20260816120000_reviews`, `20260816130000_reviews_request_unique`
+Plan: `docs/milestones/MILESTONE_16_PLAN.md` (approved)
+Status: Applied (local)
+
+## New Tables
+
+The three Tier-2 review tables designed in the M4 ER diagram (§10), migrated at
+their owning milestone.
+
+| Table | Purpose |
+|---|---|
+| `review_platforms` | Google / Facebook as rows. Branch-scoped; unique `(branchId, provider)`. `credentials_ref` is a secret-store key, never the token. |
+| `review_requests` | A review asked of a contact, linked to the completed appointment. Unique `(appointmentId, platformId)` — one request per appointment+platform, so the automation worker is idempotent. |
+| `reviews` | The review a request yielded. `rating` constrained 1–5 by a CHECK. `request_id` is `@unique` (one review per request) via the follow-up migration. |
+
+## Enums
+
+| Enum | Values |
+|---|---|
+| `review_platform_provider` | `google`, `facebook` |
+| `review_request_status` | `created`, `sent`, `responded`, `expired`, `cancelled` |
+
+## Relations
+
+- `ReviewRequest.contactId` / `ReviewRequest.appointmentId` /
+  `ReviewRequest.platformId` — `Restrict` (a request never silently loses its
+  subject).
+- `Review.requestId` — `SetNull` (a deleted request keeps the review; the
+  `@unique` makes it one review per request).
+- `Review.contactId` / `Review.platformId` — `Restrict`.
+
+## Constraints
+
+- `reviews_rating_check` — `rating >= 1 AND rating <= 5` (DATABASE_RULES: ranges
+  constrained in the database, not trusted to the application).
+- `review_requests_appointment_id_platform_id_key` — unique request guard.
+- `reviews_request_id_key` — one review per request (follow-up migration).
+
+## Indexes
+
+Every FK plus the query patterns: `review_requests (organization_id, status)`
+(the list filter), `reviews (organization_id, received_at)` (the review feed),
+and `reviews (organization_id, external_review_id)` (platform-idempotent
+imports).
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI;
+the documented restore-from-backup path for any live env (exercised in M25).
+
+## Verification
+
+`src/features/reviews/tests/reviews.integration.test.ts` — 12 tests against real
+Postgres: default platforms, request create → send → expire sweep, consent
+refusals (never-consented and opted-out), non-completed appointment refusal,
+automation (grace window, consent skip, idempotency), review recording +
+feedback threshold, out-of-range rating refusal, and **org A never sees org B**
+for platforms and reviews.

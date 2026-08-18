@@ -27,6 +27,7 @@
     "reminders:work": "tsx scripts/reminders-worker.ts",
     "crm:work": "tsx scripts/crm-automation-worker.ts",
     "broadcast:work": "tsx scripts/broadcast-worker.ts",
+    "reviews:work": "tsx scripts/reviews-worker.ts",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "_prepare_backup": "husky"
   },

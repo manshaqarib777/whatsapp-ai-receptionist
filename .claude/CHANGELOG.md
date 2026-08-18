@@ -28,6 +28,30 @@ change gets an entry in the same PR.
 
 ### Added
 
+**Milestone 16 — Reviews**
+
+- A reviews system at `/reviews`: a review list with a needs-attention badge
+  for ratings below 4, a review-request list with send/cancel lifecycle actions,
+  and a platform list showing Google/Facebook connection state.
+- The three Tier-2 review tables from the M4 ER diagram are migrated now:
+  `review_platforms`, `review_requests`, `reviews`. A request links a consented
+  contact to the completed appointment that triggered it and targets a
+  platform; a review hangs off its request with a 1–5 rating (DB CHECK
+  constrained) and the feedback text.
+- The consent invariants from M14 apply: a review request for a non-consenting
+  or opted-out contact is refused (422), never silently skipped, and the
+  automation worker never asks one.
+- Google and Facebook sit behind a review-platform seam mirroring the M12
+  payment gateways — both `unconfigured` in M16 (the real APIs need OAuth
+  credentials) and failing loudly rather than faking a connection.
+- Automation: `npm run reviews:work` finds completed appointments past a 24-hour
+  grace window, creates + sends a review request through the transport stub
+  seam, and sweeps expired requests — idempotent via the unique
+  `(appointmentId, platformId)` guard.
+- The reviews API is fully tenant-scoped: every query runs through `forScope`,
+  and the integration suite proves org A can never see org B's reviews,
+  requests, or platforms.
+
 **Milestone 15 — Analytics**
 
 - An analytics surface at `/analytics` covering revenue, funnels, conversion,
