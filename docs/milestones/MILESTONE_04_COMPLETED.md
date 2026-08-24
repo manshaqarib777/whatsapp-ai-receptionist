@@ -1,5 +1,15 @@
 # Milestone 4 — Completed
 
+> **Authoritative structural re-certification — 2026-08-23:** The sequential review
+> found that six later background workers could bypass the static unscoped-Prisma lint
+> boundary with dynamic imports. Pre-scope discovery now lives in
+> `src/lib/db/system-discovery.repository.ts`; tenant-owned reminder writes re-enter
+> through `forScope()`; and lint rejects both static and dynamic bypasses (verified by
+> a deliberately failing probe). Current database evidence: 75/75 isolation, erasure,
+> and deterministic-seed integration tests; typecheck/lint clean; schema drift limited
+> to the documented HNSW/trgm indexes. Preview verification is centralized in M25 by
+> the user's decision.
+
 Completed: 2026-08-10
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 4`
 

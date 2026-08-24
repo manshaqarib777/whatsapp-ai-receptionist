@@ -194,6 +194,28 @@ test.describe('onboarding', () => {
 });
 
 test.describe('sign in', () => {
+  test('progressively locks an account after repeated password failures', async ({
+    request,
+  }) => {
+    const email = uniqueEmail('lockout');
+    await request.post('/api/auth/sign-up/email', {
+      data: { name: 'Lockout Test', email, password: STRONG_PASSWORD },
+    });
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      const response = await request.post('/api/auth/sign-in/email', {
+        data: { email, password: 'definitely-the-wrong-password' },
+      });
+      expect(response.status(), `failure ${attempt}`).not.toBe(429);
+    }
+
+    const locked = await request.post('/api/auth/sign-in/email', {
+      data: { email, password: STRONG_PASSWORD },
+    });
+    expect(locked.status()).toBe(429);
+    expect(locked.headers()['retry-after']).toBeTruthy();
+  });
+
   test('shows a generic message for unknown credentials', async ({ page }) => {
     await page.goto('/login');
 

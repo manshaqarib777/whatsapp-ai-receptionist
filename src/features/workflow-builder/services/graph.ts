@@ -156,7 +156,28 @@ export function validateGraph(
         });
       }
     }
+    if (isRecord(node) && node['type'] !== 'condition') {
+      const outgoing = edges.filter(
+        (edge) => isRecord(edge) && edge['from'] === node['id'],
+      );
+      if (outgoing.length > 1) {
+        problems.push({
+          path: `nodes.${String(node['id'])}`,
+          message: 'A non-condition node may have at most one outgoing edge.',
+        });
+      }
+    }
   });
+
+  const triggerCount = nodes.filter(
+    (node) => isRecord(node) && node['type'] === 'trigger',
+  ).length;
+  if (triggerCount !== 1) {
+    problems.push({
+      path: 'nodes',
+      message: 'A workflow needs exactly one trigger node.',
+    });
+  }
 
   // A non-condition node must not carry branch labels.
   edges.forEach((edge, index) => {

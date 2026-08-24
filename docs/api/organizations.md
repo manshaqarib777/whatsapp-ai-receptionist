@@ -233,3 +233,95 @@ Conversation and contact permissions are declared now so that Milestones 6 and 1
 extend this matrix rather than inventing a parallel one.
 
 **Unknown roles are denied everything** — the model fails closed.
+
+---
+
+## Milestone 18 — Branches (Planned)
+
+Branches are subordinate tenancy boundaries within the active organization. Branch
+ids are always verified against the active organization before they are persisted or
+used as scope. Cross-organization ids return 404.
+
+### `GET /api/branches`
+
+Lists live branches in the active organization, default branch first.
+
+**Auth**: session + active organization
+**Permission**: `organization:read`
+
+**Response 200**
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Riyadh",
+      "slug": "riyadh",
+      "timezone": "Asia/Riyadh",
+      "isDefault": true
+    }
+  ]
+}
+```
+
+### `POST /api/branches`
+
+Creates a branch in the active organization.
+
+**Auth**: session + active organization
+**Permission**: `organization:update`
+
+**Request**: `{ "name": "Jeddah", "timezone": "Asia/Riyadh" }`
+
+`slug` is derived server-side from `name`; clients cannot choose it. `timezone` must be
+a supported IANA timezone. Existing organizations already have one default branch.
+
+**Response 201**: the created branch.
+**Errors**: 400 validation, 401 unauthenticated, 403 unauthorized, 409 live slug
+collision.
+
+### `PATCH /api/branches/:id`
+
+Updates a live branch's name or timezone. Renaming regenerates a unique slug server-side.
+
+**Auth**: session + active organization
+**Permission**: `organization:update`
+
+At least one field is required. Cross-organization or deleted branch ids return 404.
+
+### `PATCH /api/branches/active`
+
+Persists the current session's active branch.
+
+**Auth**: session + active organization
+**Permission**: organization membership
+
+**Request**: `{ "branchId": "uuid" }`
+
+The service proves the branch belongs to the active organization before updating the
+session. The response is `{ "data": { "branchId": "uuid" } }`. The switch is audited
+with ids only.
+
+### `PATCH /api/branches/:id/default`
+
+Makes a live branch the organization's default.
+
+**Auth**: session + active organization
+**Permission**: `organization:update`
+
+The old and new default flags change in one transaction. The partial unique index
+prevents two defaults under concurrent requests. Cross-organization ids return 404.
+# Invitations
+
+## `POST /api/invitations`
+
+Requires an authenticated active organization and `member:invite`. The JSON body is
+strictly validated as `{ email, role }`, where role is `admin`, `member`, or `viewer`;
+`owner` is deliberately excluded. The server supplies the active organization id to
+Better Auth, sends the 48-hour invitation through the configured email port, and records
+`member.invited`. Returns `201` with the invitation id, role, and status.
+
+The recipient signs in and visits `/accept-invitation/:id`. Acceptance uses Better
+Auth's single-use organization invitation endpoint and records `member.joined` against
+the invitation's organization.

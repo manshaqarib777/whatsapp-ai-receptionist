@@ -200,6 +200,12 @@ function InvoiceSummary({
           <dt className="text-muted-foreground">VAT</dt>
           <dd className="tabular-nums">{money(invoice.taxAmount)}</dd>
         </div>
+        {invoice.discountAmount > 0 ? (
+          <div className="flex justify-between">
+            <dt className="text-muted-foreground">Coupon discount</dt>
+            <dd className="tabular-nums">-{money(invoice.discountAmount)}</dd>
+          </div>
+        ) : null}
         <div className="flex justify-between">
           <dt className="text-muted-foreground">Paid</dt>
           <dd className="tabular-nums">{money(invoice.amountPaid)}</dd>

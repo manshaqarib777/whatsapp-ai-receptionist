@@ -7,7 +7,13 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useSendMessage, useSetTyping } from '@/features/inbox/hooks/use-inbox';
+import {
+  useSendMessage,
+  useSetTyping,
+  useUploadAttachment,
+} from '@/features/inbox/hooks/use-inbox';
+import { VoiceRecorder } from '@/features/voice/components/voice-recorder';
+import { VoiceCommandControl } from '@/features/voice/components/voice-command';
 
 /**
  * The message composer.
@@ -33,7 +39,9 @@ export function Composer({ conversationId }: { conversationId: string }) {
   const [value, setValue] = useState('');
   const sendMessage = useSendMessage(conversationId);
   const setTyping = useSetTyping(conversationId);
+  const uploadAttachment = useUploadAttachment(conversationId);
   const lastTypingSent = useRef(0);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   function reportTyping() {
     // Date.now() here is only ever read inside event handlers (keystroke
@@ -58,6 +66,14 @@ export function Composer({ conversationId }: { conversationId: string }) {
   function insertEmoji(emoji: string) {
     setValue((current) => `${current}${emoji}`);
     reportTyping();
+  }
+
+  function upload(file: File | undefined) {
+    if (!file) return;
+    uploadAttachment.mutate(file, {
+      onSuccess: () => toast.success('Attachment sent.'),
+      onError: () => toast.error('Could not upload the attachment.'),
+    });
   }
 
   return (
@@ -91,15 +107,29 @@ export function Composer({ conversationId }: { conversationId: string }) {
           </PopoverContent>
         </Popover>
 
+        <input
+          ref={fileInput}
+          type="file"
+          className="sr-only"
+          accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,audio/mpeg,audio/mp4,audio/ogg,audio/webm"
+          aria-label="Choose attachment"
+          onChange={(event) => {
+            upload(event.target.files?.[0]);
+            event.target.value = '';
+          }}
+        />
         <Button
           variant="ghost"
           size="icon"
           aria-label="Attach a file"
           className="text-muted-foreground shrink-0"
-          onClick={() => toast.info('Attachments: choose a file from your device.')}
+          disabled={uploadAttachment.isPending}
+          onClick={() => fileInput.current?.click()}
         >
           <Paperclip aria-hidden="true" className="size-4" />
         </Button>
+        <VoiceRecorder disabled={uploadAttachment.isPending} onRecorded={upload} />
+        <VoiceCommandControl onDraft={setValue} />
 
         <Textarea
           aria-label="Message"

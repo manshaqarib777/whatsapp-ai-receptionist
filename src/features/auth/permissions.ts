@@ -88,6 +88,10 @@ export const PERMISSIONS = [
   // Reviews — Milestone 16.
   'review:read',
   'review:write',
+
+  // Loyalty — Milestone 17.
+  'loyalty:read',
+  'loyalty:write',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -140,6 +144,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'analytics:read',
     'review:read',
     'review:write',
+    'loyalty:read',
+    'loyalty:write',
   ],
 
   admin: [
@@ -182,6 +188,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'analytics:read',
     'review:read',
     'review:write',
+    'loyalty:read',
+    'loyalty:write',
   ],
 
   member: [
@@ -215,6 +223,8 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'analytics:read',
     'review:read',
     'review:write',
+    'loyalty:read',
+    'loyalty:write',
   ],
 
   viewer: [
@@ -233,6 +243,7 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'broadcast:read',
     'analytics:read',
     'review:read',
+    'loyalty:read',
   ],
 };
 

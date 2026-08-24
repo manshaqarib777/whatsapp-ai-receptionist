@@ -86,6 +86,11 @@ export const CONTACT_REDACTIONS: readonly RedactionSpec[] = [
     stampsRedactedAt: true,
   },
   {
+    model: 'Transcription',
+    columns: { text: null },
+    stampsRedactedAt: true,
+  },
+  {
     model: 'ConversationNote',
     // Staff-written, about the contact, and frequently quotes them.
     columns: { body: 'Redacted' },
@@ -157,6 +162,7 @@ export async function eraseContact(
       Conversation: conversationIds,
       Message: messageIds,
       MessageAttachment: messageIds,
+      Transcription: messageIds,
       ConversationNote: conversationIds,
     };
 
@@ -173,9 +179,11 @@ export async function eraseContact(
       const where =
         spec.model === 'MessageAttachment'
           ? { messageId: { in: ids } }
-          : spec.model === 'ConversationNote'
-            ? { conversationId: { in: ids } }
-            : { id: { in: ids } };
+          : spec.model === 'Transcription'
+            ? { messageId: { in: ids } }
+            : spec.model === 'ConversationNote'
+              ? { conversationId: { in: ids } }
+              : { id: { in: ids } };
 
       const delegate = (tx as unknown as Record<string, DelegateWithUpdateMany>)[
         lowerFirst(spec.model)

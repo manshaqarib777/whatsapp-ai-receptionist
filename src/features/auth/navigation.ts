@@ -29,6 +29,7 @@ export const APP_NAV_SECTIONS: NavSection[] = [
       { href: '/broadcast', label: 'Broadcast', icon: 'megaphone' },
       { href: '/analytics', label: 'Analytics', icon: 'chart-column' },
       { href: '/reviews', label: 'Reviews', icon: 'star' },
+      { href: '/loyalty', label: 'Loyalty', icon: 'gift' },
       { href: '/settings', label: 'Settings', icon: 'settings' },
     ],
   },

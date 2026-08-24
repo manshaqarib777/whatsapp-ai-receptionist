@@ -1,6 +1,7 @@
 import { requirePermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { WorkflowsService } from '@/features/workflow-builder/services/workflows.service';
+import { createRunSchema } from '@/features/workflow-builder/validators/workflows.validators';
 
 /**
  * POST /api/workflows/[id]/runs — start a manual (test) run against the
@@ -16,8 +17,10 @@ export const POST = withApiHandler(
     const { organizationId } = await requirePermission('workflow:write');
     const { id } = await routeParams.params;
 
+    const body = await request.json().catch(() => ({}));
+    const { variables } = createRunSchema.parse(body);
     const service = WorkflowsService.forOrganization(organizationId);
-    const result = await service.createRun({ workflowId: id });
+    const result = await service.createRun({ workflowId: id, variables });
 
     return jsonSuccess(result, { status: 201, correlationId });
   },

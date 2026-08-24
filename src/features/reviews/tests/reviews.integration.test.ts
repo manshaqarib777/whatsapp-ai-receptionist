@@ -44,7 +44,9 @@ async function makeBranch(orgId: string, label: string): Promise<string> {
 }
 
 function serviceFor(orgId: string): ReviewsService {
-  return ReviewsService.forOrganization(orgId);
+  return ReviewsService.forOrganizationWithTransport(orgId, {
+    async send() {},
+  });
 }
 
 async function makeContact(
@@ -279,6 +281,28 @@ describe('reviews — requests', () => {
     expect(sent.sentAt).not.toBeNull();
 
     await expect(service.transition(request.id, 'send')).rejects.toThrow(ConflictError);
+  });
+
+  it('does not mark a request sent when delivery is unavailable', async () => {
+    const service = ReviewsService.forOrganization(f.orgA);
+    await service.ensurePlatforms();
+    const [platform] = await service.listPlatforms();
+    if (!platform) throw new Error('Expected a review platform fixture.');
+    const contactId = await makeContact(f.orgA, f.branchA);
+    const appointmentId = await makeCompletedAppointment(f.orgA, f.branchA, contactId);
+    const request = await service.createRequest({
+      contactId,
+      appointmentId,
+      platformId: platform.id,
+    });
+
+    await expect(service.transition(request.id, 'send')).rejects.toThrow(
+      /transport is not configured/i,
+    );
+    await expect(service.getRequest(request.id)).resolves.toMatchObject({
+      status: 'created',
+      sentAt: null,
+    });
   });
 
   it('sweeps expired sent requests', async () => {

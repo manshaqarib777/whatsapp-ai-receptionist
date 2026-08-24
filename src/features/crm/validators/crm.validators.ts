@@ -71,7 +71,7 @@ export const createTagSchema = z.object({
 
 export const assignTagSchema = z.object({
   tagId: z.string().uuid(),
-  taggableType: z.enum(['contact', 'deal', 'conversation']),
+  taggableType: z.enum(['contact', 'deal', 'conversation', 'company']),
   taggableId: z.string().uuid(),
 });
 

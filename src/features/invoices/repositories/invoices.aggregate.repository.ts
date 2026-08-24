@@ -15,6 +15,7 @@ const INVOICE_SELECT = {
   status: true,
   subtotalAmount: true,
   taxAmount: true,
+  discountAmount: true,
   totalAmount: true,
   amountPaid: true,
   currency: true,
@@ -141,6 +142,7 @@ export class InvoicesAggregateRepository extends InvoicesBaseRepository {
       currency?: string;
       subtotalAmount?: number;
       taxAmount?: number;
+      discountAmount?: number;
       totalAmount?: number;
     },
   ): Promise<InvoiceRow> {
@@ -155,6 +157,9 @@ export class InvoicesAggregateRepository extends InvoicesBaseRepository {
             ? { subtotalAmount: data.subtotalAmount }
             : {}),
           ...(data.taxAmount !== undefined ? { taxAmount: data.taxAmount } : {}),
+          ...(data.discountAmount !== undefined
+            ? { discountAmount: data.discountAmount }
+            : {}),
           ...(data.totalAmount !== undefined ? { totalAmount: data.totalAmount } : {}),
           version: { increment: 1 },
         },

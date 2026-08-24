@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import type { MemberSummary } from '@/features/auth/services/organization.service';
+import { changeMemberRole } from '@/features/auth/services/members.client';
 import {
   ROLE_LABELS,
   ROLE_ORDER,
@@ -51,23 +52,14 @@ export function MembersTable({
     setPendingId(memberId);
     setError(null);
 
-    const response = await fetch(`/api/members/${memberId}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ role }),
-    });
-
-    setPendingId(null);
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as {
-        error?: { message?: string };
-      } | null;
-      setError(payload?.error?.message ?? 'Could not change that role.');
-      return;
+    try {
+      await changeMemberRole(memberId, role);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not change that role.');
+    } finally {
+      setPendingId(null);
     }
-
-    router.refresh();
   }
 
   if (members.length === 0) {

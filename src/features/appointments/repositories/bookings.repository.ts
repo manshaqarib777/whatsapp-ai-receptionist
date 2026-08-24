@@ -15,6 +15,8 @@ const APPOINTMENT_SELECT = {
   status: true,
   notes: true,
   rescheduledFromId: true,
+  recurrenceRule: true,
+  recurrenceParentId: true,
 } as const;
 
 /**
@@ -57,6 +59,8 @@ export class AppointmentsRepository extends AppointmentsBaseRepository {
     endsAt: Date;
     timezone: string;
     notes?: string;
+    recurrenceRule?: string;
+    recurrenceParentId?: string;
   }): Promise<AppointmentRow> {
     const db = this.writeScope(input.branchId);
     try {
@@ -72,6 +76,8 @@ export class AppointmentsRepository extends AppointmentsBaseRepository {
           timezone: input.timezone,
           status: 'booked',
           notes: input.notes,
+          recurrenceRule: input.recurrenceRule,
+          recurrenceParentId: input.recurrenceParentId,
         },
         select: APPOINTMENT_SELECT,
       });
@@ -134,6 +140,39 @@ export class AppointmentsRepository extends AppointmentsBaseRepository {
         channel: 'whatsapp',
         status: 'scheduled',
       })),
+    });
+  }
+
+  async getReminderDelivery(id: string) {
+    const reminder = await this.db.appointmentReminder.findFirst({
+      where: { id, status: 'scheduled' },
+      select: {
+        id: true,
+        appointment: {
+          select: {
+            startsAt: true,
+            timezone: true,
+            contact: { select: { phoneNumber: true, displayName: true } },
+            service: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!reminder) throw new NotFoundError('Scheduled reminder not found.');
+    return {
+      reminderId: reminder.id,
+      phoneNumber: reminder.appointment.contact.phoneNumber,
+      contactName: reminder.appointment.contact.displayName,
+      startsAt: reminder.appointment.startsAt,
+      timezone: reminder.appointment.timezone,
+      serviceName: reminder.appointment.service.name,
+    };
+  }
+
+  async setReminderStatus(id: string, status: 'sent' | 'failed'): Promise<void> {
+    await this.db.appointmentReminder.updateMany({
+      where: { id, status: 'scheduled' },
+      data: { status },
     });
   }
 }

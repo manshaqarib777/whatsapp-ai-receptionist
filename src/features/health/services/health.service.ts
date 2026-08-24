@@ -1,5 +1,7 @@
 import { currentTransport } from '@/lib/email';
 import { prisma } from '@/lib/prisma';
+import { redisClient } from '@/lib/redis';
+import { env } from '@/lib/env';
 
 /**
  * Health service.
@@ -19,6 +21,7 @@ export type HealthReport = {
   checks: {
     database: DependencyStatus;
     email: DependencyStatus;
+    redis: DependencyStatus;
   };
 };
 
@@ -66,17 +69,31 @@ export function checkEmail(): DependencyStatus {
   return currentTransport() === 'smtp' ? 'ok' : 'not-configured';
 }
 
+export async function checkRedis(): Promise<DependencyStatus> {
+  if (!env.REDIS_URL) return 'not-configured';
+  try {
+    const redis = await redisClient();
+    if (!redis) return 'error';
+    return (await withTimeout(redis.ping(), DEPENDENCY_TIMEOUT_MS)) === 'PONG'
+      ? 'ok'
+      : 'error';
+  } catch {
+    return 'error';
+  }
+}
+
 export async function getHealthReport(): Promise<HealthReport> {
   const database = await checkDatabase();
   const email = checkEmail();
+  const redis = await checkRedis();
 
-  const degraded = database !== 'ok' || email === 'error';
+  const degraded = database !== 'ok' || email === 'error' || redis === 'error';
 
   return {
     status: degraded ? 'degraded' : 'ok',
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
-    checks: { database, email },
+    checks: { database, email, redis },
   };
 }
 

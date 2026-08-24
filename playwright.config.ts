@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import { loadEnvConfig } from '@next/env';
+
+// Playwright runs outside the Next.js runtime, so it does not load `.env*` on its
+// own. Load the same files Next uses before Playwright imports test modules; many of
+// those modules seed through Prisma at module scope and therefore need validated env
+// values during collection, not only in the spawned web-server process.
+loadEnvConfig(process.cwd());
 
 /**
  * Port 3100, NOT 3000.

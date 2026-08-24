@@ -1,4 +1,4 @@
-import { requireOrg } from '@/server/auth-context';
+import { requireBranch } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 import { KnowledgeService } from '@/features/knowledge/services/knowledge.service';
 import { searchQuerySchema } from '@/features/knowledge/validators/knowledge.validators';
@@ -14,11 +14,11 @@ import { searchQuerySchema } from '@/features/knowledge/validators/knowledge.val
 export const GET = withApiHandler(
   'GET /api/knowledge/search',
   async (request, { correlationId }) => {
-    const { organizationId } = await requireOrg();
+    const { organizationId, branchId } = await requireBranch();
     const url = new URL(request.url);
     const input = searchQuerySchema.parse(Object.fromEntries(url.searchParams));
 
-    const service = KnowledgeService.forOrganization(organizationId);
+    const service = KnowledgeService.forScope({ organizationId, branchId });
     const hits = await service.search(input.q, input.limit);
 
     return jsonSuccess({ hits }, { correlationId });

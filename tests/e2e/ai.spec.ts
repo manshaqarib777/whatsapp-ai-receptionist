@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { processNextAiTurn } from '@/workflows/ai-turn.worker';
 
 /**
  * Milestone 8 E2E — the AI Engine against a production build.
@@ -29,6 +30,7 @@ type SeededOrg = {
   organizationId: string;
   branchId: string;
   conversationId: string;
+  inputMessageId: string;
 };
 
 async function seedAiOrg(email: string, organizationId: string): Promise<SeededOrg> {
@@ -38,14 +40,8 @@ async function seedAiOrg(email: string, organizationId: string): Promise<SeededO
   const client = new PrismaClient({ adapter });
 
   try {
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -85,7 +81,7 @@ async function seedAiOrg(email: string, organizationId: string): Promise<SeededO
       select: { id: true },
     });
 
-    await client.message.create({
+    const inputMessage = await client.message.create({
       data: {
         organizationId,
         conversationId: conversation.id,
@@ -116,7 +112,12 @@ async function seedAiOrg(email: string, organizationId: string): Promise<SeededO
       },
     });
 
-    return { organizationId, branchId: branch.id, conversationId: conversation.id };
+    return {
+      organizationId,
+      branchId: branch.id,
+      conversationId: conversation.id,
+      inputMessageId: inputMessage.id,
+    };
   } finally {
     await client.$disconnect();
   }
@@ -130,6 +131,9 @@ async function cleanupOrg(seeded: SeededOrg): Promise<void> {
 
   try {
     await client.aiRunCitation.deleteMany({
+      where: { organizationId: seeded.organizationId },
+    });
+    await client.aiTurnJob.deleteMany({
       where: { organizationId: seeded.organizationId },
     });
     await client.aiRun.deleteMany({ where: { organizationId: seeded.organizationId } });
@@ -206,13 +210,15 @@ test.describe('ai engine', () => {
     }
   });
 
-  test('runs a turn and records it in the run log', async ({ page }) => {
+  test('queues a persisted message and the worker records its run', async ({ page }) => {
     const seeded = await openAi(page);
 
     try {
-      await page.getByLabel('Conversation id').fill(seeded.conversationId);
-      await page.getByLabel('Customer message').fill('How much does a check-up cost?');
-      await page.getByRole('button', { name: 'Run turn' }).click();
+      await page.getByLabel('Inbound message id').fill(seeded.inputMessageId);
+      await page.getByRole('button', { name: 'Queue turn' }).click();
+      await expect(page.getByText('queued')).toBeVisible();
+      await processNextAiTurn(seeded.organizationId);
+      await page.reload();
       await expect(page.getByText(/answered|escalated|refused/)).toBeVisible({
         timeout: 10_000,
       });

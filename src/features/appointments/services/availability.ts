@@ -1,4 +1,9 @@
 import type { AppointmentsRepository } from '@/features/appointments/repositories/appointments.repository';
+import {
+  addLocalDays,
+  weekdayForLocalDate,
+  zonedDateTimeToUtc,
+} from '@/features/appointments/services/timezone';
 
 /**
  * Availability computation — Milestone 9 (AD-2).
@@ -39,10 +44,12 @@ export async function computeSlots(
     ? resources.filter((r) => r.id === input.resourceId)
     : resources;
 
-  // Parse the date in the branch timezone (approximated by treating the date
-  // string as UTC-local-to-zone — full IANA math lands with M9's timezone util).
-  const dayStartUtc = new Date(`${input.date}T00:00:00.000Z`);
-  const dayEndUtc = new Date(`${input.date}T23:59:59.999Z`);
+  const dayStartUtc = zonedDateTimeToUtc(input.date, '00:00', input.timezone);
+  const dayEndUtc = zonedDateTimeToUtc(
+    addLocalDays(input.date, 1),
+    '00:00',
+    input.timezone,
+  );
 
   const booked = await repo.listAppointmentsInRange(
     input.branchId,
@@ -70,7 +77,8 @@ export async function computeSlots(
       resource.rules,
       resource.id,
       input.durationMinutes,
-      dayStartUtc,
+      input.date,
+      input.timezone,
       busy.get(resource.id) ?? [],
     );
     results.push({ resourceId: resource.id, slots });
@@ -83,20 +91,27 @@ function slotsForResource(
   rules: { weekday: number; startTime: string; endTime: string }[],
   resourceId: string,
   durationMinutes: number,
-  dayStartUtc: Date,
+  localDate: string,
+  timezone: string,
   busy: Slot[],
 ): Slot[] {
-  const weekday = dayStartUtc.getUTCDay();
+  const weekday = weekdayForLocalDate(localDate);
   const rule = rules.find((r) => r.weekday === weekday);
   if (!rule) return [];
 
   const [startHour, startMinute] = rule.startTime.split(':').map(Number);
   const [endHour, endMinute] = rule.endTime.split(':').map(Number);
 
-  const openStart = new Date(dayStartUtc);
-  openStart.setUTCHours(startHour ?? 0, startMinute ?? 0, 0, 0);
-  const openEnd = new Date(dayStartUtc);
-  openEnd.setUTCHours(endHour ?? 0, endMinute ?? 0, 0, 0);
+  const openStart = zonedDateTimeToUtc(
+    localDate,
+    `${String(startHour ?? 0).padStart(2, '0')}:${String(startMinute ?? 0).padStart(2, '0')}`,
+    timezone,
+  );
+  const openEnd = zonedDateTimeToUtc(
+    localDate,
+    `${String(endHour ?? 0).padStart(2, '0')}:${String(endMinute ?? 0).padStart(2, '0')}`,
+    timezone,
+  );
 
   const slots: Slot[] = [];
   const stepMs = durationMinutes * 60_000;

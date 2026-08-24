@@ -1,4 +1,8 @@
 import { logger } from '@/lib/logger';
+import { createHmac } from 'node:crypto';
+import { env } from '@/lib/env';
+import { rateLimitRepository } from '@/lib/db/rate-limit.repository';
+import { consumeRedisRateLimit } from '@/lib/db/redis-rate-limit';
 
 /**
  * In-process rate limiter.
@@ -96,6 +100,45 @@ export function consume(name: RateLimitName, identifier: string): RateLimitResul
     allowed: true,
     remaining: rule.limit - existing.count,
     retryAfterSeconds: 0,
+  };
+}
+
+/** Durable, atomic limiter for application-owned high-risk routes. Raw identifiers
+ * never enter the database; the keyed digest also resists offline IP enumeration. */
+export async function consumeDurable(
+  name: RateLimitName,
+  identifier: string,
+): Promise<RateLimitResult> {
+  const rule = RATE_LIMITS[name];
+  const keyHash = createHmac('sha256', env.AUTH_SECRET)
+    .update(`${name}:${identifier}`)
+    .digest('hex');
+  const redis = await consumeRedisRateLimit(
+    `${env.CACHE_PREFIX}:rate:${keyHash}`,
+    rule.windowSeconds,
+  );
+  if (redis) {
+    const allowed = redis.count <= rule.limit;
+    return {
+      allowed,
+      remaining: Math.max(0, rule.limit - redis.count),
+      retryAfterSeconds: allowed ? 0 : redis.retryAfterSeconds,
+    };
+  }
+  const now = new Date();
+  const bucket = await rateLimitRepository.consume(
+    keyHash,
+    rule.limit,
+    rule.windowSeconds,
+    now,
+  );
+  const allowed = bucket.count <= rule.limit;
+  return {
+    allowed,
+    remaining: Math.max(0, rule.limit - bucket.count),
+    retryAfterSeconds: allowed
+      ? 0
+      : Math.max(1, Math.ceil((bucket.resetAt.getTime() - now.getTime()) / 1000)),
   };
 }
 

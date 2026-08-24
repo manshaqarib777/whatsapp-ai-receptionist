@@ -1,6 +1,6 @@
 # Milestone 3 — Design System
 
-Status: Planned
+Status: Complete — structurally re-certified 2026-08-23
 Created: 2026-08-01
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 3`
 
@@ -302,3 +302,18 @@ Per `MILESTONE_RULES.md` §8, plus:
 - [ ] Gallery 404s in a production build
 - [ ] `MILESTONE_03_COMPLETED.md` written
 - [ ] **STOP** — visual review and approval before Milestone 4
+
+---
+
+## 2026-08-23 Structural Review Amendment
+
+The sequential milestone audit reopened this plan after comparing the implementation
+with the repository-wide rules. Functional and visual acceptance evidence remains
+valid, but certification also requires:
+
+- [x] Split `src/components/ui/chart.tsx` below the 300-line hard limit.
+- [x] Remove avoidable raw-pixel and physical-direction utilities from the reusable
+      primitives; retain exact third-party selectors only where they identify markup
+      emitted by Radix/Recharts rather than define a design value.
+- [x] Re-run the design-system tests, static gates, production build, and gallery E2E.
+- [x] Record an authoritative repair addendum in the completion report.

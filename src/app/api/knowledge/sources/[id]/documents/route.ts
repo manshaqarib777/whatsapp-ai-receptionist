@@ -1,5 +1,5 @@
 import { UnprocessableError } from '@/lib/errors';
-import { requirePermission } from '@/server/auth-context';
+import { requireBranchPermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { putStorage } from '@/lib/storage';
 import { KnowledgeService } from '@/features/knowledge/services/knowledge.service';
@@ -19,7 +19,7 @@ type Params = { id: string };
 export const POST = withApiHandler(
   'POST /api/knowledge/sources/[id]/documents',
   async (request, { correlationId }, routeParams: RouteParams<Params>) => {
-    const { organizationId } = await requirePermission('knowledge:write');
+    const { organizationId, branchId } = await requireBranchPermission('knowledge:write');
     const { id } = await routeParams.params;
 
     const form = await request.formData();
@@ -38,7 +38,7 @@ export const POST = withApiHandler(
       fileName: file.name,
     });
 
-    const service = KnowledgeService.forOrganization(organizationId);
+    const service = KnowledgeService.forScope({ organizationId, branchId });
     const result = await service.enqueueUpload({
       sourceId: id,
       title: parsedTitle.title,

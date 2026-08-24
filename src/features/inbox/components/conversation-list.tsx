@@ -9,6 +9,7 @@ import { useConversations } from '@/features/inbox/hooks/use-inbox';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { virtualWindow } from '@/lib/virtual-window';
 
 /**
  * The inbox conversation list (AD-9).
@@ -33,6 +34,7 @@ export function ConversationList() {
   const searchParams = useSearchParams();
   const filter = parseSearchParams(searchParams);
   const [q, setQ] = useState(filter.q ?? '');
+  const [viewport, setViewport] = useState({ scrollTop: 0, height: 704 });
 
   const { data, isPending, isError, refetch } = useConversations({
     status: filter.status,
@@ -41,6 +43,14 @@ export function ConversationList() {
   });
 
   const rows = data?.rows ?? [];
+  const useWindow = rows.length > 20;
+  const window = virtualWindow({
+    count: rows.length,
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.height,
+    rowHeight: 88,
+  });
+  const visibleRows = useWindow ? rows.slice(window.start, window.end) : rows;
 
   function apply(next: FilterValue) {
     const params = new URLSearchParams();
@@ -101,7 +111,13 @@ export function ConversationList() {
         </form>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2">
+      <div
+        className="flex-1 overflow-y-auto p-2"
+        onScroll={(event) => {
+          const target = event.currentTarget;
+          setViewport({ scrollTop: target.scrollTop, height: target.clientHeight });
+        }}
+      >
         {isPending && !data ? (
           <LoadingState rows={8} label="Loading conversations" />
         ) : isError ? (
@@ -112,12 +128,29 @@ export function ConversationList() {
             description="Try a different filter, or wait for a new message to arrive."
           />
         ) : (
-          <ul className="space-y-0.5">
-            {rows.map((conversation) => (
-              <li key={conversation.id}>
-                <ConversationRow conversation={conversation} />
-              </li>
-            ))}
+          <ul
+            className={useWindow ? 'relative' : 'space-y-0.5'}
+            style={useWindow ? { height: window.totalHeight } : undefined}
+            aria-label={`${rows.length} conversations`}
+          >
+            {visibleRows.map((conversation, visibleIndex) => {
+              const index = useWindow ? window.start + visibleIndex : visibleIndex;
+              return (
+                <li
+                  key={conversation.id}
+                  aria-posinset={index + 1}
+                  aria-setsize={rows.length}
+                  className={
+                    useWindow ? 'absolute inset-x-0 h-22 overflow-hidden' : undefined
+                  }
+                  style={
+                    useWindow ? { transform: `translateY(${index * 88}px)` } : undefined
+                  }
+                >
+                  <ConversationRow conversation={conversation} />
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

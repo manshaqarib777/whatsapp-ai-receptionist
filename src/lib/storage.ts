@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -32,6 +32,10 @@ export async function putStorage(
 
   const key = `${randomUUID()}${path.extname(options.fileName ?? '')}`;
   await writeFile(path.join(dir, key), data);
+  await writeFile(
+    path.join(dir, `${key}.metadata.json`),
+    JSON.stringify({ mimeType: options.mimeType }),
+  );
 
   return { key, sizeBytes: BigInt(data.byteLength) };
 }
@@ -59,8 +63,8 @@ function safeResolve(key: string): string {
 /** Signs a storage key for short-lived serving: `sig-<hmac>.<key>` */
 export function signStorageKey(key: string, ttlMs = 60_000): string {
   const expires = Date.now() + ttlMs;
-  const digest = createHash('sha256')
-    .update(`${key}.${expires}.${env.AUTH_SECRET}`)
+  const digest = createHmac('sha256', env.AUTH_SECRET)
+    .update(`${key}.${expires}`)
     .digest('hex')
     .slice(0, 32);
   return `${SIGNATURE_PREFIX}${expires}.${digest}.${Buffer.from(key).toString('base64url')}`;
@@ -82,12 +86,17 @@ export function verifyStorageToken(token: string): string {
   }
 
   const key = Buffer.from(encoded, 'base64url').toString('utf8');
-  const expected = createHash('sha256')
-    .update(`${key}.${expires}.${env.AUTH_SECRET}`)
+  const expected = createHmac('sha256', env.AUTH_SECRET)
+    .update(`${key}.${expires}`)
     .digest('hex')
     .slice(0, 32);
 
-  if (expected !== digest) {
+  const expectedBytes = Buffer.from(expected, 'hex');
+  const digestBytes = Buffer.from(digest, 'hex');
+  if (
+    expectedBytes.length !== digestBytes.length ||
+    !timingSafeEqual(expectedBytes, digestBytes)
+  ) {
     throw new NotFoundError('Attachment not found.');
   }
 
@@ -101,5 +110,14 @@ export async function storageInfo(key: string): Promise<{
 }> {
   const filePath = safeResolve(key);
   const info = await stat(filePath);
-  return { mimeType: 'application/octet-stream', sizeBytes: info.size };
+  let mimeType = 'application/octet-stream';
+  try {
+    const metadata = JSON.parse(await readFile(`${filePath}.metadata.json`, 'utf8')) as {
+      mimeType?: unknown;
+    };
+    if (typeof metadata.mimeType === 'string') mimeType = metadata.mimeType;
+  } catch {
+    // Older seed/local files predate metadata sidecars and remain downloadable.
+  }
+  return { mimeType, sizeBytes: info.size };
 }

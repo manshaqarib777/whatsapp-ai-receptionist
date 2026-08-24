@@ -1,5 +1,42 @@
 # Milestone 2 — Completed
 
+> The original 2026-08-01 claim was reopened and repaired on 2026-08-23. The original
+> report remains below for traceability; this addendum is the authoritative evidence.
+
+## 2026-08-23 Repair Addendum
+
+The repair closed the invitation, session-management, QR-code, and progressive-lockout
+limitations and corrected structural violations that the original review missed.
+
+- Auth persistence now lives in `src/lib/db/auth`; services and auth context no longer
+  touch Prisma. Client components call feature client services instead of issuing fetches
+  or Better Auth mutations directly.
+- Organization creation atomically provisions the owner and one default `Main` branch
+  (`Asia/Riyadh`). Downstream E2E fixtures resolve that invariant instead of creating a
+  duplicate branch.
+- `/api/invitations`, the members invite form, and `/accept-invitation/[id]` are present,
+  with the custom `viewer` role registered in Better Auth.
+- Security settings list active sessions and revoke non-current sessions.
+- Failed password attempts persist in PostgreSQL and progressively lock at 1, 5, 15,
+  then 60 minutes. Production E2E proves the next attempt returns `429`.
+- Sign-out, password change/reset, 2FA changes, session revocation, and invitation
+  acceptance feed the append-only audit service.
+- TOTP setup generates an SVG QR code locally and retains the accessible URI fallback.
+- `middleware.ts` was replaced with Next.js 16 `proxy.ts`; audit-log query parameters
+  now use strict Zod validation.
+
+| Gate | Result |
+|---|---|
+| TypeScript, ESLint, Prettier | Passed; zero lint warnings |
+| Unit/integration/component | 944/944 across 91 files; 150 auth tests |
+| E2E | 234/234; desktop + mobile; one worker; zero retries; 8.8 minutes |
+| Production build | Passed; 55 pages generated; Proxy recognized |
+| Dependency audit | 0 vulnerabilities |
+| Schema drift | Only documented HNSW/trgm indexes |
+
+External limitations remain explicit: Google/GitHub redirect round-trips require provider
+credentials, and preview deployment verification is owned by Milestone 25.
+
 Completed: 2026-08-01
 Plan: [`MILESTONE_02_PLAN.md`](MILESTONE_02_PLAN.md)
 Progress: [`MILESTONE_02_PROGRESS.md`](MILESTONE_02_PROGRESS.md)

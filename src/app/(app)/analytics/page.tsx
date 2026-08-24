@@ -65,7 +65,7 @@ export default async function AnalyticsPage() {
       <Suspense
         fallback={<CardSkeleton title="Conversion" description="Loading conversion…" />}
       >
-        <ConversionData organizationId={organizationId} />
+        <ConversionData organizationId={organizationId} range={range} />
       </Suspense>
 
       <Suspense
@@ -113,9 +113,15 @@ async function FunnelData({ organizationId }: { organizationId: string }) {
   return <FunnelSection funnels={funnels} />;
 }
 
-async function ConversionData({ organizationId }: { organizationId: string }) {
+async function ConversionData({
+  organizationId,
+  range,
+}: {
+  organizationId: string;
+  range: ReturnType<typeof rangeToDates>;
+}) {
   const service = AnalyticsService.forOrganization(organizationId);
-  const conversion = await service.getConversion();
+  const conversion = await service.getConversion(range);
   return <ConversionSection conversion={conversion} />;
 }
 

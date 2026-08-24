@@ -154,7 +154,7 @@ export class CrmService {
   async createCompany(input: { name: string; vatNumber?: string }): Promise<CompanyRow> {
     const branchId = await this.repo.resolveDefaultBranch();
     const company = await this.repo.createCompany({ branchId, ...input });
-    await this.recordActivity(company.id, 'contact', 'note', {
+    await this.recordActivity(company.id, 'company', 'note', {
       body: `Company created: ${company.name}`,
       actor: null,
     });
@@ -205,9 +205,11 @@ export class CrmService {
     } else if (type === 'contact') {
       const exists = await this.repo.contactExists(id);
       if (!exists) throw new NotFoundError('Contact not found.');
-    } else {
+    } else if (type === 'conversation') {
       const exists = await this.repo.conversationExists(id);
       if (!exists) throw new NotFoundError('Conversation not found.');
+    } else {
+      await this.repo.getCompany(id);
     }
   }
 

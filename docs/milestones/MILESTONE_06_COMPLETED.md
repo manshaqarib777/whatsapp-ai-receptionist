@@ -1,5 +1,15 @@
 # Milestone 6 — Completed
 
+> **Authoritative structural re-certification — 2026-08-23:** The sequential review
+> found that assignment, attachment upload, and internal-note creation were reported
+> complete while their UI remained stubbed or absent. All three are now real. The
+> repair also validates file type/size server-side, rejects assignees outside the active
+> organization, serves downloads/audio with preserved MIME metadata, replaces the
+> keyed plain hash with HMAC plus constant-time verification, and splits the 314-line
+> hook module into 222/111-line query/mutation modules. Current evidence: inbox tests
+> 41/41, full existing inbox E2E 12/12, new assignment/note E2E 2/2 across desktop and
+> mobile, typecheck/lint clean, drift guard clean, and production build successful.
+
 Completed: 2026-08-12
 
 ---
@@ -148,9 +158,9 @@ volume; the bounded-optimization path is documented in the plan's AD-1.
 2. **Attachment storage is local** (`STORAGE_DIR`). A production deployment swaps
    the `putStorage`/`getStorage`/`signStorageKey` interface for real object storage;
    the schema's `storage_key` design makes that a bounded change.
-3. **Assignments are a dropdown stub** in the UI — the PATCH route + permission check
-   exist and are integration-tested, but the picker renders a toast rather than a
-   full member list (the member data is available; a fuller picker is polish).
+3. **Attachment storage is still a local adapter**, but the complete user interaction,
+   server validation, signed serving, document download, and audio playback paths are
+   now implemented. Production object storage remains a bounded adapter replacement.
 4. **Heuristic AI is rule-based by design** — M8 replaces suggestions + summary with
    the real AI Engine behind the same UI seam.
 5. **Not exercised on a preview deployment** — carried forward from M5; needs the

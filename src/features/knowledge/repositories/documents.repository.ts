@@ -173,6 +173,29 @@ export class KnowledgeDocumentsRepository extends KnowledgeBaseRepository {
     expectOne(result, 'Document');
   }
 
+  /** Atomically approves a pending version and promotes it as the current version. */
+  async approveAndSetCurrent(versionId: string, approverId: string): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const transitioned = await tx.knowledgeDocumentVersion.updateMany({
+        where: { id: versionId, status: 'pending_approval' },
+        data: { status: 'approved', approvedById: approverId, approvedAt: new Date() },
+      });
+      expectOne(transitioned, 'Version');
+
+      const version = await tx.knowledgeDocumentVersion.findFirst({
+        where: { id: versionId },
+        select: { documentId: true },
+      });
+      if (!version) throw new NotFoundError('Version not found.');
+
+      const promoted = await tx.knowledgeDocument.updateMany({
+        where: { id: version.documentId },
+        data: { currentVersionId: versionId },
+      });
+      expectOne(promoted, 'Document');
+    });
+  }
+
   async getNextVersionNumber(documentId: string): Promise<number> {
     const latest = await this.db.knowledgeDocumentVersion.findFirst({
       where: { documentId },

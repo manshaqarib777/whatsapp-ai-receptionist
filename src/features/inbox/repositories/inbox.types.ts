@@ -50,6 +50,7 @@ export type MessageRow = {
   attachments: {
     id: string;
     storageKey: string;
+    downloadUrl: string;
     mimeType: string;
     sizeBytes: string;
     fileName: string | null;

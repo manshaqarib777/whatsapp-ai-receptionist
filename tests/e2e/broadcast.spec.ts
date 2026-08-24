@@ -45,14 +45,8 @@ async function seedBroadcastOrg(
   const client = new PrismaClient({ adapter });
 
   try {
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -213,7 +207,9 @@ test.describe('broadcast', () => {
 
     try {
       await page.getByText('E2E campaign').click();
-      await expect(page.getByText('Analytics')).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Analytics', exact: true }),
+      ).toBeVisible();
       await expect(page.getByText('E2E Recipient')).toBeVisible();
       await expect(page.getByText('delivered').first()).toBeVisible();
     } finally {

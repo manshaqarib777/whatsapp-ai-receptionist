@@ -8,6 +8,7 @@ import { Composer } from '@/features/inbox/components/composer';
 import { ConversationList } from '@/features/inbox/components/conversation-list';
 import { formatRelativeTime } from '@/features/inbox/components/conversation-row';
 import { MessageBubble } from '@/features/inbox/components/message-bubble';
+import { NoteComposer } from '@/features/inbox/components/note-composer';
 import type {
   ConversationRow,
   MessageRow,
@@ -162,6 +163,28 @@ describe('ConversationList', () => {
     // never mounts, so the full axe audit of the tabs lives in the E2E suite
     // (real browser), where the content panels do mount.
   });
+
+  it('windows large result sets while exposing the complete accessible count', async () => {
+    const rows = Array.from({ length: 50 }, (_, index) => ({
+      ...conversationRow,
+      id: `conv-${index + 1}`,
+      contactId: `contact-${index + 1}`,
+      contactDisplayName: `Contact ${index + 1}`,
+    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => ok({ data: { rows, nextCursor: null } })),
+    );
+
+    renderWithQuery(<ConversationList />);
+
+    const list = await screen.findByRole('list', { name: '50 conversations' });
+    const renderedRows = list.querySelectorAll(':scope > li');
+    expect(renderedRows.length).toBeGreaterThan(0);
+    expect(renderedRows.length).toBeLessThan(rows.length);
+    expect(renderedRows[0]).toHaveAttribute('aria-posinset', '1');
+    expect(renderedRows[0]).toHaveAttribute('aria-setsize', '50');
+  });
 });
 
 describe('MessageBubble', () => {
@@ -197,6 +220,7 @@ describe('MessageBubble', () => {
         {
           id: 'att-1',
           storageKey: 'key',
+          downloadUrl: '/api/storage/audio-token',
           mimeType: 'audio/ogg',
           sizeBytes: '1024',
           fileName: 'voice-note.ogg',
@@ -219,6 +243,7 @@ describe('MessageBubble', () => {
         {
           id: 'att-2',
           storageKey: 'key',
+          downloadUrl: '/api/storage/document-token',
           mimeType: 'image/png',
           sizeBytes: '2048',
           fileName: 'x-ray.png',
@@ -287,5 +312,41 @@ describe('Composer', () => {
     renderWithQuery(<Composer conversationId="conv-1" />);
 
     expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  });
+
+  it('uploads the selected attachment as multipart form data', async () => {
+    const user = userEvent.setup();
+    const request = vi.fn(() => ok({ data: { message: { id: 'msg-file' } } }));
+    vi.stubGlobal('fetch', request);
+    renderWithQuery(<Composer conversationId="conv-1" />);
+
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' });
+    await user.upload(screen.getByLabelText('Choose attachment'), file);
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        '/api/inbox/conversations/conv-1/attachments',
+        expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+      ),
+    );
+  });
+});
+
+describe('NoteComposer', () => {
+  it('creates an internal note through the notes endpoint', async () => {
+    const user = userEvent.setup();
+    const request = vi.fn(() => ok({ data: { id: 'note-1' } }));
+    vi.stubGlobal('fetch', request);
+    renderWithQuery(<NoteComposer conversationId="conv-1" />);
+
+    await user.type(screen.getByLabelText('Internal note'), 'Customer asked for VAT.');
+    await user.click(screen.getByRole('button', { name: 'Add note' }));
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        '/api/inbox/conversations/conv-1/notes',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
   });
 });

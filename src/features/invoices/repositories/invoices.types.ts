@@ -7,7 +7,8 @@
 
 export type InvoiceStatus =
   'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'void';
-export type PaymentGateway = 'stripe' | 'hyperpay' | 'paytabs' | 'stcpay' | 'applepay';
+export type PaymentGateway =
+  'manual' | 'stripe' | 'hyperpay' | 'paytabs' | 'stcpay' | 'applepay';
 export type PaymentStatus = 'pending' | 'succeeded' | 'failed';
 
 export type InvoiceLineItemRow = {
@@ -30,6 +31,7 @@ export type InvoiceRow = {
   status: InvoiceStatus;
   subtotalAmount: number;
   taxAmount: number;
+  discountAmount: number;
   totalAmount: number;
   amountPaid: number;
   currency: string;

@@ -102,6 +102,16 @@ describe('listMembers', () => {
 });
 
 describe('listForUser', () => {
+  it('creates exactly one default Main branch with the organization', async () => {
+    const branches = await prisma.branch.findMany({
+      where: { organizationId: fixture.orgA },
+      select: { name: true, slug: true, timezone: true, isDefault: true },
+    });
+    expect(branches).toEqual([
+      { name: 'Main', slug: 'main', timezone: 'Asia/Riyadh', isDefault: true },
+    ]);
+  });
+
   it('returns only organizations the user actually belongs to', async () => {
     const organizations = await organizationService.listForUser(fixture.memberA);
 

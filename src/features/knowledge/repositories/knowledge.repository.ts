@@ -32,6 +32,10 @@ export class KnowledgeRepository {
     return new KnowledgeRepository(resolveScope(organizationId));
   }
 
+  static forScope(scope: Scope): KnowledgeRepository {
+    return new KnowledgeRepository(scope);
+  }
+
   async resolveDefaultBranch(): Promise<string> {
     return this.sources.resolveDefaultBranch();
   }
@@ -97,6 +101,13 @@ export class KnowledgeRepository {
     versionId: string,
   ): ReturnType<KnowledgeDocumentsRepository['setCurrentVersion']> {
     return this.documents.setCurrentVersion(documentId, versionId);
+  }
+
+  approveAndSetCurrent(
+    versionId: string,
+    approverId: string,
+  ): ReturnType<KnowledgeDocumentsRepository['approveAndSetCurrent']> {
+    return this.documents.approveAndSetCurrent(versionId, approverId);
   }
 
   getNextVersionNumber(

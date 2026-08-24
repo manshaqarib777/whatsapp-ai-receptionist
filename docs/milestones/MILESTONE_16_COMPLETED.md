@@ -1,6 +1,6 @@
 # Milestone 16 — Completed
 
-Completed: 2026-08-17
+Completed: 2026-08-17; re-certified: 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 16`
 
 ---
@@ -30,8 +30,8 @@ Against the plan's objective, all of the following are now true and were not bef
 - **Feedback is captured**: a rating below 4 is surfaced as "needs attention" in
   the review list — the feedback surface is real.
 - **Automation exists**: `npm run reviews:work` finds completed appointments
-  past a 24-hour grace window whose contacts have consented, creates + sends a
-  review request through the transport stub seam, and sweeps sent requests past
+  past a 24-hour grace window whose contacts have consented, creates a durable
+  request and sends it only through an acknowledged transport, and sweeps sent requests past
   their expiry into `expired`. Idempotent via the unique
   `(appointmentId, platformId)` guard.
 - **The `/reviews` UI is real**: a review list with the needs-attention badge
@@ -128,6 +128,15 @@ automation worker creates + sends for a completed appointment past the grace
 window, skips one inside the grace window, never asks a non-consenting contact,
 and is idempotent; a 2-star review is flagged needs-attention while a 5-star is
 not; a rating of 6 is refused; org B never sees org A's reviews.
+
+### Re-certification repairs (2026-08-23)
+
+- Removed false `sent` transitions from manual and automated requests.
+- Added injectable acknowledgement, fail-closed behavior, and durable retry of
+  requests left in `created`.
+- Google/Facebook adapters now fail loudly from fetch/webhook operations.
+- Split the 448-line repository into bounded request/platform/review units.
+- Gates: 32 focused tests, lint, typecheck, drift check, 55-page build, 6/6 E2E.
 
 ### Deliberately not covered
 

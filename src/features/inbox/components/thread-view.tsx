@@ -1,11 +1,13 @@
 'use client';
 
-import { Archive, ArchiveRestore, MoreHorizontal, Pin, PinOff, User } from 'lucide-react';
+import { Archive, ArchiveRestore, MoreHorizontal, Pin, PinOff } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { Composer } from '@/features/inbox/components/composer';
 import { MessageBubble } from '@/features/inbox/components/message-bubble';
+import { AssignmentPicker } from '@/features/inbox/components/assignment-picker';
+import { NoteComposer } from '@/features/inbox/components/note-composer';
 import {
   useArchiveConversation,
   useLabels,
@@ -95,9 +97,9 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
       <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="truncate text-sm font-semibold">
+            <h1 className="truncate text-sm font-semibold">
               {conversation.contactDisplayName}
-            </h2>
+            </h1>
             {conversation.isEscalated ? (
               <Badge variant="destructive">Escalated</Badge>
             ) : null}
@@ -154,12 +156,7 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
               )}
               {conversation.status === 'archived' ? 'Unarchive' : 'Archive'}
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => toast.info('Assignments ship in this milestone.')}
-            >
-              <User aria-hidden="true" className="size-4" />
-              Assign…
-            </DropdownMenuItem>
+            <AssignmentPicker conversationId={conversationId} />
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Labels</DropdownMenuLabel>
             {(labelsQuery.data ?? []).map((label) => (
@@ -237,6 +234,8 @@ export function ThreadView({ conversationId }: { conversationId: string }) {
           </ul>
         </div>
       ) : null}
+
+      <NoteComposer conversationId={conversationId} />
 
       <Composer conversationId={conversationId} />
     </div>

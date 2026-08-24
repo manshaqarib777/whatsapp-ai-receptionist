@@ -140,6 +140,20 @@ async function makeInvoice(
     },
     select: { id: true },
   });
+  if (status === 'paid') {
+    await prisma.payment.create({
+      data: {
+        organizationId: orgId,
+        invoiceId: invoice.id,
+        gateway: 'manual',
+        gatewayPaymentId: `analytics-${invoice.id}`,
+        amount,
+        currency: 'SAR',
+        status: 'succeeded',
+        capturedAt: new Date(Date.now() - 3 * 24 * 3_600_000),
+      },
+    });
+  }
   return invoice.id;
 }
 
@@ -388,7 +402,7 @@ describe('analytics — retention', () => {
           displayName: 'A1',
           lifecycleStage: 'customer',
           hasConsent: true,
-          createdAt: new Date(Date.now() - 10 * 24 * 3_600_000),
+          createdAt: new Date(Date.now() - 40 * 24 * 3_600_000),
         },
         {
           organizationId: f.orgA,
@@ -397,7 +411,7 @@ describe('analytics — retention', () => {
           displayName: 'A2',
           lifecycleStage: 'lead',
           hasConsent: true,
-          createdAt: new Date(Date.now() - 10 * 24 * 3_600_000),
+          createdAt: new Date(Date.now() - 40 * 24 * 3_600_000),
         },
         {
           organizationId: f.orgB,
@@ -406,12 +420,15 @@ describe('analytics — retention', () => {
           displayName: 'B1',
           lifecycleStage: 'customer',
           hasConsent: true,
-          createdAt: new Date(Date.now() - 10 * 24 * 3_600_000),
+          createdAt: new Date(Date.now() - 40 * 24 * 3_600_000),
         },
       ],
     });
 
-    const retention = await serviceFor(f.orgA).getRetention(range());
+    const retention = await serviceFor(f.orgA).getRetention({
+      from: new Date(Date.now() - 90 * 24 * 3_600_000),
+      to: new Date(),
+    });
 
     expect(
       retention.lifecycle.find((row) => row.lifecycleStage === 'customer')?.count,

@@ -92,6 +92,12 @@ const eslintConfig = defineConfig([
         'error',
         {
           selector:
+            "ImportExpression[source.value='@/lib/prisma'], CallExpression[callee.type='Import'][arguments.0.value='@/lib/prisma']",
+          message:
+            'Dynamic import does not bypass tenant isolation. Use forScope(), or add an explicit pre-scope operation to src/lib/db/system-discovery.repository.ts.',
+        },
+        {
+          selector:
             "JSXAttribute[name.name='className'] > Literal[value=/(^|\\s|:)(p[lr]|m[lr]|left|right|border-[lr]|rounded-[lr]|text-(left|right)|float-(left|right)|inset-[lr])-/]",
           message:
             'Use logical properties so RTL works: ps-/pe-, ms-/me-, start-/end-, border-s/border-e, text-start/text-end. See .claude/RTL_I18N_RULES.md.',

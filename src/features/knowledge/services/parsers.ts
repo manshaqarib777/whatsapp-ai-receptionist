@@ -1,8 +1,6 @@
 import { parse } from 'csv-parse/sync';
-import mammoth from 'mammoth';
 import { isIP } from 'node:net';
 import { parse as parseHtml } from 'node-html-parser';
-import { PDFParse } from 'pdf-parse';
 
 import { UnprocessableError } from '@/lib/errors';
 
@@ -24,6 +22,7 @@ export type ParseResult = {
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20 MB
 export const MAX_WEBSITE_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_REDIRECTS = 5;
 
 /** Parses an uploaded file buffer into text. */
 export async function parseUpload(
@@ -61,6 +60,7 @@ export async function parseUpload(
 }
 
 async function parsePdf(buffer: Buffer): Promise<ParseResult> {
+  const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
 
   try {
@@ -80,6 +80,7 @@ async function parsePdf(buffer: Buffer): Promise<ParseResult> {
 
 async function parseDocx(buffer: Buffer): Promise<ParseResult> {
   try {
+    const mammoth = (await import('mammoth')).default;
     const result = await mammoth.extractRawText({ buffer });
     const text = (result.value ?? '').trim();
     return { text: text.length > 0 ? text : null, needsOcr: false };
@@ -116,13 +117,7 @@ export async function fetchWebsiteText(url: string): Promise<string> {
     throw new UnprocessableError('Only http(s) URLs can be ingested.');
   }
 
-  await assertPublicHost(parsed);
-
-  const response = await fetch(parsed.toString(), {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(15_000),
-    headers: { 'user-agent': 'WhatsApp-AI-Receptionist/1.0 (+knowledge-ingestion)' },
-  });
+  const response = await fetchPublicWebsite(parsed);
 
   if (!response.ok) {
     throw new UnprocessableError(`The website responded with status ${response.status}.`);
@@ -133,10 +128,7 @@ export async function fetchWebsiteText(url: string): Promise<string> {
     throw new UnprocessableError('The website page exceeds the 2 MB fetch limit.');
   }
 
-  const html = await response.text();
-  if (html.length > MAX_WEBSITE_BYTES) {
-    throw new UnprocessableError('The website page exceeds the 2 MB fetch limit.');
-  }
+  const html = await readLimitedText(response);
 
   const root = parseHtml(html);
   root
@@ -149,6 +141,57 @@ export async function fetchWebsiteText(url: string): Promise<string> {
   }
 
   return text;
+}
+
+async function fetchPublicWebsite(initialUrl: URL): Promise<Response> {
+  let current = initialUrl;
+
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    await assertPublicHost(current);
+    const response = await fetch(current.toString(), {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15_000),
+      headers: { 'user-agent': 'WhatsApp-AI-Receptionist/1.0 (+knowledge-ingestion)' },
+    });
+
+    if (response.status < 300 || response.status >= 400) return response;
+    const location = response.headers.get('location');
+    if (!location)
+      throw new UnprocessableError('The website returned an invalid redirect.');
+    const next = new URL(location, current);
+    if (next.protocol !== 'http:' && next.protocol !== 'https:') {
+      throw new UnprocessableError('Website redirects must use http(s).');
+    }
+    current = next;
+  }
+
+  throw new UnprocessableError('The website redirected too many times.');
+}
+
+async function readLimitedText(response: Response): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_WEBSITE_BYTES) {
+      await reader.cancel();
+      throw new UnprocessableError('The website page exceeds the 2 MB fetch limit.');
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 /** Resolves a hostname and refuses private, loopback, and link-local ranges. */

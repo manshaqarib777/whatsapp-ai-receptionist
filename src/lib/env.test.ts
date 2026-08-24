@@ -211,6 +211,18 @@ describe('parseEnv — auth configuration (Milestone 2)', () => {
     expect(parsed.EMAIL_TRANSPORT).toBe('smtp');
   });
 
+  it('allows the console transport only for an explicit production E2E run', () => {
+    const parsed = parseEnv({
+      ...validEnv,
+      NODE_ENV: 'production',
+      EMAIL_TRANSPORT: 'console',
+      E2E_TEST_RUN: 'true',
+    });
+
+    expect(parsed.EMAIL_TRANSPORT).toBe('console');
+    expect(parsed.E2E_TEST_RUN).toBe(true);
+  });
+
   it('defaults EMAIL_FROM and rejects a malformed address', () => {
     expect(parseEnv(validEnv).EMAIL_FROM).toContain('@');
     expect(() => parseEnv({ ...validEnv, EMAIL_FROM: 'not-an-address' })).toThrowError(

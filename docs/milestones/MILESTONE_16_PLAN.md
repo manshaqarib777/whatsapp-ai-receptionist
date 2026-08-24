@@ -92,8 +92,9 @@ clear error rather than a silent no-op (the `UnconfiguredGateway` pattern). The
 
 `created → sent → responded / expired`. Creating a request for a completed
 appointment is gated on the contact's consent (`hasConsent && !optedOutAt`).
-Sending marks `sent` (the transport is the same stub seam as the reminder
-worker). A manual or webhook-entered review transitions the request to
+Sending marks `sent` only after the injectable transport acknowledges delivery;
+an unconfigured transport throws and leaves the request durable in `created`.
+A manual or webhook-entered review transitions the request to
 `responded`; an unreplied request past its expiry window becomes `expired`
 (worker-swept).
 

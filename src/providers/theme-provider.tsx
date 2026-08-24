@@ -14,12 +14,19 @@ import type { ReactNode } from 'react';
  * Class-based rather than media-query-only, so a user can override their system
  * preference.
  */
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({
+  children,
+  nonce,
+}: {
+  children: ReactNode;
+  nonce?: string;
+}) {
   return (
     <NextThemesProvider
       attribute="class"
       defaultTheme="system"
       enableSystem
+      nonce={nonce}
       // Transitions during a theme swap animate every colour on the page at once,
       // which reads as a glitch rather than a transition.
       disableTransitionOnChange

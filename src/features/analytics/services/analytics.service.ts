@@ -1,5 +1,18 @@
 import { AnalyticsRepository } from '@/features/analytics/repositories/analytics.repository';
 import type { DateRange } from '@/features/analytics/repositories/analytics.types';
+import { fillDailySeries, formatShortDate, rate } from './analytics-math';
+import type {
+  BookingsOverview,
+  ConversionRates,
+  ForecastOverview,
+  FunnelSection,
+  PerformanceOverview,
+  RetentionOverview,
+  RevenueOverview,
+} from './analytics.view-models';
+
+export * from './analytics-math';
+export type * from './analytics.view-models';
 
 /**
  * Analytics view model — Milestone 15.
@@ -9,134 +22,6 @@ import type { DateRange } from '@/features/analytics/repositories/analytics.type
  * deltas, conversion rates, the weighted forecast, and the trailing-average
  * projection. No SQL here; the repository is the only DB-touching layer.
  */
-
-export type RevenueOverview = {
-  invoiced: number;
-  collected: number;
-  outstanding: number;
-  refunds: number;
-  byStatus: { status: string; amount: number }[];
-  invoicedSeries: { date: Date; label: string; amount: number }[];
-  collectedSeries: { date: Date; label: string; amount: number }[];
-};
-
-export type FunnelSection = {
-  pipeline: {
-    stageName: string;
-    openDeals: number;
-    openValue: number;
-    winProbability: number;
-  }[];
-  conversion: {
-    quotes: number;
-    accepted: number;
-    invoiced: number;
-    paid: number;
-    acceptanceRate: number | null;
-    invoiceRate: number | null;
-    paymentRate: number | null;
-  };
-};
-
-export type ConversionRates = {
-  quoteAcceptanceRate: number | null;
-  quoteToInvoiceRate: number | null;
-  invoiceToPaidRate: number | null;
-  dealWinRate: number | null;
-  dealWinCount: number;
-  dealLostCount: number;
-};
-
-export type RetentionOverview = {
-  lifecycle: { lifecycleStage: string; count: number }[];
-  createdInRange: number;
-  activeOfCreated: number;
-  retentionRate: number | null;
-};
-
-export type BookingsOverview = {
-  byStatus: { status: string; count: number }[];
-  total: number;
-  value: number;
-  cancelledCount: number;
-  noShowCount: number;
-  cancellationRate: number | null;
-  noShowRate: number | null;
-};
-
-export type PerformanceOverview = {
-  conversations: number;
-  escalatedCount: number;
-  escalationRate: number | null;
-  responseTimeSeconds: number | null;
-  assigned: { assigneeName: string; count: number }[];
-  campaigns: { status: string; count: number }[];
-};
-
-export type ForecastOverview = {
-  weighted: number;
-  openValue: number;
-  deals: number;
-  byStage: { stageName: string; deals: number; value: number; weighted: number }[];
-  projection: { month: string; amount: number }[];
-  projectionIsEstimate: boolean;
-};
-
-const currencyFormatter = new Intl.NumberFormat('en', {
-  style: 'currency',
-  currency: 'SAR',
-  maximumFractionDigits: 0,
-});
-
-export function formatCurrency(amount: number): string {
-  return currencyFormatter.format(amount);
-}
-
-/** Seconds → a human duration like "2m 14s" or "45s". */
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = Math.round(seconds % 60);
-  return `${minutes}m ${remaining}s`;
-}
-
-export function formatShortDate(date: Date): string {
-  return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(date);
-}
-
-/** Rounded percentage; null when there is no baseline. */
-export function rate(numerator: number, denominator: number): number | null {
-  if (denominator <= 0) return null;
-  return Math.round((numerator / denominator) * 1000) / 10;
-}
-
-/** Fills a sparse daily series into a dense series covering the range. */
-export function fillDailySeries<
-  TInput extends { date: Date },
-  TOutput extends { date: Date },
->(
-  points: TInput[],
-  range: DateRange,
-  mapPoint: (date: Date, existing?: TInput) => TOutput,
-): TOutput[] {
-  const byDay = new Map<string, TInput>();
-  for (const point of points) byDay.set(point.date.toISOString().slice(0, 10), point);
-
-  const out: TOutput[] = [];
-  const cursor = new Date(range.from);
-  cursor.setUTCHours(0, 0, 0, 0);
-  const end = new Date(range.to);
-  end.setUTCHours(23, 59, 59, 999);
-
-  while (cursor <= end) {
-    const key = cursor.toISOString().slice(0, 10);
-    const existing = byDay.get(key);
-    out.push(mapPoint(new Date(cursor), existing));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-
-  return out;
-}
 
 export class AnalyticsService {
   private readonly repo: AnalyticsRepository;
@@ -218,11 +103,11 @@ export class AnalyticsService {
   // Conversion
   // -------------------------------------------------------------------------
 
-  async getConversion(): Promise<ConversionRates> {
+  async getConversion(range?: DateRange): Promise<ConversionRates> {
     const [funnel, won, lost] = await Promise.all([
-      this.repo.conversionFunnel(),
-      this.repo.dealCountByStatus('won'),
-      this.repo.dealCountByStatus('lost'),
+      this.repo.conversionFunnel(range),
+      this.repo.dealCountByStatus('won', range),
+      this.repo.dealCountByStatus('lost', range),
     ]);
 
     const dealsClosed = won + lost;

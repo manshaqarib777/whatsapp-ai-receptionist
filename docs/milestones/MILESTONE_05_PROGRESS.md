@@ -1,10 +1,20 @@
 # Milestone 5 — Progress
 
-Status: **Complete — see `MILESTONE_05_COMPLETED.md`**
+Status: **Complete — structurally re-certified 2026-08-23**
 Started: 2026-08-12
-Last updated: 2026-08-12
+Last updated: 2026-08-23
 
 Plan: `MILESTONE_05_PLAN.md` (approved 2026-08-12).
+
+## 2026-08-23 Sequential Review
+
+- [x] Rechecked the requirements, plan, repository/service boundaries, server page,
+      component states, API handlers, tenant tests, and E2E evidence.
+- [x] Corrected the missing independent widget error boundaries (the original completion
+      report's “deliberately not covered” rationale contradicts AD-3 and the DoD).
+- [x] Extracted notification reads, bringing the dashboard repository to 292 lines.
+- [x] Current gates: 75/75 focused dashboard tests, typecheck/lint clean, production
+      build successful (55 pages), dashboard E2E 12/12 across desktop/mobile.
 
 ## Completed Tasks
 

@@ -46,6 +46,11 @@ Creates a service. Requires `appointment:write`. Body:
 `durationMinutes` must be between 5 and 480. Response (201):
 `{ data: { service } }`.
 
+### `PATCH /api/appointments/services/[id]`
+
+Updates one or more service fields. Requires `appointment:write`; the body is a
+strict partial version of the create schema. Missing/cross-tenant ids return 404.
+
 ## Resources
 
 ### `GET /api/appointments/resources`
@@ -154,5 +159,6 @@ cancelled. Cancelling sets `cancelled` and cancels future reminders.
 Reminders are rows in `appointment_reminders`, created on booking and cancelled on
 cancel/reschedule. The worker (`npm run reminders:work`,
 `src/workflows/appointment-reminders.worker.ts`) polls due `scheduled` rows and
-marks them `sent`/`failed`. Delivery is a no-op stub until the WhatsApp messaging
-milestone.
+hands each reminder to the configured transport. A row becomes `sent` only after
+transport acknowledgement. Until Meta is configured in Milestone 19, the default
+transport fails closed and the row becomes `failed`; it is never falsely reported sent.

@@ -1,6 +1,6 @@
 # Milestone 10 — Completed
 
-Completed: 2026-08-14
+Completed: 2026-08-14; re-certified 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 10`
 
 ---

@@ -33,4 +33,6 @@ export type AppointmentRow = {
   status: string;
   notes: string | null;
   rescheduledFromId: string | null;
+  recurrenceRule: string | null;
+  recurrenceParentId: string | null;
 };

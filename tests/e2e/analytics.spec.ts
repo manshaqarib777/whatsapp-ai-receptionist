@@ -39,14 +39,8 @@ async function seedAnalyticsOrg(organizationId: string): Promise<SeededOrg> {
   const client = new PrismaClient({ adapter });
 
   try {
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -227,7 +221,9 @@ test.describe('analytics', () => {
     try {
       await expect(page.getByText('Revenue', { exact: true }).first()).toBeVisible();
       await expect(page.getByText('SAR 1,150').first()).toBeVisible();
-      await expect(page.getByText('Funnels', { exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('main').getByText('Funnels', { exact: true }),
+      ).toBeVisible();
       await expect(page.getByText('Qualified', { exact: true })).toBeVisible();
       await expect(page.getByText('Bookings', { exact: true })).toBeVisible();
       await expect(page.getByText('Forecast', { exact: true })).toBeVisible();

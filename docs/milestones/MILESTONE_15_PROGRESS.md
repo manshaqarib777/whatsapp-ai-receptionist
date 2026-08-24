@@ -1,8 +1,8 @@
 # Milestone 15 — Analytics — Progress
 
-Status: In Progress
+Status: Completed; re-certified
 Started: 2026-08-16
-Last updated: 2026-08-16
+Last updated: 2026-08-23
 
 ## Completed Tasks
 
@@ -30,6 +30,8 @@ None — milestone complete.
 | 2 | Async server components cannot be rendered in jsdom (React 19: "Only Server Components can be async") | Resolved | Sections refactored to presentational client components receiving data props; the server page does the fetching — the same split as the dashboard's `RevenueChart` vs page |
 | 3 | Permissions test caught `analytics:read` missing on `member` while viewer held it | Resolved | Role matrix completed — all four roles hold `analytics:read` |
 | 4 | E2E strict-mode violations on repeated strings (`SAR 1,150`, `Qualified`, `Revenue`) | Resolved | Exact + `.first()` matchers |
+| 5 | Conversion ignored the documented range; revenue used invoice snapshots; retention was not a 30-day cohort; response timing was N+1 | Resolved | Range-aware cohort queries, captured successful payments, mature-contact activity threshold, batched message reads |
+| 6 | Analytics repository/service exceeded the 300-line structural budget | Resolved | Split revenue/performance repositories plus math/view-model modules |
 
 ## Technical Decisions
 

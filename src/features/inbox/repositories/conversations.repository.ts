@@ -229,11 +229,13 @@ export class InboxConversationsRepository extends InboxBaseRepository {
     conversationId: string;
     assigneeId?: string | null;
     isPinned?: boolean;
+    isEscalated?: boolean;
   }): Promise<void> {
     await this.assertConversation(input.conversationId);
     const data: Record<string, unknown> = {};
     if (input.assigneeId !== undefined) data['assigneeId'] = input.assigneeId;
     if (input.isPinned !== undefined) data['isPinned'] = input.isPinned;
+    if (input.isEscalated !== undefined) data['isEscalated'] = input.isEscalated;
 
     await this.db.conversation.updateMany({
       where: { id: input.conversationId },

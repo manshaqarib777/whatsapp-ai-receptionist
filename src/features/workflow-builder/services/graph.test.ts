@@ -133,4 +133,25 @@ describe('validateGraph', () => {
       );
     }
   });
+
+  it('rejects multiple triggers and ambiguous non-condition branches', () => {
+    const definition = validDefinition();
+    definition.nodes.push(
+      { id: 'trigger-2', type: 'trigger', config: {} },
+      { id: 'action-2', type: 'action', config: {} },
+    );
+    definition.edges.push({ id: 'edge-2', from: 'trigger-1', to: 'action-2' });
+    const result = validateGraph(definition);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.problems.some((problem) =>
+          problem.message.includes('exactly one trigger'),
+        ),
+      ).toBe(true);
+      expect(
+        result.problems.some((problem) => problem.message.includes('at most one')),
+      ).toBe(true);
+    }
+  });
 });

@@ -9,6 +9,7 @@ export function toInvoiceRow(row: {
   status: InvoiceRow['status'];
   subtotalAmount: unknown;
   taxAmount: unknown;
+  discountAmount: unknown;
   totalAmount: unknown;
   amountPaid: unknown;
   currency: string;
@@ -38,6 +39,7 @@ export function toInvoiceRow(row: {
     status: row.status,
     subtotalAmount: Number(row.subtotalAmount),
     taxAmount: Number(row.taxAmount),
+    discountAmount: Number(row.discountAmount),
     totalAmount: Number(row.totalAmount),
     amountPaid: Number(row.amountPaid),
     currency: row.currency,

@@ -1,8 +1,8 @@
 # Milestone 10 — CRM — Progress
 
-Status: In Progress → Completed
+Status: Complete — re-certified 2026-08-23
 Started: 2026-08-13
-Last updated: 2026-08-14
+Last updated: 2026-08-23
 
 > **Batch decision**: Work on milestones 9–11 was executed as one approved batch
 > ("approved through M11, proceed on green"): sequential implementation, per-milestone
@@ -20,6 +20,8 @@ Last updated: 2026-08-14
 - [x] Tasks per org with assignee, due date, status; create + complete in UI
 - [x] Rule-based automation (auto-assign, value threshold → tag, company default tag) in a DB-polled worker (`npm run crm:work`), idempotent via markers
 - [x] Typecheck, lint, unit/integration/E2E, build all pass; axe audits clean
+- [x] Company subjects fixed for automation/timelines, unreachable company PATCH moved
+      to its dynamic route, and the oversized client hook split below 300 lines
 
 ## Pending Tasks
 
@@ -32,6 +34,9 @@ None — milestone complete.
 | 1 | `Deal` model has no `tags` relation; initial `DEAL_SELECT` rejected by Prisma at runtime | Resolved | Batched `tagsForDeals` hydration keyed by deal id |
 | 2 | `/api/crm/tasks/[id]` PATCH had no route (handler in `tasks/route.ts`) — E2E 404 | Resolved | Dynamic-segment handler moved to `tasks/[id]/route.ts` |
 | 3 | Integration teardown deleting `branch` before `company`/`tag` failed on FK | Resolved | Teardown deletes children first |
+| 4 | Company PATCH handler lived in `/companies` and could never receive `[id]` | Resolved 2026-08-23 | Moved GET/PATCH to `/api/crm/companies/[id]`. |
+| 5 | Company automation wrote a `contact` tag/activity against a company UUID | Resolved 2026-08-23 | Added the `company` polymorphic subject type and migrated the enum; company tags/timeline rows are now truthful. |
+| 6 | `use-crm.ts` exceeded the structural line target | Resolved 2026-08-23 | Extracted client DTO types; hook is 256 lines. |
 
 ## Technical Decisions
 
@@ -43,8 +48,9 @@ None — milestone complete.
 
 ## Database Changes
 
-No schema changes in M10 — the M4 schema already designed `companies`, `pipelines`,
-`pipeline_stages`, `deals`, `tags`, `taggables`, `activities`, `tasks`.
+The re-certification migration `20260823150000_crm_company_subject` adds `company`
+to the polymorphic subject enum so company automation and timelines do not masquerade
+as contacts.
 
 ## API Changes
 

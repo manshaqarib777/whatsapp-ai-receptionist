@@ -109,6 +109,11 @@ export const updateMemberRoleSchema = z.object({
   role: z.enum(ROLES),
 });
 
+export const auditLogQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().uuid('Invalid audit-log cursor.').optional(),
+});
+
 /** Derives a URL-safe slug from an organization name. */
 export function slugify(value: string): string {
   return (

@@ -85,11 +85,17 @@ export class AiRunsRepository extends AiBaseRepository {
     };
   }
 
+  async findRun(id: string): Promise<{ id: string } | null> {
+    return this.db.aiRun.findFirst({ where: { id }, select: { id: true } });
+  }
+
   async createRun(input: {
+    id?: string;
     branchId: string;
     conversationId: string | null;
     outputMessageId: string | null;
     promptVersionId: string | null;
+    agentId?: string | null;
     model: string;
     intent: string | null;
     confidence: number | null;
@@ -103,11 +109,13 @@ export class AiRunsRepository extends AiBaseRepository {
     const db = this.writeScope(input.branchId);
     return db.aiRun.create({
       data: {
+        id: input.id,
         organizationId: this.organizationId,
         branchId: input.branchId,
         conversationId: input.conversationId,
         outputMessageId: input.outputMessageId,
         promptVersionId: input.promptVersionId,
+        agentId: input.agentId ?? null,
         model: input.model,
         intent: input.intent,
         confidence: input.confidence,

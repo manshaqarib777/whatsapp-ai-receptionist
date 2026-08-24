@@ -2,9 +2,16 @@
 
 Created: 2026-08-02
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 4`
-Status: **Approved 2026-08-02.** Both open questions answered — branches are real
+Status: **Complete — structurally re-certified 2026-08-23.** Originally approved 2026-08-02; both open questions answered — branches are real
 isolation boundaries, and the Tier 1 / Tier 2 split is accepted. See Open Questions for
 the recorded answers.
+
+> **2026-08-23 audit amendment:** Current later-milestone workers revealed that the
+> static-import lint restriction can be bypassed with `await import('@/lib/prisma')`.
+> M4 was re-certified after pre-scope system discovery was moved behind an
+> explicit database-layer repository, the reminder worker's global reads/writes must
+> explicit repository, the reminder worker's global reads/writes were scoped, and lint
+> was proven to reject both static and dynamic unscoped-client imports.
 
 ---
 

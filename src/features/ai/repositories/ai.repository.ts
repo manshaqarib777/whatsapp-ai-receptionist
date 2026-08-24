@@ -28,6 +28,10 @@ export class AiRepository {
     return new AiRepository(resolveScope(organizationId));
   }
 
+  static forScope(scope: Scope): AiRepository {
+    return new AiRepository(scope);
+  }
+
   async resolveDefaultBranch(): Promise<string> {
     return this.runs.resolveDefaultBranch();
   }
@@ -45,6 +49,10 @@ export class AiRepository {
 
   getRun(id: string): ReturnType<AiRunsRepository['getRun']> {
     return this.runs.getRun(id);
+  }
+
+  findRun(id: string): ReturnType<AiRunsRepository['findRun']> {
+    return this.runs.findRun(id);
   }
 
   createRun(

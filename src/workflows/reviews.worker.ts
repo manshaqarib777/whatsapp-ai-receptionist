@@ -1,5 +1,6 @@
 import { logger } from '@/lib/logger';
 import { ReviewsService } from '@/features/reviews/services/reviews.service';
+import { listOrganizationIds } from '@/lib/db/system-discovery.repository';
 
 /**
  * Review automation worker — Milestone 16 (AD-4).
@@ -19,13 +20,10 @@ export async function processReviewAutomation(): Promise<{
   requestsCreated: number;
   expired: number;
 }> {
-  const { prisma } = await import('@/lib/prisma');
-  const organizations = await prisma.organization.findMany({ select: { id: true } });
-
   let requestsCreated = 0;
   let expired = 0;
 
-  for (const { id: organizationId } of organizations) {
+  for (const organizationId of await listOrganizationIds()) {
     const service = ReviewsService.forOrganization(organizationId);
     requestsCreated += await service.automateRequests();
     expired += await service.sweepExpiredRequests();

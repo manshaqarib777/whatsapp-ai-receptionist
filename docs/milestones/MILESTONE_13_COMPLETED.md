@@ -1,6 +1,6 @@
 # Milestone 13 — Completed
 
-Completed: 2026-08-15
+Completed: 2026-08-15; re-certified: 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 13`
 
 ---
@@ -30,9 +30,11 @@ Against the plan's objective, all of the following are now true and were not bef
   problem — never a saved half-graph.
 - **Runs exist.** `POST /api/workflows/[id]/runs` starts a manual (test) run
   against the current version: it writes a `WorkflowRun` and one
-  `WorkflowRunStep` per node, walking the graph along the true path. Delay
-  nodes land `pending` with a `scheduledFor` derived from `config.delaySeconds`
-  (default 1 hour) — the seam a scheduler worker (a later milestone) consumes.
+  `WorkflowRunStep` per selected node. Conditions evaluate definition defaults
+  plus supplied run variables. Delay nodes remain pending until the atomic
+  database-polled worker resumes the same path from persisted run context.
+- **Templates are usable.** The builder's **Use as template** action and clone
+  endpoint create a disabled workflow seeded from the current definition.
 - **The `/workflows` UI is real** — a list with create + enable/disable
   toggles, a builder page with save-as-new-version and test-run, and a run
   history section.
@@ -107,16 +109,14 @@ with no version cannot run; a run writes the run + one step per node in
 execution order; a delay node lands `pending` with a `scheduledFor`; and — the
 non-negotiable — org B never sees org A's runs.
 
-### Deliberately not covered
+### Re-certification repairs (2026-08-23)
 
-- **A scheduler worker executing due delay steps.** M13 owns the run journal and
-  the step rows (the `scheduledFor` seam); execution lands with a later
-  milestone using the established DB-polled worker pattern.
-- **Variables are validated but not interpolated into action configs** — the
-  builder stores them; interpolation is a later milestone.
-- **Templates** are deferred per the plan's AD-6: a templated workflow is a new
-  workflow seeded with a prior definition (no dedicated template table in the
-  M4 schema).
+- Replaced the hard-coded true branch with deterministic variable evaluation.
+- Added persisted `WorkflowRun.context` and an atomic due-step worker.
+- Added the planned copy-definition template API and UI action.
+- Enforced one trigger and deterministic non-condition edges.
+- Split oversized builder/repository responsibilities into node-card and types files.
+- Gates: 27 focused tests, lint, typecheck, drift check, 55-page build, and 8/8 E2E.
 
 ---
 
@@ -134,12 +134,8 @@ No per-read graph work beyond parsing the stored JSON definition.
 1. **The builder is list-ordered, not a free-form canvas** — node placement is
    ordered cards with explicit connectors rather than drag-drop, matching the
    CRM board's keyboard-reachable precedent.
-2. **Condition configs are not yet evaluated** — a run always follows the true
-   branch. Real condition evaluation is a later milestone.
-3. **No scheduler worker** — delay steps carry `scheduledFor` but nothing
-   executes them yet.
-4. **Templates deferred** — no dedicated template table; copy-definition is the
-   M13 path (plan AD-6).
+2. **Action nodes journal execution only.** Integrations that deliver messages
+   or mutate external systems remain owned by their feature/integration milestones.
 
 ---
 

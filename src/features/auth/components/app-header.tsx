@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import type { OrganizationSummary } from '@/features/auth/services/organization.service';
+import { switchActiveOrganization } from '@/features/auth/services/members.client';
 import type { AuthUser } from '@/server/auth-context';
 import { ROLE_LABELS, type Role } from '@/features/auth/permissions';
-import { authClient } from '@/lib/auth-client';
+import { signOutAccount } from '@/features/auth/services/account.client';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -49,16 +50,11 @@ export function AppHeader({
 
     setIsSwitching(true);
 
-    const response = await fetch('/api/organizations/active', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ organizationId }),
-    });
-
-    setIsSwitching(false);
-
-    if (response.ok) {
+    try {
+      await switchActiveOrganization(organizationId);
       router.refresh();
+    } finally {
+      setIsSwitching(false);
     }
   }
 
@@ -152,7 +148,7 @@ export function AppHeader({
 
             <DropdownMenuItem
               onSelect={async () => {
-                await authClient.signOut();
+                await signOutAccount();
                 router.push('/login');
                 router.refresh();
               }}

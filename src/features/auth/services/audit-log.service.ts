@@ -1,5 +1,5 @@
-import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { auditLogsRepository } from '@/lib/db/auth/audit-logs.repository';
 
 /**
  * Append-only audit log (DATABASE_RULES.md → Audit).
@@ -33,6 +33,19 @@ export const AUDIT_ACTIONS = [
   'organization.updated',
   'organization.deleted',
   'organization.switched',
+  'branch.created',
+  'branch.updated',
+  'branch.default_changed',
+  'branch.switched',
+  'integration.configured',
+  'integration.tested',
+  'integration.disconnected',
+  'ai.agent_updated',
+  'platform.plan_updated',
+  'platform.subscription_updated',
+  'privacy.requested',
+  'privacy.exported',
+  'privacy.erased',
   'member.invited',
   'member.joined',
   'member.role_changed',
@@ -124,17 +137,15 @@ export function sanitiseMetadata(
  */
 export async function record(entry: AuditEntry): Promise<void> {
   try {
-    await prisma.auditLog.create({
-      data: {
-        action: entry.action,
-        actorId: entry.actorId ?? null,
-        organizationId: entry.organizationId ?? null,
-        entityType: entry.entityType ?? null,
-        entityId: entry.entityId ?? null,
-        ipAddress: entry.ipAddress ?? null,
-        userAgent: entry.userAgent ?? null,
-        metadata: sanitiseMetadata(entry.metadata) ?? undefined,
-      },
+    await auditLogsRepository.create({
+      action: entry.action,
+      actorId: entry.actorId ?? null,
+      organizationId: entry.organizationId ?? null,
+      entityType: entry.entityType ?? null,
+      entityId: entry.entityId ?? null,
+      ipAddress: entry.ipAddress ?? null,
+      userAgent: entry.userAgent ?? null,
+      metadata: sanitiseMetadata(entry.metadata) ?? undefined,
     });
   } catch (error) {
     logger.error({ err: error, action: entry.action }, 'failed to write audit log');
@@ -167,20 +178,9 @@ export async function list(
 ): Promise<AuditLogPage> {
   const limit = Math.min(options.limit ?? 50, 100);
 
-  const rows = await prisma.auditLog.findMany({
-    where: { organizationId },
-    orderBy: { createdAt: 'desc' },
-    take: limit + 1,
-    ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
-    select: {
-      id: true,
-      action: true,
-      actorId: true,
-      entityType: true,
-      entityId: true,
-      createdAt: true,
-      metadata: true,
-    },
+  const rows = await auditLogsRepository.list(organizationId, {
+    limit,
+    ...(options.cursor ? { cursor: options.cursor } : {}),
   });
 
   const hasMore = rows.length > limit;

@@ -43,6 +43,8 @@ export class InvoicesPaymentsRepository extends InvoicesBaseRepository {
     gatewayPaymentId: string;
     amount: number;
     currency: string;
+    status?: PaymentStatus;
+    capturedAt?: Date;
   }): Promise<PaymentRow> {
     const db = this.writeScope(await this.resolveDefaultBranch());
     const row = await db.payment.create({
@@ -53,7 +55,8 @@ export class InvoicesPaymentsRepository extends InvoicesBaseRepository {
         gatewayPaymentId: input.gatewayPaymentId,
         amount: input.amount,
         currency: input.currency,
-        status: 'pending',
+        status: input.status ?? 'pending',
+        capturedAt: input.capturedAt,
       },
       select: PAYMENT_SELECT,
     });

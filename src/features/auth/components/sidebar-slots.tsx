@@ -6,9 +6,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import type { OrganizationSummary } from '@/features/auth/services/organization.service';
+import {
+  switchActiveBranch,
+  switchActiveOrganization,
+} from '@/features/auth/services/members.client';
+import type { BranchSummary } from '@/features/organizations/services/branches.service';
 import { ROLE_LABELS, type Role } from '@/features/auth/permissions';
 import type { AuthUser } from '@/server/auth-context';
-import { authClient } from '@/lib/auth-client';
+import { signOutAccount } from '@/features/auth/services/account.client';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -62,9 +67,13 @@ function useSidebarCollapsed(): {
 export function SidebarWorkspaceSwitcher({
   organizations,
   activeOrganizationId,
+  branches,
+  activeBranchId,
 }: {
   organizations: OrganizationSummary[];
   activeOrganizationId: string | null;
+  branches: BranchSummary[];
+  activeBranchId: string | null;
 }) {
   const router = useRouter();
   const [isSwitching, setIsSwitching] = useState(false);
@@ -75,19 +84,30 @@ export function SidebarWorkspaceSwitcher({
 
   if (!active) return null;
   const currentOrganizationId = active.id;
+  const activeBranch =
+    branches.find((branch) => branch.id === activeBranchId) ?? branches[0];
 
   async function switchOrganization(organizationId: string) {
     if (organizationId === currentOrganizationId) return;
     setIsSwitching(true);
 
-    const response = await fetch('/api/organizations/active', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ organizationId }),
-    });
+    try {
+      await switchActiveOrganization(organizationId);
+      router.refresh();
+    } finally {
+      setIsSwitching(false);
+    }
+  }
 
-    setIsSwitching(false);
-    if (response.ok) router.refresh();
+  async function switchBranch(branchId: string) {
+    if (branchId === activeBranch?.id) return;
+    setIsSwitching(true);
+    try {
+      await switchActiveBranch(branchId);
+      router.refresh();
+    } finally {
+      setIsSwitching(false);
+    }
   }
 
   if (collapsed) {
@@ -113,7 +133,10 @@ export function SidebarWorkspaceSwitcher({
             className="w-full justify-start gap-2 px-2"
           >
             <Building2 aria-hidden="true" className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-start">{active.name}</span>
+            <span className="min-w-0 flex-1 truncate text-start">
+              {active.name}
+              {activeBranch ? ` · ${activeBranch.name}` : ''}
+            </span>
             <ChevronsUpDown aria-hidden="true" className="size-3.5 shrink-0 opacity-60" />
           </Button>
         </DropdownMenuTrigger>
@@ -138,6 +161,28 @@ export function SidebarWorkspaceSwitcher({
               </Badge>
             </DropdownMenuItem>
           ))}
+          {branches.length > 0 ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Branches</DropdownMenuLabel>
+              {branches.map((branch) => (
+                <DropdownMenuItem
+                  key={branch.id}
+                  onSelect={() => void switchBranch(branch.id)}
+                  className="gap-2"
+                >
+                  <Check
+                    aria-hidden="true"
+                    className={
+                      branch.id === activeBranch?.id ? 'size-4' : 'size-4 opacity-0'
+                    }
+                  />
+                  <span className="flex-1 truncate">{branch.name}</span>
+                  {branch.isDefault ? <Badge variant="outline">Default</Badge> : null}
+                </DropdownMenuItem>
+              ))}
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -193,11 +238,18 @@ export function SidebarAccountMenu({ user }: { user: AuthUser }) {
           </Link>
         </DropdownMenuItem>
 
+        <DropdownMenuItem asChild>
+          <Link href="/settings/integrations">
+            <Settings aria-hidden="true" className="size-4" />
+            Integrations
+          </Link>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
           onSelect={async () => {
-            await authClient.signOut();
+            await signOutAccount();
             router.push('/login');
             router.refresh();
           }}

@@ -1,4 +1,4 @@
-import type { Scope } from '@/lib/db/scope';
+import type { BranchScope, Scope } from '@/lib/db/scope';
 
 /**
  * Resolves a tenant scope from server-side state.
@@ -15,4 +15,12 @@ import type { Scope } from '@/lib/db/scope';
  */
 export function resolveScope(organizationId: string): Scope {
   return { organizationId, branchId: null };
+}
+
+/** Builds a branch scope exclusively from a branch already verified by auth context. */
+export function resolveBranchScope(
+  organizationId: string,
+  branchId: string,
+): BranchScope {
+  return { organizationId, branchId };
 }

@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { MessageRow } from '@/features/inbox/repositories/inbox.repository';
+import { ListenButton, VoiceTranscript } from '@/features/voice/components/voice-actions';
 
 /**
  * One message bubble in the thread.
@@ -65,6 +66,7 @@ export function MessageBubble({ message }: { message: MessageRow }) {
             fileName={attachment.fileName ?? 'attachment'}
             mimeType={attachment.mimeType}
             contentType={message.contentType}
+            downloadUrl={attachment.downloadUrl}
           />
         ) : null}
 
@@ -72,6 +74,11 @@ export function MessageBubble({ message }: { message: MessageRow }) {
           <p className={cn('break-words whitespace-pre-wrap', isEmojiOnly && 'text-2xl')}>
             {message.body}
           </p>
+        ) : null}
+        {message.body ? <ListenButton text={message.body} /> : null}
+        {(message.contentType === 'audio' || attachment?.mimeType.startsWith('audio/')) &&
+        attachment ? (
+          <VoiceTranscript messageId={message.id} attachmentId={attachment.id} />
         ) : null}
 
         {message.deliveryStatus === 'read' ? (
@@ -93,28 +100,38 @@ function AttachmentCard({
   fileName,
   mimeType,
   contentType,
+  downloadUrl,
 }: {
   fileName: string;
   mimeType: string;
   contentType: string;
+  downloadUrl: string;
 }) {
   const isAudio = contentType === 'audio' || mimeType.startsWith('audio/');
 
   if (isAudio) {
     return (
-      <div className="mb-1.5 flex items-center gap-2">
-        <Mic aria-hidden="true" className="size-4" />
-        <span className="text-xs font-medium">{fileName}</span>
-        <span className="sr-only">voice message</span>
+      <div className="mb-1.5 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Mic aria-hidden="true" className="size-4" />
+          <span className="text-xs font-medium">{fileName}</span>
+          <span className="sr-only">voice message</span>
+        </div>
+        <audio controls preload="none" src={downloadUrl} className="max-w-full">
+          <a href={downloadUrl}>Download {fileName}</a>
+        </audio>
       </div>
     );
   }
 
   return (
-    <div className="mb-1.5 flex items-center gap-2">
+    <a
+      href={downloadUrl}
+      className="focus-visible:ring-ring mb-1.5 flex items-center gap-2 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+    >
       <FileText aria-hidden="true" className="size-4" />
       <span className="text-xs font-medium">{fileName}</span>
       <span className="text-xs opacity-70">{mimeType}</span>
-    </div>
+    </a>
   );
 }

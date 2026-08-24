@@ -89,26 +89,13 @@ describe('KnowledgeService — approval lifecycle', () => {
         documentId: 'doc-1',
         status: 'pending_approval' as const,
       })),
-      transitionVersionStatus: vi.fn(async () => ({
-        id: 'ver-1',
-        documentId: 'doc-1',
-        status: 'approved' as const,
-      })),
-      setCurrentVersion: vi.fn(async () => undefined),
+      approveAndSetCurrent: vi.fn(async () => undefined),
     });
     const service = new KnowledgeService(repo);
 
     await service.approveVersion('ver-1', 'user-1');
 
-    expect(repo.transitionVersionStatus).toHaveBeenCalledWith(
-      expect.objectContaining({
-        versionId: 'ver-1',
-        from: 'pending_approval',
-        to: 'approved',
-        approvedById: 'user-1',
-      }),
-    );
-    expect(repo.setCurrentVersion).toHaveBeenCalledWith('doc-1', 'ver-1');
+    expect(repo.approveAndSetCurrent).toHaveBeenCalledWith('ver-1', 'user-1');
   });
 
   it('archives only pending or approved versions', async () => {

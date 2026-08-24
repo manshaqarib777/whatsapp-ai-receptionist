@@ -104,10 +104,10 @@ No new tables. All eight areas are derived at read time from existing rows:
 
 | Area | Source |
 |---|---|
-| Revenue | `Invoice` (`issuedAt`, `paidAt`, `amountPaid`, `status`), `Payment` (`capturedAt`, `status`), `Refund` |
+| Revenue | issued invoices, succeeded payments by `capturedAt`, and refunds |
 | Funnels | `PipelineStage.position`, `Deal.stageId`/`status`, `Quote.status` |
 | Conversion | `Quote.status` → `Invoice.quoteId` → `Invoice.status`/`amountPaid` |
-| Retention | `Contact.createdAt`, `Contact.lifecycleStage` |
+| Retention | mature 30-day contact cohorts plus post-threshold activity |
 | Bookings | `Appointment.status`/`startsAt` × `Service.priceAmount` |
 | Performance | `Conversation` (`lastMessageAt`, `isEscalated`, `assigneeId`), `Message` (first-response timing) |
 | Forecasting | `Deal.valueAmount` × `PipelineStage.winProbability` (the planted column) |

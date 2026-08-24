@@ -12,6 +12,7 @@ export const aiKeys = {
     [...aiKeys.all, 'runs', conversationId ?? 'org'] as const,
   templates: () => [...aiKeys.all, 'templates'] as const,
   template: (id: string) => [...aiKeys.all, 'template', id] as const,
+  agents: () => [...aiKeys.all, 'agents'] as const,
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -97,18 +98,61 @@ export function useTemplates() {
 export function useRunTurn() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { conversationId: string; message: string }) =>
-      sendJson<{ run: RunTurnResult }>('/api/ai/runs', 'POST', input),
+    mutationFn: (input: { inputMessageId: string }) =>
+      sendJson<{ job: AiTurnJob }>('/api/ai/runs', 'POST', input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: aiKeys.all });
     },
   });
 }
 
-export type RunTurnResult = {
-  intent: { label: string; confidence: number; model: string };
-  reply: string;
-  outcome: 'answered' | 'escalated' | 'refused' | 'failed';
-  runId: string;
-  latencyMs: number;
+export type AiTurnJob = {
+  id: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  runId: string | null;
 };
+
+export type AiAgent = {
+  id: string;
+  kind: string;
+  displayName: string;
+  description: string;
+  purpose: string;
+  enabled: boolean;
+  tools: readonly string[];
+  promptTemplateId: string | null;
+  version: number;
+};
+
+export function useAiAgents() {
+  return useQuery({
+    queryKey: aiKeys.agents(),
+    queryFn: () => fetchJson<{ agents: AiAgent[] }>('/api/ai/agents'),
+  });
+}
+
+export function useUpdateAiAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: {
+      id: string;
+      version: number;
+      displayName?: string;
+      description?: string;
+      enabled?: boolean;
+    }) => sendJson<{ agent: AiAgent }>(`/api/ai/agents/${id}`, 'PATCH', input),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: aiKeys.agents() }),
+  });
+}
+
+export function useTestAiAgent() {
+  return useMutation({
+    mutationFn: ({ id, message }: { id: string; message: string }) =>
+      sendJson<{
+        result: { routedKind: string | null; wouldHandle: boolean; reply: string };
+      }>(`/api/ai/agents/${id}/test`, 'POST', { message }),
+  });
+}

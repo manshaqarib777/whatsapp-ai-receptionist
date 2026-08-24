@@ -63,9 +63,10 @@ const TEMPLATES = [
 export async function seedAi(
   prisma: PrismaClient,
   tenants: SeededTenants,
-): Promise<{ templateIds: string[]; runIds: string[] }> {
+): Promise<{ templateIds: string[]; runIds: string[]; agentIds: string[] }> {
   const templateIds: string[] = [];
   const runIds: string[] = [];
+  const agentIds: string[] = [];
 
   for (const [index, template] of TEMPLATES.entries()) {
     const row = await prisma.promptTemplate.create({
@@ -100,6 +101,82 @@ export async function seedAi(
       data: { currentVersionId: version.id },
     });
   }
+
+  const agents = [
+    [
+      'reception',
+      'Reception Agent',
+      'Welcomes patients, answers common questions, and coordinates appointments.',
+    ],
+    [
+      'sales',
+      'Treatment Sales Agent',
+      'Explains approved treatment packages and qualifies quotation requests.',
+    ],
+    [
+      'support',
+      'Patient Support Agent',
+      'Triages service issues and routes sensitive complaints to a person.',
+    ],
+    [
+      'marketing',
+      'Campaign Assistant',
+      'Drafts compliant campaign ideas without sending them.',
+    ],
+    [
+      'analytics',
+      'Practice Analytics Agent',
+      'Explains approved conversion and appointment metrics.',
+    ],
+    [
+      'billing',
+      'Billing Agent',
+      'Helps with invoices, receipts, VAT, and payment questions.',
+    ],
+    [
+      'manager',
+      'Operations Manager Agent',
+      'Summarizes operational requests and coordinates escalation.',
+    ],
+    [
+      'knowledge',
+      'Knowledge Agent',
+      'Finds grounded answers in approved clinic documents.',
+    ],
+  ] as const;
+
+  for (const [index, [kind, displayName, description]] of agents.entries()) {
+    const id = seedId('ai-agent', index + 1);
+    await prisma.aiAgent.create({
+      data: {
+        id,
+        organizationId: tenants.northwind.id,
+        branchId: tenants.northwind.riyadh,
+        kind,
+        displayName,
+        description,
+        promptTemplateId: kind === 'reception' ? templateIds[0] : null,
+        enabled: kind !== 'marketing',
+        createdAt: SEED_NOW,
+        updatedAt: SEED_NOW,
+      },
+    });
+    agentIds.push(id);
+  }
+
+  await prisma.aiAgent.create({
+    data: {
+      id: seedId('ai-agent-beacon', 1),
+      organizationId: tenants.beacon.id,
+      branchId: tenants.beacon.main,
+      kind: 'reception',
+      displayName: 'Service Reception Agent',
+      description: 'Synthetic cross-tenant isolation fixture.',
+      enabled: true,
+      createdAt: SEED_NOW,
+      updatedAt: SEED_NOW,
+    },
+  });
 
   // A couple of runs from the demo conversation so the run log is not empty.
   const conversation = await prisma.conversation.findFirst({
@@ -149,6 +226,7 @@ export async function seedAi(
           costCurrency: 'USD',
           latencyMs: run.latencyMs,
           outcome: run.outcome,
+          agentId: agentIds[0],
           createdAt: SEED_NOW,
         },
       });
@@ -156,5 +234,5 @@ export async function seedAi(
     }
   }
 
-  return { templateIds, runIds };
+  return { templateIds, runIds, agentIds };
 }

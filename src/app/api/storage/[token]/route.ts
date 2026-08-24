@@ -1,4 +1,4 @@
-import { getStorage, verifyStorageToken } from '@/lib/storage';
+import { getStorage, storageInfo, verifyStorageToken } from '@/lib/storage';
 
 /**
  * GET /api/storage/[token]
@@ -20,11 +20,11 @@ export async function GET(
   const { token } = await params;
 
   const key = verifyStorageToken(token);
-  const buffer = await getStorage(key);
+  const [buffer, info] = await Promise.all([getStorage(key), storageInfo(key)]);
 
   return new Response(new Uint8Array(buffer), {
     headers: {
-      'content-type': 'application/octet-stream',
+      'content-type': info.mimeType,
       'content-length': String(buffer.byteLength),
       // Never cache: the URL is short-lived and a stale copy is a leak vector.
       'cache-control': 'private, no-store',

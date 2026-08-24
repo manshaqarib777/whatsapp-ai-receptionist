@@ -117,6 +117,18 @@ export function renderInvoicePdf(invoice: InvoiceRow): Buffer {
   push(textLine(MARGIN + 350, y, 'VAT', BODY));
   push(textLine(MARGIN + 430, y, formatMoney(invoice.taxAmount, invoice.currency), BODY));
   y += LINE_HEIGHT;
+  if (invoice.discountAmount > 0) {
+    push(textLine(MARGIN + 350, y, 'Discount', BODY));
+    push(
+      textLine(
+        MARGIN + 430,
+        y,
+        `-${formatMoney(invoice.discountAmount, invoice.currency)}`,
+        BODY,
+      ),
+    );
+    y += LINE_HEIGHT;
+  }
   push(textLine(MARGIN + 350, y, 'Total', BODY, headerColor));
   push(
     textLine(
@@ -162,6 +174,7 @@ export function renderInvoicePdf(invoice: InvoiceRow): Buffer {
 /** Serialises content pages into a valid PDF 1.4 document with xref. */
 function buildPdf(pages: string[][]): Buffer {
   const objects: { stream?: string; dict: Record<string, PdfPrimitive> }[] = [];
+  const fontObjectId = 3 + pages.length * 2;
 
   // Object 1: Catalog
   objects.push({ dict: { Type: '/Catalog', Pages: '2 0 R' } });
@@ -182,7 +195,7 @@ function buildPdf(pages: string[][]): Buffer {
         Parent: '2 0 R',
         MediaBox: `[0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}]`,
         Contents: `${objects.length + 2} 0 R`,
-        Resources: `<< /Font << /F1 4 0 R >> >>`,
+        Resources: `<< /Font << /F1 ${fontObjectId} 0 R >> >>`,
       },
     });
     // Content stream
@@ -191,15 +204,14 @@ function buildPdf(pages: string[][]): Buffer {
   }
 
   // Font object (always after all pages, referenced as 4 0 R above)
-  const fontObjectIndex = 3 + pages.length * 2 + 1;
-  objects[fontObjectIndex - 1] = {
+  objects.push({
     dict: {
       Type: '/Font',
       Subtype: '/Type1',
       BaseFont: '/Helvetica',
       Encoding: '/WinAnsiEncoding',
     },
-  };
+  });
 
   let pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
   const offsets: number[] = [];

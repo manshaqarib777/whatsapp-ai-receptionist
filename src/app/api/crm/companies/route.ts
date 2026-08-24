@@ -1,10 +1,7 @@
 import { requireOrg, requirePermission } from '@/server/auth-context';
-import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
+import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 import { CrmService } from '@/features/crm/services/crm.service';
-import {
-  createCompanySchema,
-  updateCompanySchema,
-} from '@/features/crm/validators/crm.validators';
+import { createCompanySchema } from '@/features/crm/validators/crm.validators';
 
 /**
  * GET  /api/crm/companies — companies (`crm:read`).
@@ -32,22 +29,5 @@ export const POST = withApiHandler(
     const company = await service.createCompany(input);
 
     return jsonSuccess({ company }, { status: 201, correlationId });
-  },
-);
-
-type Params = { id: string };
-
-export const PATCH = withApiHandler(
-  'PATCH /api/crm/companies/[id]',
-  async (request, { correlationId }, routeParams: RouteParams<Params>) => {
-    const { organizationId } = await requirePermission('crm:write');
-    const { id } = await routeParams.params;
-    const body: unknown = await request.json();
-    const input = updateCompanySchema.parse(body);
-
-    const service = CrmService.forOrganization(organizationId);
-    const company = await service.updateCompany(id, input);
-
-    return jsonSuccess({ company }, { correlationId });
   },
 );

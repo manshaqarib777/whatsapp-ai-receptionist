@@ -12,18 +12,12 @@ import { GATEWAYS, UnconfiguredGateway, type PaymentGatewayAdapter } from './gat
 import { computeTotals, lineTaxFigures } from './totals';
 import type { InvoiceLineInput } from './totals';
 import { processGatewayWebhook, reconcileInvoice } from './webhook.processor';
+import {
+  transitionInvoice,
+  type InvoiceAction,
+} from '@/features/invoices/services/invoice-lifecycle';
 
-/**
- * Invoices orchestration — Milestone 12.
- *
- * Pure orchestration over the repository: invoice creation (standalone or from
- * a quote) with VAT math, sequential numbering, the status lifecycle
- * (draft → issued → partially_paid → paid / overdue / void), the payment
- * gateway seam, and refunds.
- *
- * Money math mirrors quotations: the tax RATE and tax AMOUNT are both stored
- * per line at write time. Nothing is recomputed from today's rate at read time.
- */
+/** Tenant-scoped invoice, payment, webhook, and refund orchestration. */
 
 export class InvoicesService {
   private readonly repo: InvoicesRepository;
@@ -58,10 +52,6 @@ export class InvoicesService {
       adapters,
     );
   }
-
-  // -------------------------------------------------------------------------
-  // Invoices
-  // -------------------------------------------------------------------------
 
   async listInvoices(filter: { status?: InvoiceStatus } = {}): Promise<InvoiceRow[]> {
     return this.repo.listInvoices(filter);
@@ -166,6 +156,7 @@ export class InvoicesService {
 
     if (input.lineItems) {
       const totals = computeTotals(input.lineItems);
+      const discountAmount = Math.min(invoice.discountAmount, totals.totalAmount);
       await this.repo.updateInvoice(id, {
         ...(input.dueAt !== undefined
           ? { dueAt: input.dueAt ? new Date(input.dueAt) : null }
@@ -173,7 +164,8 @@ export class InvoicesService {
         ...(input.currency !== undefined ? { currency: input.currency } : {}),
         subtotalAmount: totals.subtotalAmount,
         taxAmount: totals.taxAmount,
-        totalAmount: totals.totalAmount,
+        discountAmount,
+        totalAmount: totals.totalAmount - discountAmount,
       });
       await this.repo.replaceLineItems(
         id,
@@ -199,40 +191,9 @@ export class InvoicesService {
    * Status transitions. `issue` moves a draft to issued; `void` cancels; a
    * `mark_paid` is a manual override for cash/offline payments.
    */
-  async transition(
-    id: string,
-    action: 'issue' | 'void' | 'mark_paid',
-  ): Promise<InvoiceRow> {
-    const invoice = await this.repo.getInvoice(id);
-    const now = new Date();
-
-    switch (action) {
-      case 'issue': {
-        if (invoice.status !== 'draft') {
-          throw new ConflictError('Only a draft invoice can be issued.');
-        }
-        return this.repo.setInvoiceStatus(id, 'issued', { issuedAt: now });
-      }
-      case 'void': {
-        if (invoice.status === 'paid' || invoice.status === 'void') {
-          throw new ConflictError('A paid or void invoice cannot be voided.');
-        }
-        return this.repo.setInvoiceStatus(id, 'void');
-      }
-      case 'mark_paid': {
-        if (invoice.status === 'void') {
-          throw new ConflictError('A void invoice cannot be marked paid.');
-        }
-        return this.repo.setInvoiceStatus(id, 'paid', { paidAt: now });
-      }
-      default:
-        throw new UnprocessableError('Unknown transition.');
-    }
+  async transition(id: string, action: InvoiceAction): Promise<InvoiceRow> {
+    return transitionInvoice(this.repo, id, action);
   }
-
-  // -------------------------------------------------------------------------
-  // Payments
-  // -------------------------------------------------------------------------
 
   async createPayment(input: {
     invoiceId: string;
@@ -284,10 +245,6 @@ export class InvoicesService {
   }): Promise<{ received: boolean }> {
     return processGatewayWebhook(this.repo, this.gateways, input);
   }
-
-  // -------------------------------------------------------------------------
-  // Refunds
-  // -------------------------------------------------------------------------
 
   async refundPayment(input: {
     paymentId: string;

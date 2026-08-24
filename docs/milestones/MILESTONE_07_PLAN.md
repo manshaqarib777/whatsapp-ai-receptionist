@@ -2,7 +2,7 @@
 
 Created: 2026-08-12
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 7`
-Status: **Approved 2026-08-12**
+Status: **Complete — structurally re-certified 2026-08-23**
 
 ---
 
@@ -393,3 +393,14 @@ each claim backed by an actually-run command.
 - [ ] Docs: `CHANGELOG.md`, `docs/api/knowledge.md`, schema-change entry,
       `MILESTONE_07_PROGRESS.md`
 - [ ] `MILESTONE_07_COMPLETED.md` — only after all exit criteria pass
+
+---
+
+## 2026-08-23 Sequential Review Amendment
+
+- [x] Revalidate every website redirect target before following it; automatic redirect
+      following can otherwise bypass the SSRF guard.
+- [x] Make version approval + `currentVersionId` promotion one database transaction,
+      as AD-4 promised, and test rollback behavior.
+- [x] Split the 357-line knowledge service below the 300-line hard limit.
+- [x] Re-run knowledge tests, E2E, drift, static gates, and build.

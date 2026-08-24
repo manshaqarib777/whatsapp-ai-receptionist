@@ -6,67 +6,74 @@ import {
   type MemoryTurn,
 } from '@/features/ai/services/memory';
 import { renderPrompt } from '@/features/ai/services/prompts';
+import { describeTools } from '@/features/ai/services/tools/registry';
 import {
-  describeTools,
-  knowledgeTool,
-  type ToolDefinition,
-} from '@/features/ai/services/tools/registry';
-import { llmProvider, currentReplyModel } from '@/lib/llm-gateway';
+  calculateTurnBudget,
+  detectsPromptInjection,
+  isOverTurnBudget,
+  requiresHardEscalation,
+  sanitizeReply,
+} from '@/features/ai/services/guardrails';
+import { draftReplyWithRetry } from '@/features/ai/services/provider-execution';
+import {
+  AiRunRecorder,
+  type RecordedOutcome,
+  type RunCitation,
+} from '@/features/ai/services/ai-run-recorder';
+import {
+  engineTools,
+  resolveAiToolContext,
+} from '@/features/ai/services/ai-tool-context';
+import { llmProvider, type LLMProvider } from '@/lib/llm-gateway';
 import type { Scope } from '@/lib/db/scope';
 import { InboxRepository } from '@/features/inbox/repositories/inbox.repository';
 import { resolveScope } from '@/server/scope';
+import { AiAgentsService } from '@/features/ai/services/agents.service';
+import { agentProfile } from '@/features/ai/services/agent-catalog';
 
 /**
  * AI Engine — Milestone 8 (AD-1, AD-3, AD-4).
  *
- * The turn orchestration service. Given a conversation (and optionally a new
- * inbound message), it:
- *
- *   1. Reads the conversation + recent messages (windowed memory + summary).
- *   2. Classifies intent + confidence.
- *   3. Resolves the active prompt template for the intent.
- *   4. Runs the tool that fits the intent (knowledge lookup, availability
- *      proposal, escalate) — authorization in code, scoping from the session.
- *   5. Drafts the reply through the LLM provider with the rendered prompt.
- *   6. Applies the hallucination guard: no retrieval support → refuse, never
- *      invent.
- *   7. Records an `ai_runs` row (model, tokens, cost, latency, outcome, intent,
- *      confidence) plus `ai_run_citations` when retrieval backed the answer.
- *
- * The engine is deterministic under the local provider — the whole suite runs
- * without an API key.
+ * One guarded orchestration path serves every specialist. Local mode is deterministic
+ * and capability selection is bounded by the server-owned agent catalog.
  */
 
 export type EngineTurnInput = {
   conversationId: string;
   messageText: string;
   contactName?: string;
+  runId?: string;
 };
 
 export type EngineTurnResult = {
   intent: IntentResult;
   reply: string;
-  outcome: 'answered' | 'escalated' | 'refused' | 'failed';
-  citations: { chunkId: string; similarity: number; content: string }[];
+  outcome: RecordedOutcome;
+  citations: RunCitation[];
   runId: string;
   tokens: { input: number; output: number };
   latencyMs: number;
 };
 
 const CONFIDENCE_ESCALATION_THRESHOLD = 0.45;
-const SIMILARITY_CITATION_THRESHOLD = 0.5;
+const HOLDING_REPLY =
+  'Thank you for your message — one of our team will get back to you shortly.';
 
 export class AiEngineService {
   private readonly repo: AiRepository;
   private readonly inbox: InboxRepository;
   private readonly scope: Scope;
+  private readonly provider: LLMProvider;
+  private readonly recorder: AiRunRecorder;
   readonly organizationId: string;
 
-  constructor(scope: Scope) {
+  constructor(scope: Scope, provider: LLMProvider = llmProvider()) {
     this.scope = scope;
     this.organizationId = scope.organizationId;
     this.repo = new AiRepository(scope);
     this.inbox = new InboxRepository(scope);
+    this.provider = provider;
+    this.recorder = new AiRunRecorder(this.repo);
   }
 
   static forOrganization(organizationId: string): AiEngineService {
@@ -82,6 +89,39 @@ export class AiEngineService {
 
     // 1. Read the conversation + windowed memory.
     const conversation = await this.inbox.getConversation(input.conversationId);
+    const specialist = await AiAgentsService.forScope({
+      organizationId: this.organizationId,
+      branchId: conversation.branchId,
+    }).resolve(input.messageText);
+
+    if (conversation.assigneeId || conversation.isEscalated) {
+      return this.persistGuardedTurn({
+        conversation,
+        reply: '',
+        outcome: 'escalated',
+        intent: { label: 'human', confidence: 1, model: 'local/guardrail' },
+        startedAt,
+        requestedRunId: input.runId,
+        agentId: specialist?.id,
+      });
+    }
+
+    if (
+      detectsPromptInjection(input.messageText) ||
+      requiresHardEscalation(input.messageText)
+    ) {
+      await this.escalateConversation(input.conversationId);
+      return this.persistGuardedTurn({
+        conversation,
+        reply: HOLDING_REPLY,
+        outcome: 'escalated',
+        intent: { label: 'human', confidence: 1, model: 'local/guardrail' },
+        startedAt,
+        requestedRunId: input.runId,
+        agentId: specialist?.id,
+      });
+    }
+
     const messages = await this.inbox.listAllMessages(input.conversationId);
     const summaryRow = await this.inbox.getSummary(input.conversationId);
     const summary = summaryRow?.summary ?? null;
@@ -99,36 +139,12 @@ export class AiEngineService {
     const intent = await classifyIntent(input.messageText);
 
     // 3. Tools.
-    let toolContext = '';
-    let citations: EngineTurnResult['citations'] = [];
-    let escalated = false;
-
-    if (intent.label === 'complaint' || intent.label === 'human') {
-      escalated = true;
-    } else if (intent.label === 'booking' || intent.label === 'availability') {
-      toolContext =
-        'The customer asked about appointments. Offer to check availability or book a slot.';
-    } else {
-      // FAQ / pricing / general → retrieval-backed answer.
-      const result = await knowledgeTool.execute(
-        { query: input.messageText, limit: 3 },
-        this.scope,
-      );
-      const hits = (
-        result.data as { hits: { content: string; similarity: number; source: string }[] }
-      ).hits;
-      const aboveThreshold = hits.filter(
-        (h) => h.similarity >= SIMILARITY_CITATION_THRESHOLD,
-      );
-      if (aboveThreshold.length > 0) {
-        toolContext = aboveThreshold.map((h) => h.content).join('\n');
-        citations = aboveThreshold.slice(0, 3).map((h) => ({
-          chunkId: 'retrieved',
-          similarity: h.similarity,
-          content: h.content,
-        }));
-      }
-    }
+    const toolContext = await resolveAiToolContext(
+      intent,
+      input.messageText,
+      this.scope,
+      specialist ? new Set(specialist.tools) : undefined,
+    );
 
     // 4. Render the prompt.
     const templateKey = templateKeyForIntent(intent.label);
@@ -137,28 +153,35 @@ export class AiEngineService {
     const instructions = renderPrompt(promptBody, {
       customerName: input.contactName ?? conversation.contactDisplayName,
       conversationContext: memoryText,
-      toolsDescription: describeTools(engineTools()),
+      toolsDescription: describeTools(engineTools(specialist?.tools)),
     });
+    const specialistInstructions = specialist
+      ? `${instructions}\n\nSpecialist role: ${agentProfile(specialist.kind).purpose}`
+      : instructions;
 
     // 5. Draft the reply.
-    const provider = llmProvider();
     let reply = '';
+    let providerFailed = false;
     try {
-      reply = await provider.draftReply({
-        context: `${memoryText}\n\n${toolContext ? `Retrieved:\n${toolContext}` : ''}`,
-        instructions,
+      reply = await draftReplyWithRetry(this.provider, {
+        context: `${memoryText}\n\n${toolContext.text ? `Retrieved:\n${toolContext.text}` : ''}`,
+        instructions: specialistInstructions,
       });
     } catch {
-      reply =
-        'Thank you for your message — one of our team will get back to you shortly.';
+      providerFailed = true;
+      reply = HOLDING_REPLY;
     }
+
+    reply = sanitizeReply(reply);
 
     // 6. Hallucination guard + outcome.
     let outcome: EngineTurnResult['outcome'] = 'answered';
-    if (escalated) {
+    if (providerFailed) {
+      outcome = 'failed';
+    } else if (toolContext.escalated) {
       outcome = 'escalated';
     } else if (
-      !toolContext &&
+      !toolContext.text &&
       intent.label !== 'general' &&
       intent.label !== 'booking' &&
       intent.label !== 'availability'
@@ -171,70 +194,78 @@ export class AiEngineService {
       outcome = 'escalated';
     }
 
+    const budget = calculateTurnBudget(`${memoryText}\n${toolContext.text}`, reply);
+    if (isOverTurnBudget(budget)) {
+      outcome = 'escalated';
+      reply = HOLDING_REPLY;
+    }
+
+    if (outcome === 'failed' || outcome === 'escalated') {
+      await this.escalateConversation(input.conversationId);
+    }
+
     // 7. Record the run.
     const latencyMs = Math.round(performance.now() - startedAt);
-    const tokens = { input: memoryText.length, output: reply.length };
-    const runId = await this.persistRun({
+    const tokens = { input: budget.inputTokens, output: budget.outputTokens };
+    const runId = await this.recorder.persist({
       branchId: conversation.branchId,
       conversationId: input.conversationId,
       intent,
       outcome,
-      reply,
-      citations,
+      citations: toolContext.citations,
       latencyMs,
       tokens,
+      requestedRunId: input.runId,
+      agentId: specialist?.id,
     });
 
     return {
       intent,
       reply,
       outcome,
-      citations,
+      citations: toolContext.citations,
       runId,
       tokens,
       latencyMs,
     };
   }
 
-  private async persistRun(input: {
-    branchId: string;
-    conversationId: string;
-    intent: IntentResult;
-    outcome: EngineTurnResult['outcome'];
+  private async persistGuardedTurn(input: {
+    conversation: { id: string; branchId: string };
     reply: string;
-    citations: EngineTurnResult['citations'];
-    latencyMs: number;
-    tokens: { input: number; output: number };
-  }): Promise<string> {
-    const run = await this.repo.createRun({
-      branchId: input.branchId,
-      conversationId: input.conversationId,
-      outputMessageId: null,
-      promptVersionId: null,
-      model: currentReplyModel(),
-      intent: input.intent.label,
-      confidence: input.intent.confidence,
-      inputTokens: input.tokens.input,
-      outputTokens: input.tokens.output,
-      costAmount: estimateCost(input.tokens),
-      costCurrency: 'USD',
-      latencyMs: input.latencyMs,
+    outcome: EngineTurnResult['outcome'];
+    intent: IntentResult;
+    startedAt: number;
+    requestedRunId?: string;
+    agentId?: string;
+  }): Promise<EngineTurnResult> {
+    const latencyMs = Math.round(performance.now() - input.startedAt);
+    const budget = calculateTurnBudget('', input.reply);
+    const tokens = { input: budget.inputTokens, output: budget.outputTokens };
+    const runId = await this.recorder.persist({
+      branchId: input.conversation.branchId,
+      conversationId: input.conversation.id,
+      intent: input.intent,
       outcome: input.outcome,
+      citations: [],
+      latencyMs,
+      tokens,
+      requestedRunId: input.requestedRunId,
+      agentId: input.agentId,
     });
+    return {
+      intent: input.intent,
+      reply: input.reply,
+      outcome: input.outcome,
+      citations: [],
+      runId,
+      tokens,
+      latencyMs,
+    };
+  }
 
-    const realCitations = input.citations.filter((c) => c.chunkId !== 'retrieved');
-    if (realCitations.length > 0) {
-      await this.repo.createCitations(
-        run.id,
-        realCitations.map((c) => ({
-          knowledgeChunkId: c.chunkId,
-          similarity: c.similarity,
-        })),
-        input.branchId,
-      );
-    }
-
-    return run.id;
+  private async escalateConversation(conversationId: string): Promise<void> {
+    await this.inbox.updateConversation({ conversationId, isEscalated: true });
   }
 
   async listRuns(conversationId?: string): Promise<AiRunRow[]> {
@@ -256,10 +287,6 @@ function templateKeyForIntent(intent: string): string {
   }
 }
 
-function engineTools(): ToolDefinition[] {
-  return [knowledgeTool];
-}
-
 function defaultPrompt(): string {
   return [
     'You are the WhatsApp receptionist for {{business_name}}.',
@@ -269,11 +296,4 @@ function defaultPrompt(): string {
     '',
     '{{conversation_context}}',
   ].join('\n');
-}
-
-/** Crude token→USD cost model (the live provider fills the real numbers). */
-function estimateCost(tokens: { input: number; output: number }): number {
-  // ~$3 / 1M input tokens, ~$15 / 1M output — a rough ceiling, replaced by the
-  // provider's real usage in the OpenAI path.
-  return (tokens.input * 3 + tokens.output * 15) / 1_000_000;
 }

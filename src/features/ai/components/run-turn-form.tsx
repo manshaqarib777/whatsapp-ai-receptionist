@@ -9,14 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
 /**
- * A minimal engine test surface (M8): run a turn against a conversation and see
- * the intent/confidence/outcome. The real entry point is the inbox's AI seam;
- * this page proves the engine end to end.
+ * A minimal durable-engine test surface (M8): enqueue a persisted inbound
+ * message. Production ingestion uses the same job boundary.
  */
 
 export function RunTurnForm() {
-  const [conversationId, setConversationId] = useState('');
-  const [message, setMessage] = useState('');
+  const [inputMessageId, setInputMessageId] = useState('');
   const runTurn = useRunTurn();
   const { refetch } = useAiRuns();
 
@@ -25,31 +23,21 @@ export function RunTurnForm() {
       className="space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!conversationId.trim() || !message.trim()) return;
+        if (!inputMessageId.trim()) return;
         runTurn.mutate(
-          { conversationId: conversationId.trim(), message },
+          { inputMessageId: inputMessageId.trim() },
           { onSuccess: () => void refetch() },
         );
       }}
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="run-conversation">Conversation id</Label>
-          <Input
-            id="run-conversation"
-            value={conversationId}
-            onChange={(event) => setConversationId(event.target.value)}
-            placeholder="00000000-0000-0000-0000-000000000000"
-            required
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="run-message">Customer message</Label>
+          <Label htmlFor="run-message">Inbound message id</Label>
           <Input
             id="run-message"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder="Do you have any appointments tomorrow?"
+            value={inputMessageId}
+            onChange={(event) => setInputMessageId(event.target.value)}
+            placeholder="00000000-0000-0000-0000-000000000000"
             required
           />
         </div>
@@ -57,13 +45,12 @@ export function RunTurnForm() {
 
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={runTurn.isPending}>
-          {runTurn.isPending ? 'Running…' : 'Run turn'}
+          {runTurn.isPending ? 'Queuing…' : 'Queue turn'}
         </Button>
         {runTurn.data ? (
           <div className="flex items-center gap-2 text-sm">
-            <Badge variant="secondary">{runTurn.data.run.intent.label}</Badge>
-            <span className="text-muted-foreground">{runTurn.data.run.outcome}</span>
-            <span className="text-muted-foreground">reply: {runTurn.data.run.reply}</span>
+            <Badge variant="secondary">{runTurn.data.job.status}</Badge>
+            <span className="text-muted-foreground">Job {runTurn.data.job.id}</span>
           </div>
         ) : null}
         {runTurn.isError ? (

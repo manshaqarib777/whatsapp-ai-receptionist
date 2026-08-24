@@ -1,6 +1,6 @@
 # Milestone 9 — Completed
 
-Completed: 2026-08-14
+Completed: 2026-08-14; re-certified 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 9`
 
 ---
@@ -32,8 +32,8 @@ Against the plan's objective, all of the following are now true and were not bef
   original `rescheduled`, and cancels its reminders.
 - **Reminders are scheduled and a DB-polled worker sends them** —
   `npm run reminders:work` / `src/workflows/appointment-reminders.worker.ts`
-  marks due rows `sent`/`failed`. Delivery is a no-op stub (the WhatsApp send
-  path lands with the messaging milestone); the status column is real.
+  marks a row `sent` only after transport acknowledgement. Until Meta is configured
+  in M19, the unavailable transport records `failed` instead of inventing delivery.
 - **Recurring appointments use an RRULE subset** (`FREQ=WEEKLY|DAILY` with
   `COUNT`/`UNTIL`) on the parent; children link via `recurrenceParentId`.
   Editing/cancelling one occurrence creates an exception rather than
@@ -134,14 +134,15 @@ cancels reminders; reschedule links the replacement and marks the original
 `rescheduled`; a weekly RRULE books parent + children; and — the non-negotiable —
 org A's appointments are invisible to org B.
 
-### Deliberately not covered
+### Re-certification additions (2026-08-23)
 
-- **WhatsApp delivery.** The worker marks rows `sent`/`failed`; the actual send
-  path is a no-op stub until the messaging milestone. The worker loop itself is
-  covered by construction (the same pattern as the knowledge worker).
-- **Live timezone/DST edge cases.** Slot math uses the stored IANA zone, but full
-  IANA conversion in slot computation is approximated (the plan's noted TODO);
-  DST boundary behaviour is deliberately out of scope.
+- IANA/DST-aware local-to-UTC conversion, including zoned day boundaries and
+  rejection of nonexistent spring-forward times.
+- Reminder transport acknowledgement tests: success becomes `sent`; unavailable
+  transport becomes `failed`.
+- Parent RRULE persistence and `recurrenceParentId` links on every child.
+- Availability validation and replacement reminders during reschedule.
+- The planned `PATCH /api/appointments/services/[id]` route.
 
 ---
 
@@ -157,19 +158,13 @@ materialised for every read.
 
 ## Known Limitations
 
-1. **Reminder delivery is a stub.** Rows are marked `sent`/`failed` by the worker
-   but nothing sends a WhatsApp message yet — that lands with the messaging
-   milestone (M9 plan AD-5).
+1. **Meta transport configuration lands in M19.** Until then, due reminders fail
+   visibly and are never marked sent without acknowledgement.
 2. **The worker only runs when started** (`npm run reminders:work`). A stopped
    worker leaves reminders `scheduled`, which is visible in the UI — there is no
    auto-start.
-3. **Slot math approximates IANA conversion.** The date string is treated as
-   UTC-local-to-zone; full IANA conversion with DST-aware day boundaries is a
-   noted TODO in `availability.ts`.
-4. **The booking form takes a raw contact id** — the contact picker is the M10
+3. **The booking form takes a raw contact id** — the contact picker is the M10
    CRM's surface (plan R-5).
-5. **`PATCH /api/appointments/services/[id]` is not implemented** (plan AD-6
-   lists it); service editing UI is out of scope for M9.
 
 ---
 

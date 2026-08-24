@@ -4,6 +4,9 @@ import type { Scope } from '@/lib/db/scope';
 import { hybridSearch } from '@/features/knowledge/lib/retrieval';
 import { llmProvider } from '@/lib/llm-gateway';
 import { embedLocal } from '@/lib/ai-gateway';
+import { assertToolAuthorized } from '@/features/ai/services/guardrails';
+import { AppointmentsService } from '@/features/appointments/services/appointments.service';
+import { localDateInZone } from '@/features/appointments/services/timezone';
 
 /**
  * Tool registry — Milestone 8 (AD-3).
@@ -32,29 +35,38 @@ export type ToolDefinition = {
   execute: (input: unknown, scope: Scope) => Promise<ToolResult>;
 };
 
-const knowledgeInput = z.object({
-  query: z.string().min(1).max(500),
-  limit: z.number().int().min(1).max(10).default(5),
-});
+const knowledgeInput = z
+  .object({
+    query: z.string().min(1).max(500),
+    limit: z.number().int().min(1).max(10).default(5),
+  })
+  .strict();
 
-const escalateInput = z.object({
-  reason: z.string().min(1).max(500),
-});
+const escalateInput = z
+  .object({
+    reason: z.string().min(1).max(500),
+  })
+  .strict();
 
-const availabilityInput = z.object({
-  serviceId: z.string().uuid(),
-  resourceId: z.string().uuid().optional(),
-  from: z.string().datetime(),
-  timezone: z.string().min(1).max(100),
-});
+const availabilityInput = z
+  .object({
+    serviceId: z.string().uuid(),
+    resourceId: z.string().uuid().optional(),
+    from: z.string().datetime(),
+    timezone: z.string().min(1).max(100),
+  })
+  .strict();
 
-const bookingInput = z.object({
-  serviceId: z.string().uuid(),
-  resourceId: z.string().uuid(),
-  startsAt: z.string().datetime(),
-  timezone: z.string().min(1).max(100),
-  contactId: z.string().uuid().optional(),
-});
+const bookingInput = z
+  .object({
+    serviceId: z.string().uuid(),
+    resourceId: z.string().uuid(),
+    startsAt: z.string().datetime(),
+    timezone: z.string().min(1).max(100),
+    contactId: z.string().uuid().optional(),
+    confirmed: z.boolean().default(false),
+  })
+  .strict();
 
 /**
  * Knowledge lookup — read tool. Hybrid retrieval (similarity + keyword) over
@@ -72,6 +84,7 @@ export const knowledgeTool: ToolDefinition = {
       ok: true,
       data: {
         hits: hits.map((h) => ({
+          chunkId: h.chunkId,
           content: h.content,
           similarity: h.similarity,
           source: h.sourceName,
@@ -106,18 +119,23 @@ export const availabilityTool: ToolDefinition = {
   description:
     'List open appointment slots for a service (and optionally a resource) on a date.',
   schema: availabilityInput,
-  async execute(input) {
+  async execute(input, scope) {
     const parsed = availabilityInput.parse(input);
+    const slots = await AppointmentsService.forOrganization(
+      scope.organizationId,
+    ).availability({
+      serviceId: parsed.serviceId,
+      resourceId: parsed.resourceId,
+      date: localDateInZone(new Date(parsed.from), parsed.timezone),
+      timezone: parsed.timezone,
+    });
     return {
       ok: true,
       data: {
         serviceId: parsed.serviceId,
         resourceId: parsed.resourceId ?? null,
         timezone: parsed.timezone,
-        // M9 supplies the real slot list; this read tool returns the request
-        // echo so the engine can present "checking availability…".
-        slots: [],
-        note: 'Availability is computed by the appointment engine (Milestone 9).',
+        slots,
       },
     };
   },
@@ -132,19 +150,34 @@ export const bookingTool: ToolDefinition = {
   description:
     'Propose booking an appointment slot. Requires explicit confirmation before committing.',
   schema: bookingInput,
-  async execute(input) {
+  async execute(input, scope) {
     const parsed = bookingInput.parse(input);
+    if (!parsed.confirmed || !parsed.contactId) {
+      return {
+        ok: true,
+        requiresConfirmation: true,
+        data: {
+          proposed: true,
+          serviceId: parsed.serviceId,
+          resourceId: parsed.resourceId,
+          startsAt: parsed.startsAt,
+          timezone: parsed.timezone,
+          contactId: parsed.contactId ?? null,
+        },
+      };
+    }
+    const appointment = await AppointmentsService.forOrganization(
+      scope.organizationId,
+    ).book({
+      contactId: parsed.contactId,
+      serviceId: parsed.serviceId,
+      resourceId: parsed.resourceId,
+      startsAt: parsed.startsAt,
+      timezone: parsed.timezone,
+    });
     return {
       ok: true,
-      requiresConfirmation: true,
-      data: {
-        proposed: true,
-        serviceId: parsed.serviceId,
-        resourceId: parsed.resourceId,
-        startsAt: parsed.startsAt,
-        timezone: parsed.timezone,
-        contactId: parsed.contactId ?? null,
-      },
+      data: { booked: true, appointmentId: appointment.id },
     };
   },
 };
@@ -155,6 +188,18 @@ export const TOOL_REGISTRY: Record<string, ToolDefinition> = {
   'appointment.book': bookingTool,
   'escalate.human': escalateTool,
 };
+
+export async function executeAuthorizedTool(
+  toolName: string,
+  input: unknown,
+  scope: Scope,
+  allowedTools: ReadonlySet<string>,
+): Promise<ToolResult> {
+  assertToolAuthorized(toolName, allowedTools);
+  const tool = TOOL_REGISTRY[toolName];
+  if (!tool) throw new Error('AI tool is not registered.');
+  return tool.execute(input, scope);
+}
 
 export function describeTools(tools: ToolDefinition[]): string {
   return tools.map((t) => `- ${t.name}: ${t.description}`).join('\n');

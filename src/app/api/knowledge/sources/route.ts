@@ -1,4 +1,4 @@
-import { requireOrg, requirePermission } from '@/server/auth-context';
+import { requireBranch, requireBranchPermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 import { KnowledgeService } from '@/features/knowledge/services/knowledge.service';
 import { createSourceSchema } from '@/features/knowledge/validators/knowledge.validators';
@@ -15,8 +15,8 @@ import { createSourceSchema } from '@/features/knowledge/validators/knowledge.va
 export const GET = withApiHandler(
   'GET /api/knowledge/sources',
   async (_request, { correlationId }) => {
-    const { organizationId } = await requireOrg();
-    const service = KnowledgeService.forOrganization(organizationId);
+    const { organizationId, branchId } = await requireBranch();
+    const service = KnowledgeService.forScope({ organizationId, branchId });
     const sources = await service.listSources();
     return jsonSuccess({ sources }, { correlationId });
   },
@@ -25,11 +25,11 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   'POST /api/knowledge/sources',
   async (request, { correlationId }) => {
-    const { organizationId } = await requirePermission('knowledge:write');
+    const { organizationId, branchId } = await requireBranchPermission('knowledge:write');
     const body: unknown = await request.json();
     const input = createSourceSchema.parse(body);
 
-    const service = KnowledgeService.forOrganization(organizationId);
+    const service = KnowledgeService.forScope({ organizationId, branchId });
     const result = await service.createSource({
       kind: input.kind,
       name: input.name,

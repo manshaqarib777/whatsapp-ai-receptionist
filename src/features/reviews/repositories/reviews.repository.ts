@@ -2,6 +2,8 @@ import { NotFoundError } from '@/lib/errors';
 import type { Scope } from '@/lib/db/scope';
 
 import { ReviewsBaseRepository } from './reviews.base';
+import { ReviewEntriesRepository } from './review-entries.repository';
+import { ReviewPlatformsRepository } from './review-platforms.repository';
 import type { ReviewPlatformRow, ReviewRequestRow, ReviewRow } from './reviews.types';
 
 /**
@@ -13,8 +15,13 @@ import type { ReviewPlatformRow, ReviewRequestRow, ReviewRow } from './reviews.t
  */
 
 export class ReviewsRepository extends ReviewsBaseRepository {
+  private readonly entries: ReviewEntriesRepository;
+  private readonly platforms: ReviewPlatformsRepository;
+
   constructor(scope: Scope) {
     super(scope);
+    this.entries = new ReviewEntriesRepository(scope);
+    this.platforms = new ReviewPlatformsRepository(scope);
   }
 
   // -------------------------------------------------------------------------
@@ -22,50 +29,18 @@ export class ReviewsRepository extends ReviewsBaseRepository {
   // -------------------------------------------------------------------------
 
   async listPlatforms(): Promise<ReviewPlatformRow[]> {
-    const rows = await this.db.reviewPlatform.findMany({
-      where: { deletedAt: null },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        provider: true,
-        isConnected: true,
-        createdAt: true,
-      },
-    });
-    return rows.map(toPlatformRow);
+    return this.platforms.listPlatforms();
   }
 
   async getPlatform(id: string): Promise<ReviewPlatformRow> {
-    const row = await this.db.reviewPlatform.findFirst({
-      where: { id, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        provider: true,
-        isConnected: true,
-        createdAt: true,
-      },
-    });
-    if (!row) throw new NotFoundError('Review platform not found.');
-    return toPlatformRow(row);
+    return this.platforms.getPlatform(id);
   }
 
   /** Finds a platform by provider, or null. */
   async findPlatformByProvider(
     provider: 'google' | 'facebook',
   ): Promise<ReviewPlatformRow | null> {
-    const row = await this.db.reviewPlatform.findFirst({
-      where: { provider, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        provider: true,
-        isConnected: true,
-        createdAt: true,
-      },
-    });
-    return row ? toPlatformRow(row) : null;
+    return this.platforms.findPlatformByProvider(provider);
   }
 
   async createPlatform(input: {
@@ -74,46 +49,12 @@ export class ReviewsRepository extends ReviewsBaseRepository {
     provider: 'google' | 'facebook';
     isConnected: boolean;
   }): Promise<ReviewPlatformRow> {
-    const db = this.writeScope(input.branchId);
-    const row = await db.reviewPlatform.create({
-      data: {
-        organizationId: this.organizationId,
-        branchId: input.branchId,
-        name: input.name,
-        provider: input.provider,
-        isConnected: input.isConnected,
-      },
-      select: {
-        id: true,
-        name: true,
-        provider: true,
-        isConnected: true,
-        createdAt: true,
-      },
-    });
-    return toPlatformRow(row);
+    return this.platforms.createPlatform(input);
   }
 
   /** Creates the Google and Facebook platform rows if absent (idempotent). */
   async ensureDefaultPlatforms(branchId: string): Promise<void> {
-    const db = this.writeScope(branchId);
-    for (const provider of ['google', 'facebook'] as const) {
-      const existing = await db.reviewPlatform.findFirst({
-        where: { provider, deletedAt: null },
-        select: { id: true },
-      });
-      if (!existing) {
-        await db.reviewPlatform.create({
-          data: {
-            organizationId: this.organizationId,
-            branchId,
-            name: provider === 'google' ? 'Google' : 'Facebook',
-            provider,
-            isConnected: false,
-          },
-        });
-      }
-    }
+    return this.platforms.ensureDefaultPlatforms(branchId);
   }
 
   // -------------------------------------------------------------------------
@@ -291,27 +232,7 @@ export class ReviewsRepository extends ReviewsBaseRepository {
   // -------------------------------------------------------------------------
 
   async listReviews(filter: { status?: string } = {}): Promise<ReviewRow[]> {
-    const rows = await this.db.review.findMany({
-      where: {
-        deletedAt: null,
-        ...(filter.status === 'needs-attention' ? { rating: { lt: 4 } } : {}),
-      },
-      orderBy: { receivedAt: 'desc' },
-      select: {
-        id: true,
-        contactId: true,
-        platformId: true,
-        requestId: true,
-        rating: true,
-        text: true,
-        externalReviewId: true,
-        receivedAt: true,
-        createdAt: true,
-        contact: { select: { displayName: true } },
-        platform: { select: { name: true, provider: true } },
-      },
-    });
-    return rows.map(toReviewRow);
+    return this.entries.listReviews(filter);
   }
 
   async createReview(input: {
@@ -323,68 +244,12 @@ export class ReviewsRepository extends ReviewsBaseRepository {
     text?: string;
     externalReviewId?: string;
   }): Promise<ReviewRow> {
-    const db = this.writeScope(input.branchId);
-    const row = await db.review.create({
-      data: {
-        organizationId: this.organizationId,
-        branchId: input.branchId,
-        contactId: input.contactId,
-        platformId: input.platformId,
-        requestId: input.requestId ?? null,
-        rating: input.rating,
-        text: input.text ?? null,
-        externalReviewId: input.externalReviewId ?? null,
-      },
-      select: { id: true },
-    });
-
-    // A review responding to a request flips the request to `responded`.
-    if (input.requestId) {
-      await this.db.reviewRequest.updateMany({
-        where: { id: input.requestId },
-        data: { status: 'responded', respondedAt: new Date() },
-      });
-    }
-
-    return this.getReview(row.id);
+    return this.entries.createReview(input);
   }
 
   async getReview(id: string): Promise<ReviewRow> {
-    const row = await this.db.review.findFirst({
-      where: { id, deletedAt: null },
-      select: {
-        id: true,
-        contactId: true,
-        platformId: true,
-        requestId: true,
-        rating: true,
-        text: true,
-        externalReviewId: true,
-        receivedAt: true,
-        createdAt: true,
-        contact: { select: { displayName: true } },
-        platform: { select: { name: true, provider: true } },
-      },
-    });
-    if (!row) throw new NotFoundError('Review not found.');
-    return toReviewRow(row);
+    return this.entries.getReview(id);
   }
-}
-
-function toPlatformRow(row: {
-  id: string;
-  name: string;
-  provider: string;
-  isConnected: boolean;
-  createdAt: Date;
-}): ReviewPlatformRow {
-  return {
-    id: row.id,
-    name: row.name,
-    provider: row.provider as 'google' | 'facebook',
-    isConnected: row.isConnected,
-    createdAt: row.createdAt,
-  };
 }
 
 function toRequestRow(row: {
@@ -414,35 +279,6 @@ function toRequestRow(row: {
     sentAt: row.sentAt,
     respondedAt: row.respondedAt,
     expiresAt: row.expiresAt,
-    createdAt: row.createdAt,
-  };
-}
-
-function toReviewRow(row: {
-  id: string;
-  contactId: string;
-  platformId: string;
-  requestId: string | null;
-  rating: number;
-  text: string | null;
-  externalReviewId: string | null;
-  receivedAt: Date;
-  createdAt: Date;
-  contact: { displayName: string };
-  platform: { name: string; provider: string } | null;
-}): ReviewRow {
-  return {
-    id: row.id,
-    contactId: row.contactId,
-    contactDisplayName: row.contact.displayName,
-    platformId: row.platformId,
-    platformName: row.platform?.name ?? 'Unknown',
-    platformProvider: row.platform?.provider ?? 'unknown',
-    requestId: row.requestId,
-    rating: row.rating,
-    text: row.text,
-    externalReviewId: row.externalReviewId,
-    receivedAt: row.receivedAt,
     createdAt: row.createdAt,
   };
 }

@@ -39,6 +39,8 @@ export const createWorkflowSchema = z.object({
   name: z.string().trim().min(1, 'A name is required.').max(100),
 });
 
+export const cloneWorkflowSchema = createWorkflowSchema;
+
 export const updateWorkflowSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
   isEnabled: z.boolean().optional(),
@@ -48,3 +50,11 @@ export const saveVersionSchema = z.object({
   definition: workflowDefinitionSchema,
   triggerKind: z.enum(TRIGGER_KINDS),
 });
+
+export const createRunSchema = z
+  .object({
+    variables: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      .default({}),
+  })
+  .strict();

@@ -2,7 +2,7 @@
 
 Created: 2026-08-12
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 5`
-Status: **Approved 2026-08-12**
+Status: **Complete — structurally re-certified 2026-08-23**
 
 ---
 
@@ -241,3 +241,13 @@ No dashboard **read** route: the page is server-rendered (AD-3). Error responses
 - [ ] Integration, component, and E2E tests per Testing Strategy
 - [ ] Docs: `CHANGELOG.md`, README/architecture/API notes; `MILESTONE_05_PROGRESS.md` maintained throughout
 - [ ] `MILESTONE_05_COMPLETED.md` — written only after all exit criteria pass
+
+---
+
+## 2026-08-23 Structural Review Amendment
+
+- [x] Implement the plan's per-widget error boundary requirement using the installed
+      Next.js component-level `unstable_catchError` API, with a retryable `ErrorState`.
+- [x] Add a regression test proving one widget fallback does not replace its siblings.
+- [x] Split the 310-line dashboard repository below the 300-line hard limit.
+- [x] Re-run focused dashboard tests, E2E, static gates, and build.

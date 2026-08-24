@@ -12,6 +12,10 @@ import {
   type WorkflowDefinition,
   type WorkflowTriggerKind,
 } from '@/features/workflow-builder/services/graph';
+import {
+  traceExecutionSegment,
+  type WorkflowVariables,
+} from '@/features/workflow-builder/services/execution';
 
 /**
  * Workflow orchestration — Milestone 13.
@@ -52,6 +56,21 @@ export class WorkflowsService {
   async createWorkflow(input: { name: string }): Promise<WorkflowRow> {
     const branchId = await this.repo.resolveDefaultBranch();
     return this.repo.createWorkflow({ branchId, name: input.name });
+  }
+
+  async cloneWorkflow(sourceId: string, input: { name: string }): Promise<WorkflowRow> {
+    const source = await this.repo.getWorkflow(sourceId);
+    if (!source.currentVersionId) {
+      throw new ConflictError('Save a version before using this workflow as a template.');
+    }
+    const sourceVersion = await this.repo.getVersion(source.currentVersionId);
+    const copy = await this.createWorkflow(input);
+    await this.saveVersion({
+      workflowId: copy.id,
+      definition: sourceVersion.definition,
+      triggerKind: sourceVersion.triggerKind,
+    });
+    return this.repo.getWorkflow(copy.id);
   }
 
   async updateWorkflow(
@@ -120,13 +139,14 @@ export class WorkflowsService {
 
   /**
    * Manual (test) run against the current version. Writes the run + one step
-   * row per node, evaluating the graph's condition branches along the true
+   * row per node, evaluating the graph's condition branches from run variables
    * path and marking delay nodes `pending` with a `scheduledFor`.
    */
   async createRun(input: {
     workflowId: string;
     triggerEntityType?: string;
     triggerEntityId?: string;
+    variables?: WorkflowVariables;
   }): Promise<{ run: WorkflowRunRow; steps: { nodeId: string; status: string }[] }> {
     const workflow = await this.repo.getWorkflow(input.workflowId);
     if (!workflow.currentVersionId) {
@@ -140,16 +160,19 @@ export class WorkflowsService {
       workflowVersionId: version.id,
       triggerEntityType: input.triggerEntityType,
       triggerEntityId: input.triggerEntityId,
+      context: input.variables,
     });
 
     // Walk the graph from the trigger along the true path. A condition takes
     // its true branch; everything else executes; delay nodes are pending.
-    const executed = this.traceTruePath(definition);
+    const trigger = definition.nodes.find((node) => node.type === 'trigger');
+    if (!trigger) throw new ConflictError('The workflow has no trigger node.');
+    const executed = traceExecutionSegment(definition, trigger.id, input.variables);
     const steps: {
       nodeId: string;
       status: 'pending' | 'succeeded';
       scheduledFor?: Date;
-    }[] = executed.map((node) => {
+    }[] = executed.nodes.map((node) => {
       if (node.type === 'delay') {
         const seconds = Number(node.config['delaySeconds'] ?? 3600);
         return {
@@ -162,7 +185,7 @@ export class WorkflowsService {
     });
 
     await this.repo.createRunSteps(runId, steps);
-    await this.repo.finishRun(runId, 'succeeded');
+    if (!executed.delay) await this.repo.finishRun(runId, 'succeeded');
 
     const run = await this.repo.getRun(runId);
     return { run, steps: steps.map(({ nodeId, status }) => ({ nodeId, status })) };
@@ -171,43 +194,5 @@ export class WorkflowsService {
   async listRuns(workflowId: string): Promise<WorkflowRunRow[]> {
     await this.repo.getWorkflow(workflowId);
     return this.repo.listRuns(workflowId);
-  }
-
-  // -------------------------------------------------------------------------
-  // Internals
-  // -------------------------------------------------------------------------
-
-  /**
-   * Orders the graph's nodes by walking edges from the trigger, following the
-   * true branch of conditions. A node with no path from the trigger is skipped.
-   */
-  private traceTruePath(definition: WorkflowDefinition): WorkflowDefinition['nodes'] {
-    const byId = new Map(definition.nodes.map((node) => [node.id, node]));
-    const outgoing = new Map<string, { to: string; label?: 'true' | 'false' }[]>();
-    for (const edge of definition.edges) {
-      const list = outgoing.get(edge.from) ?? [];
-      list.push({ to: edge.to, label: edge.label });
-      outgoing.set(edge.from, list);
-    }
-
-    const ordered: WorkflowDefinition['nodes'] = [];
-    const seen = new Set<string>();
-    const visit = (nodeId: string) => {
-      if (seen.has(nodeId)) return;
-      seen.add(nodeId);
-      const node = byId.get(nodeId);
-      if (!node) return;
-      ordered.push(node);
-
-      const edges = outgoing.get(nodeId) ?? [];
-      // Conditions: follow the true branch only. Everything else: all edges.
-      const next =
-        node.type === 'condition' ? edges.filter((e) => e.label === 'true') : edges;
-      for (const edge of next) visit(edge.to);
-    };
-
-    const trigger = definition.nodes.find((node) => node.type === 'trigger');
-    if (trigger) visit(trigger.id);
-    return ordered;
   }
 }

@@ -1,5 +1,14 @@
 # Milestone 5 — Completed
 
+> **Authoritative structural re-certification — 2026-08-23:** The original report's
+> claim that per-widget error boundaries were unnecessary contradicted AD-3 and the
+> milestone DoD. Every server-streamed widget is now wrapped with the component-level
+> `unstable_catchError` API documented by the installed Next.js 16.2.12 build, rendering
+> a retryable `ErrorState`. A regression test crashes one widget and proves its sibling
+> remains available. Notification reads were extracted so the main repository is 292
+> lines. Current evidence: focused dashboard tests 75/75, dashboard E2E 12/12,
+> typecheck/lint clean, and a successful 55-page production build.
+
 Completed: 2026-08-12
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 5`
 
@@ -153,9 +162,9 @@ with an org-level scope covering every branch.
 - **Chart rendering internals.** The chart wrapper (`src/components/charts.tsx`) is
   already covered by its own suite; widget tests assert the accessible summary and
   empty/loaded split, not recharts pixels.
-- **Per-widget error boundaries.** The dashboard page has no client widgets that can
-  fail independently at runtime (they are all server-streamed); the route-level error
-  boundary covers the page.
+- **Next.js boundary internals.** The installed framework API owns retry and error
+  capture behavior; the dashboard regression test verifies the product contract—that
+  one failed widget shows its fallback without replacing a healthy sibling.
 
 ---
 

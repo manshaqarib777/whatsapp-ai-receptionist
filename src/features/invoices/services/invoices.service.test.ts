@@ -57,6 +57,7 @@ describe('renderInvoicePdf', () => {
       quoteId: null,
       status: 'issued' as const,
       subtotalAmount: 100,
+      discountAmount: 0,
       taxAmount: 15,
       totalAmount: 115,
       amountPaid: 0,
@@ -88,5 +89,43 @@ describe('renderInvoicePdf', () => {
     expect(text).toContain('Crown fitting');
     expect(text).toContain('115.00 SAR');
     expect(text).toContain('%%EOF');
+  });
+
+  it('uses a valid shared font object when line items span pages', () => {
+    const invoice = {
+      id: 'x',
+      number: 'INV-1001',
+      contactId: 'c',
+      contactName: 'Test Patient',
+      quoteId: null,
+      status: 'issued' as const,
+      subtotalAmount: 600,
+      discountAmount: 0,
+      taxAmount: 90,
+      totalAmount: 690,
+      amountPaid: 0,
+      currency: 'SAR',
+      issuedAt: new Date('2026-08-14'),
+      dueAt: null,
+      paidAt: null,
+      createdAt: new Date('2026-08-14'),
+      updatedAt: new Date('2026-08-14'),
+      version: 1,
+      lineItems: Array.from({ length: 60 }, (_, index) => ({
+        id: `line-${index}`,
+        position: index,
+        description: `Item ${index}`,
+        quantity: 1,
+        unitPriceAmount: 10,
+        taxRate: 0.15,
+        taxAmount: 1.5,
+        lineTotalAmount: 11.5,
+      })),
+    };
+    const text = renderInvoicePdf(invoice).toString('latin1');
+
+    expect(text).toContain('/Count 2');
+    expect(text).toContain('/F1 7 0 R');
+    expect(text).toContain('7 0 obj\n<< /Type /Font');
   });
 });

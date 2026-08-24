@@ -38,14 +38,8 @@ async function seedReviewsOrg(organizationId: string): Promise<SeededOrg> {
   const client = new PrismaClient({ adapter });
 
   try {
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -167,8 +161,10 @@ test.describe('reviews', () => {
     try {
       await page.goto('/reviews/platforms');
       await expect(page.getByRole('heading', { name: 'Review platforms' })).toBeVisible();
-      await expect(page.getByText('Google')).toBeVisible();
-      await expect(page.getByText('Facebook')).toBeVisible();
+      const googlePlatform = page.getByRole('listitem').filter({ hasText: 'Google' });
+      await expect(googlePlatform.getByText('Google', { exact: true })).toBeVisible();
+      const facebookPlatform = page.getByRole('listitem').filter({ hasText: 'Facebook' });
+      await expect(facebookPlatform.getByText('Facebook', { exact: true })).toBeVisible();
       await expect(page.getByText('Not configured').first()).toBeVisible();
     } finally {
       await cleanupOrg(seeded);

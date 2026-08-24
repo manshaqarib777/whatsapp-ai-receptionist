@@ -1,9 +1,9 @@
 # Milestone 1 — Progress
 
-Status: Complete
+Status: Repair complete — preview verification assigned to Milestone 25
 Started: 2026-08-01
 Completed: 2026-08-01
-Last updated: 2026-08-01
+Last updated: 2026-08-23
 
 See [`MILESTONE_01_COMPLETED.md`](MILESTONE_01_COMPLETED.md) for the final report.
 
@@ -41,8 +41,17 @@ See [`MILESTONE_01_COMPLETED.md`](MILESTONE_01_COMPLETED.md) for the final repor
 
 ## Pending Tasks
 
-None. Two items deferred with reasons, recorded as Known Limitations 5 and 7 in the
-completion report:
+- [x] Replace network-fetched Google fonts with packaged local Geist fonts.
+- [x] Resolve the current `deepmerge-ts` high-severity advisory without downgrading
+      Prisma.
+- [x] Re-run format, typecheck, lint, unit/integration/component, build, E2E, schema
+      drift and dependency-audit gates.
+- [x] Correct the completion report with current reproducible evidence.
+- [x] Preview verification explicitly assigned to Milestone 25 by user direction on
+      2026-08-23; no preview target exists yet.
+
+Previously deferred items, recorded as Known Limitations 5 and 7 in the completion
+report:
 
 - Realistic dummy data → Milestone 4 (needs a real schema)
 - Preview-deployment verification → Milestone 25 (owns deployment)
@@ -58,6 +67,12 @@ completion report:
 | 5 | E2E keyboard-navigation test failed — scaffold page has no interactive controls | Resolved | Rewritten as a tripwire asserting zero focusable elements, so it fails when M3 adds the first control and forces a real focus test. |
 | 6 | Failure-path tests passed against the real database — `vi.resetModules()` + dynamic imports gave the service a fresh `prisma`, so the spy targeted a stale object | Resolved | Switched to static imports, dropped `resetModules`. Documented in the test file so it is not reintroduced. |
 | 7 | Missing test committed to in the plan (DB-unreachable → 503) | Resolved | Added `health-degraded.test.ts` (6 tests) covering degraded status, 503 envelope, no leaked internals, correlation id, and the timeout race. |
+| 8 | Production build depends on downloading Geist from Google | Resolved | Replaced `next/font/google` with packaged `geist` local-font exports. A fresh production build succeeds without a Google Fonts request. |
+| 9 | `npm audit` reports `deepmerge-ts <8` through Prisma tooling | Resolved | Pinned patched `deepmerge-ts` 8 through npm overrides. `npm audit` reports zero vulnerabilities; Prisma-backed tests and schema drift pass. |
+| 10 | `npm run test:e2e` fails during test-module collection because required environment variables are undefined | Resolved | Playwright now calls Next 16's documented `loadEnvConfig()` before test imports. Also aligned the email send guard with the already-validated `E2E_TEST_RUN` exception. The suite collects and executes all 232 tests. |
+| 11 | Fresh full E2E run is 229/232: three mobile assertions use ambiguous text selectors | Resolved | Replaced them with semantic main/heading/list-item scoped locators. Focused desktop/mobile regression runs pass, followed by a fresh full run: 232/232 in 8.4 minutes with one worker and zero retries. |
+| 12 | Full Vitest run failed appointment reminder assertion under concurrent verification load | Resolved | The fixture added only one week to an expired date, which was still in the past on 2026-08-23; the service correctly scheduled no reminders. It now books a fixed future Sunday covered by the availability rule. Focused regression passes and the fresh full suite is 927/927. Prettier also passes. |
+| 13 | Preview deployment exit criterion cannot be exercised | Deferred by user direction | The Vercel CLI is authenticated, but the account has no project for this repository and the worktree has no `.vercel` link. On 2026-08-23 the user directed the repair pass to proceed to the next milestone; preview provisioning and verification remain owned by Milestone 25. |
 
 ## Technical Decisions
 

@@ -2,7 +2,7 @@
 
 Created: 2026-08-12
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 6`
-Status: **Approved 2026-08-12**
+Status: **Complete — structurally re-certified 2026-08-23**
 
 ---
 
@@ -337,6 +337,17 @@ exist) is documented, not built.
 | Search | Trigram index on message bodies is org-scoped; search never leaks across tenants. |
 | Typing rows | TTL-expiring (`expiresAt < now()` filtered); a stale typing row self-cleans. |
 | Polling | `refetchInterval` respects `document.hidden`; no background churn. |
+
+### 2026-08-23 Sequential Review Amendment
+
+- [x] Replace the assignment toast with a real member picker wired to PATCH.
+- [x] Replace the attachment toast with an accessible file input and multipart upload,
+      with server-side size/type validation and cache invalidation.
+- [x] Add the missing internal-note composer wired to the existing notes endpoint.
+- [x] Harden signed local-storage tokens with HMAC + constant-time comparison and
+      preserve MIME metadata when serving audio/documents.
+- [x] Bring `use-inbox.ts` below the 300-line limit and add regression coverage.
+- [x] Re-run inbox tests, integration, E2E, drift, static gates, and build.
 
 ---
 

@@ -1,10 +1,21 @@
 # Milestone 6 — Progress
 
-Status: **Complete — see `MILESTONE_06_COMPLETED.md`**
+Status: **Complete — structurally re-certified 2026-08-23**
 Started: 2026-08-12
-Last updated: 2026-08-12
+Last updated: 2026-08-23
 
 Plan: `MILESTONE_06_PLAN.md` (approved 2026-08-12).
+
+## 2026-08-23 Sequential Review
+
+- [x] Rechecked all 15 PRD features against the UI, hooks, APIs, repositories,
+      migration, storage boundary, tests, and old limitations.
+- [x] Finished the three falsely completed interactions: assignment, upload, add note.
+- [x] Added upload allow-list/10 MB validation, same-org assignee validation, HMAC
+      tokens, constant-time verification, MIME sidecars, downloads, and audio playback.
+- [x] Split query/mutation hooks (222/111 lines). Current evidence: inbox tests 41/41,
+      focused assignment/note E2E 2/2 plus full inbox E2E 12/12 before the added case,
+      drift limited to known indexes, static gates clean, production build successful.
 
 ## Completed Tasks
 

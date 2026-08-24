@@ -1,10 +1,21 @@
 # Milestone 3 — Progress
 
-Status: Complete — approved 2026-08-02
+Status: Complete — structurally re-certified 2026-08-23
 Started: 2026-08-01
-Last updated: 2026-08-02
+Last updated: 2026-08-23
 
 See `MILESTONE_03_COMPLETED.md` for the closing report.
+
+## 2026-08-23 Sequential Review
+
+- [x] Rechecked the PRD, architecture rules, plan, implementation inventory, test
+      inventory, gallery production guard, RTL support, sanitisation boundaries, and
+      the original completion evidence.
+- [x] Brought the chart adapter under the repository's 300-line limit (253-line
+      public adapter plus a 78-line core module).
+- [x] Replaced avoidable raw-pixel and physical-direction utilities in shared UI.
+- [x] Re-ran the milestone gates: typecheck, lint, focused chart tests (10/10),
+      production build (55 pages), and gallery E2E (36/36, desktop and mobile).
 
 ## Completed Tasks
 

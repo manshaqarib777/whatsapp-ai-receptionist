@@ -1,5 +1,16 @@
 # Milestone 3 — Completed
 
+> **Authoritative structural re-certification — 2026-08-23:** The sequential review
+> rechecked the PRD, architecture and design rules, implementation inventory, security
+> boundaries, and current runtime evidence. It split the 350-line chart primitive into
+> a 253-line public adapter and 78-line core, replaced avoidable physical-direction and
+> raw-pixel utilities in shared primitives, and confirmed the remaining raw selectors
+> merely target exact Recharts/Radix-emitted markup. Current evidence: typecheck and
+> lint clean, chart tests 10/10, production build 55 pages, and design-gallery E2E
+> 36/36 across desktop/mobile, light/dark, and LTR/RTL. The old `middleware.ts`
+> limitation is resolved by Milestone 2's `proxy.ts` migration. Preview deployment
+> remains intentionally centralized in Milestone 25 by the user's decision.
+
 Completed: 2026-08-01
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 3`
 

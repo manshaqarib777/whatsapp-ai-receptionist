@@ -11,6 +11,7 @@ import {
 } from '@/features/auth/components/sidebar-slots';
 import { NotificationsBell } from '@/features/dashboard/components/notifications-bell';
 import { requireAuth } from '@/server/auth-context';
+import * as branchesService from '@/features/organizations/services/branches.service';
 
 /**
  * Authenticated shell.
@@ -39,6 +40,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const active =
     organizations.find((org) => org.id === context.organizationId) ?? organizations[0];
+  const branches = context.organizationId
+    ? await branchesService.list(context.organizationId)
+    : [];
 
   const cookieStore = await cookies();
   const defaultCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === '1';
@@ -51,6 +55,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <SidebarWorkspaceSwitcher
           organizations={organizations}
           activeOrganizationId={active?.id ?? null}
+          branches={branches}
+          activeBranchId={context.branchId}
         />
       }
       sidebarFooter={<SidebarAccountMenu user={context.user} />}

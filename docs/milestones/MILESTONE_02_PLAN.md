@@ -1,6 +1,6 @@
 # Milestone 2 — Authentication
 
-Status: Planned
+Status: Repair complete
 Created: 2026-08-01
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 2`
 
@@ -372,3 +372,32 @@ Per `MILESTONE_RULES.md` §8, plus:
 - [ ] `CHANGELOG.md` entry
 - [ ] `MILESTONE_02_COMPLETED.md` written
 - [ ] **STOP** — report, then wait for approval before Milestone 3
+
+---
+
+## 2026-08-23 Structural Repair Amendment
+
+A repository-wide milestone audit found that the original completion report recorded
+several planned requirements as complete or deferred even though the plan's Definition
+of Done did not permit those gaps. Milestone 2 is therefore reopened. This repair keeps
+the original scope and adds no future product feature.
+
+The repair must close these gates before Milestone 3 is reviewed:
+
+- Move organization, membership, auth-context membership, and audit persistence behind
+  feature repositories. Route handlers call services; only repositories touch Prisma.
+- Provision the current-schema `Main` branch atomically with every new organization.
+- Implement and test the documented invitation API, invitation form, and invitation
+  acceptance route.
+- Implement and test session listing and revocation in Security settings.
+- Implement progressive failed-sign-in lockout and security-event audit coverage, or
+  document a verified library-level control that satisfies the same acceptance test.
+- Validate audit-log query input through a feature validator.
+- Migrate the optimistic route guard from deprecated `middleware.ts` to the Next.js 16
+  `proxy.ts` convention, following the installed Next.js documentation.
+- Add missing unit, integration, component, and E2E coverage for the repaired paths,
+  then rerun every repository gate.
+
+OAuth redirect verification still requires provider credentials and preview verification
+still belongs to Milestone 25. Those external-environment gates must remain explicit and
+must not be represented as locally exercised.

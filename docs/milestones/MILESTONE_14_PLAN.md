@@ -30,11 +30,9 @@ True after this milestone, and not true now:
   cancelled before it sends; sending materialises recipients from the segment
   evaluation, excludes opted-out contacts, and records per-recipient
   `DeliveryStatus` rows.
-- A DB-polled worker sends the materialised recipients (the established
-  knowledge/reminder/CRM pattern): claims due scheduled campaigns, marks
-  recipients `sent`, and advances the campaign to `sent`. The WhatsApp send
-  path is the same stub seam as the reminder worker — the status columns are
-  real.
+- A DB-polled worker materialises due campaigns and records recipient success
+  only after transport acknowledgement. Until M19 configures Meta, delivery
+  fails visibly instead of producing a false `sent` status.
 - Analytics exist: per-campaign totals (sent, delivered, read, failed,
   delivered rate) from the recipient rows, plus a segment preview count before
   send.
@@ -128,8 +126,8 @@ silently sending nothing.
 ### AD-4 — The send worker
 
 A DB-polled worker (`npm run broadcast:work`) claims due `scheduled` campaigns
-(and `sending` ones in flight), marks recipients `sent` (the WhatsApp send is
-the same stub seam as the appointment reminder worker), and advances the
+(and `sending` ones in flight), materialises recipients, invokes an injectable
+transport, records acknowledged/failed recipient outcomes, and advances the
 campaign to `sent` (`finishedAt`). The worker's processing steps are plain
 async functions so the integration test drives them without faking timers —
 the established pattern.

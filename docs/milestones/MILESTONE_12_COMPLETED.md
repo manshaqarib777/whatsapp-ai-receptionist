@@ -1,6 +1,6 @@
 # Milestone 12 — Completed
 
-Completed: 2026-08-15
+Completed: 2026-08-15; core re-certified 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 12`
 
 ---
@@ -166,13 +166,19 @@ time, so there is no per-read money math beyond formatting.
 
 1. **The create dialog takes a contact id, not a picker** — the contact picker
    is the CRM surface (same convention as quotations M11).
-2. **Only Stripe is a real gateway** — the other four PRD gateways are
-   registered `unconfigured` adapters with a clear error until their SDKs land.
-3. **`mark_paid` does not create a payment row** — it flips the invoice to paid
-   directly for cash/offline settlements; a payment row (and thus a refundable
-   record) only exists for gateway payments.
-4. **PDF is single-page-capped Helvetica text** — no page-break reflow, no logo
-   image; same convention as the M11 quote PDF.
+2. **External rollout remains in M19** — HyperPay, PayTabs, STC Pay, and Apple Pay
+   remain fail-closed adapters pending credentials/provider integration work.
+3. **PDF uses Helvetica text** — line items reflow across pages; embedded logo
+   images remain outside this milestone.
+
+### Re-certification additions (2026-08-23)
+
+- Offline/cash settlement now creates a succeeded `manual` payment for the exact
+  remaining balance, updates `amountPaid`, and produces an auditable receipt history.
+- Multi-page invoice PDFs now reference the actual shared font object.
+- Lifecycle orchestration was extracted; the main service is 295 lines.
+- Focused tests (25), static gates, drift, production build, and 12 desktop/mobile
+  E2E/axe checks pass.
 
 ---
 

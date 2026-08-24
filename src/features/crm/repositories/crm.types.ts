@@ -6,7 +6,7 @@
  */
 
 export type DealStatus = 'open' | 'won' | 'lost';
-export type TaggableType = 'contact' | 'deal' | 'conversation';
+export type TaggableType = 'contact' | 'deal' | 'conversation' | 'company';
 export type ActivityKind =
   | 'note'
   | 'call'

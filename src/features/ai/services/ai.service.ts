@@ -4,6 +4,7 @@ import {
   type PromptTemplateDetail,
   type PromptTemplateRow,
 } from '@/features/ai/repositories/ai.repository';
+import type { BranchScope } from '@/lib/db/scope';
 
 /**
  * AI template orchestration — Milestone 8 (AD-6).
@@ -21,6 +22,10 @@ export class AiService {
 
   static forOrganization(organizationId: string): AiService {
     return new AiService(AiRepository.forOrganization(organizationId));
+  }
+
+  static forScope(scope: BranchScope): AiService {
+    return new AiService(AiRepository.forScope(scope));
   }
 
   async listTemplates(): Promise<PromptTemplateRow[]> {

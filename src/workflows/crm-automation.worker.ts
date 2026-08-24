@@ -8,6 +8,7 @@ import {
 } from '@/features/crm/services/automation';
 import { CrmService } from '@/features/crm/services/crm.service';
 import { CrmRepository } from '@/features/crm/repositories/crm.repository';
+import { listOrganizationIds } from '@/lib/db/system-discovery.repository';
 
 /**
  * CRM automation worker — Milestone 10 (AD-5).
@@ -35,11 +36,9 @@ export async function processDueAutomation(
 ): Promise<number> {
   // Enumerating organizations is a pre-scope read (there is no tenant yet), the
   // same sanctioned pattern as the auth-context session resolution.
-  const { prisma } = await import('@/lib/prisma');
-  const organizations = await prisma.organization.findMany({ select: { id: true } });
   let applied = 0;
 
-  for (const { id: organizationId } of organizations) {
+  for (const organizationId of await listOrganizationIds()) {
     applied += await processOrganization(organizationId, rules);
   }
 

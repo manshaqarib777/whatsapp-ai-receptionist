@@ -1,6 +1,10 @@
 import { ConflictError, NotFoundError, UnprocessableError } from '@/lib/errors';
 
 import { ReviewsRepository } from '@/features/reviews/repositories/reviews.repository';
+import {
+  unavailableReviewRequestTransport,
+  type ReviewRequestTransport,
+} from './review-request-transport';
 
 /**
  * Reviews orchestration — Milestone 16.
@@ -25,12 +29,22 @@ export interface ReviewPlatformAdapter {
   readonly provider: 'google' | 'facebook';
   /** Whether real credentials are configured. */
   readonly configured: boolean;
+  fetchReviews(): Promise<never>;
+  verifyWebhook(): never;
 }
 
 export class UnconfiguredPlatform implements ReviewPlatformAdapter {
   constructor(readonly provider: 'google' | 'facebook') {}
 
   readonly configured = false;
+
+  async fetchReviews(): Promise<never> {
+    throw new Error(`${this.provider} review integration is not configured.`);
+  }
+
+  verifyWebhook(): never {
+    throw new Error(`${this.provider} review integration is not configured.`);
+  }
 }
 
 export const PLATFORM_ADAPTERS: readonly ReviewPlatformAdapter[] = [
@@ -46,15 +60,30 @@ export function adapterFor(provider: string): ReviewPlatformAdapter {
 
 export class ReviewsService {
   private readonly repo: ReviewsRepository;
+  private readonly transport: ReviewRequestTransport;
   readonly organizationId: string;
 
-  constructor(repo: ReviewsRepository) {
+  constructor(
+    repo: ReviewsRepository,
+    transport: ReviewRequestTransport = unavailableReviewRequestTransport,
+  ) {
     this.repo = repo;
+    this.transport = transport;
     this.organizationId = repo.organizationId;
   }
 
   static forOrganization(organizationId: string): ReviewsService {
     return new ReviewsService(ReviewsRepository.forOrganization(organizationId));
+  }
+
+  static forOrganizationWithTransport(
+    organizationId: string,
+    transport: ReviewRequestTransport,
+  ): ReviewsService {
+    return new ReviewsService(
+      ReviewsRepository.forOrganization(organizationId),
+      transport,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -137,7 +166,7 @@ export class ReviewsService {
         if (request.status !== 'created') {
           throw new ConflictError('Only a created request can be sent.');
         }
-        // TODO(M16 transport): deliver the review-request message via WhatsApp.
+        await this.transport.send({ organizationId: this.organizationId, request });
         return this.repo.updateRequestStatus(id, 'sent', { sentAt: new Date() });
       }
       case 'cancel': {
@@ -211,14 +240,21 @@ export class ReviewsService {
   async automateRequests(now = new Date()): Promise<number> {
     const graceBefore = new Date(now.getTime() - REQUEST_GRACE_HOURS * 3_600_000);
     const appointments = await this.repo.listEligibleAppointments(graceBefore);
-    if (appointments.length === 0) return 0;
-
     const branchId = await this.repo.resolveDefaultBranch();
     await this.repo.ensureDefaultPlatforms(branchId);
     const google = await this.repo.findPlatformByProvider('google');
     if (!google) return 0;
 
-    let created = 0;
+    let sent = 0;
+    for (const request of await this.repo.listRequests({ status: 'created' })) {
+      try {
+        await this.transport.send({ organizationId: this.organizationId, request });
+        await this.repo.updateRequestStatus(request.id, 'sent', { sentAt: now });
+        sent += 1;
+      } catch {
+        // Durable retry: leave it created for the next worker pass.
+      }
+    }
     for (const appointment of appointments) {
       try {
         const request = await this.repo.createRequest({
@@ -228,8 +264,13 @@ export class ReviewsService {
           platformId: google.id,
           expiresAt: new Date(now.getTime() + REQUEST_EXPIRY_DAYS * 24 * 3_600_000),
         });
-        await this.repo.updateRequestStatus(request.id, 'sent', { sentAt: new Date() });
-        created += 1;
+        try {
+          await this.transport.send({ organizationId: this.organizationId, request });
+          await this.repo.updateRequestStatus(request.id, 'sent', { sentAt: now });
+          sent += 1;
+        } catch {
+          // Keep the durable request in `created`; a later worker pass can retry.
+        }
       } catch (error) {
         // P2002 — a request already exists for this appointment+platform.
         const code = (error as { code?: string })?.code;
@@ -237,6 +278,6 @@ export class ReviewsService {
       }
     }
 
-    return created;
+    return sent;
   }
 }

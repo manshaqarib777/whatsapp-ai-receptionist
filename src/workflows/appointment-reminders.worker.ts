@@ -1,4 +1,10 @@
 import { logger } from '@/lib/logger';
+import { listDueAppointmentReminders } from '@/lib/db/system-discovery.repository';
+import { AppointmentsRepository } from '@/features/appointments/repositories/appointments.repository';
+import {
+  unavailableReminderTransport,
+  type AppointmentReminderTransport,
+} from '@/features/appointments/services/reminder-transport';
 
 /**
  * Appointment reminder worker — Milestone 9 (AD-5).
@@ -8,38 +14,31 @@ import { logger } from '@/lib/logger';
  * per ARCHITECTURE_RULES §11 (same pattern as the knowledge ingestion worker).
  *
  * Run with `npm run reminders:work` or the docker-compose `worker` service.
- * Delivery is a no-op stub in M9 (the WhatsApp send path lands with the
- * messaging milestone); the worker marks rows and records the outcome so the
- * status column is real.
+ * Meta delivery is configured in the integrations milestone. The default
+ * transport fails closed: a reminder is never marked sent without a successful
+ * transport acknowledgement.
  */
 
 const POLL_INTERVAL_MS = 30_000;
 
-export async function processDueReminders(): Promise<number> {
-  const { prisma } = await import('@/lib/prisma');
-  const due = await prisma.appointmentReminder.findMany({
-    where: { status: 'scheduled', sendAt: { lte: new Date() } },
-    orderBy: { sendAt: 'asc' },
-    take: 50,
-    select: { id: true, appointmentId: true },
-  });
+export async function processDueReminders(
+  transport: AppointmentReminderTransport = unavailableReminderTransport,
+): Promise<number> {
+  const due = await listDueAppointmentReminders(new Date());
 
   for (const reminder of due) {
+    const scope = { organizationId: reminder.organizationId, branchId: null };
+    const repo = new AppointmentsRepository(scope);
     try {
-      // TODO(M9 messaging milestone): deliver via WhatsApp transport.
-      await prisma.appointmentReminder.updateMany({
-        where: { id: reminder.id },
-        data: { status: 'sent' },
-      });
+      const payload = await repo.getReminderDelivery(reminder.id);
+      await transport.send(payload);
+      await repo.setReminderStatus(reminder.id, 'sent');
     } catch (error) {
       logger.error(
         { reminderId: reminder.id, err: error },
         'appointment reminder delivery failed',
       );
-      await prisma.appointmentReminder.updateMany({
-        where: { id: reminder.id },
-        data: { status: 'failed' },
-      });
+      await repo.setReminderStatus(reminder.id, 'failed');
     }
   }
 

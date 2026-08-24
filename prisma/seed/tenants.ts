@@ -15,6 +15,11 @@ import { SEED_NOW, seedId } from './support';
 
 export const ROLES = ['owner', 'admin', 'member', 'viewer'] as const;
 
+// Password for every synthetic seed user: DemoPass!2026
+// This precomputed Better Auth scrypt value keeps repeat seeds deterministic.
+const DEMO_PASSWORD_HASH =
+  'de58940dcd66fca3b1dee2b06565e829:543453ac1fb3413e1709823a6ff8b909b0e9115a6f45d3deb57477a1a96961e1a32f264cfad78174c90043c8446db5074b87ce099d96ab1b60e7bffde1932dc9';
+
 export type SeededTenants = Awaited<ReturnType<typeof seedTenants>>;
 
 export async function seedTenants(prisma: PrismaClient) {
@@ -110,6 +115,18 @@ export async function seedTenants(prisma: PrismaClient) {
       },
     });
 
+    await prisma.account.create({
+      data: {
+        id: seedId('account', index + 1),
+        accountId: user.id,
+        providerId: 'credential',
+        userId: user.id,
+        password: DEMO_PASSWORD_HASH,
+        createdAt: SEED_NOW,
+        updatedAt: SEED_NOW,
+      },
+    });
+
     staff[role] = user.id;
   }
 
@@ -133,6 +150,18 @@ export async function seedTenants(prisma: PrismaClient) {
       organizationId: northwind.id,
       userId: consultant.id,
       role: 'viewer',
+      createdAt: SEED_NOW,
+      updatedAt: SEED_NOW,
+    },
+  });
+
+  await prisma.account.create({
+    data: {
+      id: seedId('account', 99),
+      accountId: consultant.id,
+      providerId: 'credential',
+      userId: consultant.id,
+      password: DEMO_PASSWORD_HASH,
       createdAt: SEED_NOW,
       updatedAt: SEED_NOW,
     },

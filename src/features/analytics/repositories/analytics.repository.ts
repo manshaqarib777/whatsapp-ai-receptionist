@@ -1,6 +1,8 @@
 import { forScope } from '@/lib/db/scoped-prisma';
 import type { Scope } from '@/lib/db/scope';
 import { resolveScope } from '@/server/scope';
+import { AnalyticsPerformanceRepository } from './analytics-performance.repository';
+import { AnalyticsRevenueRepository } from './analytics-revenue.repository';
 
 import type {
   AppointmentStatusRow,
@@ -25,9 +27,13 @@ import type {
 
 export class AnalyticsRepository {
   private readonly db: ReturnType<typeof forScope>;
+  private readonly revenue: AnalyticsRevenueRepository;
+  private readonly performanceReads: AnalyticsPerformanceRepository;
 
   constructor(scope: Scope) {
     this.db = forScope(scope);
+    this.revenue = new AnalyticsRevenueRepository(scope);
+    this.performanceReads = new AnalyticsPerformanceRepository(scope);
   }
 
   static forOrganization(organizationId: string): AnalyticsRepository {
@@ -40,69 +46,27 @@ export class AnalyticsRepository {
 
   /** Sum of invoice totals by status, within a range (issuedAt). */
   async revenueByStatus(range: DateRange): Promise<{ status: string; amount: number }[]> {
-    const rows = await this.db.invoice.groupBy({
-      by: ['status'],
-      where: {
-        issuedAt: { gte: range.from, lte: range.to },
-        status: { not: 'void' },
-      },
-      _sum: { totalAmount: true },
-    });
-    return rows.map((row) => ({
-      status: row.status,
-      amount: Number(row._sum.totalAmount ?? 0),
-    }));
+    return this.revenue.revenueByStatus(range);
   }
 
-  /** Sum of collected amounts (amountPaid) within a range (paidAt). */
+  /** Sum of successful captured payments within a range. */
   async collectedRevenue(range: DateRange): Promise<number> {
-    const agg = await this.db.invoice.aggregate({
-      where: { paidAt: { gte: range.from, lte: range.to } },
-      _sum: { amountPaid: true },
-    });
-    return Number(agg._sum.amountPaid ?? 0);
+    return this.revenue.collectedRevenue(range);
   }
 
   /** Daily invoiced revenue series within a range. */
   async invoicedSeries(range: DateRange): Promise<RevenueSeriesPoint[]> {
-    const rows = await this.db.invoice.findMany({
-      where: {
-        issuedAt: { gte: range.from, lte: range.to },
-        status: { not: 'void' },
-      },
-      select: { issuedAt: true, totalAmount: true },
-      orderBy: { issuedAt: 'asc' },
-    });
-
-    return collapseToDay(
-      rows,
-      (row) => row.issuedAt,
-      (row) => Number(row.totalAmount),
-    );
+    return this.revenue.invoicedSeries(range);
   }
 
   /** Daily collected revenue series within a range (paidAt). */
   async collectedSeries(range: DateRange): Promise<RevenueSeriesPoint[]> {
-    const rows = await this.db.invoice.findMany({
-      where: { paidAt: { gte: range.from, lte: range.to } },
-      select: { paidAt: true, amountPaid: true },
-      orderBy: { paidAt: 'asc' },
-    });
-
-    return collapseToDay(
-      rows,
-      (row) => row.paidAt,
-      (row) => Number(row.amountPaid),
-    );
+    return this.revenue.collectedSeries(range);
   }
 
   /** Sum of refunds created within a range. */
   async refundsIn(range: DateRange): Promise<number> {
-    const agg = await this.db.refund.aggregate({
-      where: { createdAt: { gte: range.from, lte: range.to } },
-      _sum: { amount: true },
-    });
-    return Number(agg._sum.amount ?? 0);
+    return this.revenue.refundsIn(range);
   }
 
   // -------------------------------------------------------------------------
@@ -135,18 +99,21 @@ export class AnalyticsRepository {
   }
 
   /** Counts for the quote → invoice → paid conversion funnel. */
-  async conversionFunnel(): Promise<ConversionFunnelRow> {
+  async conversionFunnel(range?: DateRange): Promise<ConversionFunnelRow> {
+    const quoteRange = range ? { createdAt: { gte: range.from, lte: range.to } } : {};
     const [quotes, accepted, invoiced, paid] = await Promise.all([
-      this.db.quote.count({ where: { status: { not: 'draft' } } }),
-      this.db.quote.count({ where: { status: 'accepted' } }),
+      this.db.quote.count({ where: { ...quoteRange, status: { not: 'draft' } } }),
+      this.db.quote.count({ where: { ...quoteRange, status: 'accepted' } }),
       this.db.quote.count({
         where: {
+          ...quoteRange,
           status: 'accepted',
           invoices: { some: { status: { not: 'void' } } },
         },
       }),
       this.db.quote.count({
         where: {
+          ...quoteRange,
           status: 'accepted',
           invoices: { some: { status: 'paid' } },
         },
@@ -162,8 +129,13 @@ export class AnalyticsRepository {
   }
 
   /** Count of deals by status (won/lost). */
-  async dealCountByStatus(status: 'won' | 'lost'): Promise<number> {
-    return this.db.deal.count({ where: { status } });
+  async dealCountByStatus(status: 'won' | 'lost', range?: DateRange): Promise<number> {
+    return this.db.deal.count({
+      where: {
+        status,
+        ...(range ? { updatedAt: { gte: range.from, lte: range.to } } : {}),
+      },
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -184,8 +156,10 @@ export class AnalyticsRepository {
 
   /** Contacts created within a range. */
   async contactsCreatedIn(range: DateRange): Promise<number> {
+    const matureBy = new Date(range.to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (matureBy < range.from) return 0;
     return this.db.contact.count({
-      where: { createdAt: { gte: range.from, lte: range.to } },
+      where: { createdAt: { gte: range.from, lte: matureBy } },
     });
   }
 
@@ -195,35 +169,29 @@ export class AnalyticsRepository {
    * behavioural retention measure rather than a lifecycle-field guess.
    */
   async activeCreatedContactsIn(range: DateRange): Promise<number> {
+    const matureBy = new Date(range.to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (matureBy < range.from) return 0;
     const contacts = await this.db.contact.findMany({
-      where: { createdAt: { gte: range.from, lte: range.to } },
+      where: { createdAt: { gte: range.from, lte: matureBy } },
       select: {
         id: true,
         createdAt: true,
-        appointments: {
-          where: { createdAt: { gt: range.to } },
-          select: { id: true },
-          take: 1,
-        },
-        invoices: {
-          where: { createdAt: { gt: range.to } },
-          select: { id: true },
-          take: 1,
-        },
-        conversations: {
-          where: { lastMessageAt: { gt: range.to } },
-          select: { id: true },
-          take: 1,
-        },
+        appointments: { select: { createdAt: true } },
+        invoices: { select: { createdAt: true } },
+        conversations: { select: { lastMessageAt: true } },
       },
     });
 
-    return contacts.filter(
-      (contact) =>
-        contact.appointments.length > 0 ||
-        contact.invoices.length > 0 ||
-        contact.conversations.length > 0,
-    ).length;
+    return contacts.filter((contact) => {
+      const threshold = contact.createdAt.getTime() + 30 * 24 * 60 * 60 * 1000;
+      return (
+        contact.appointments.some((row) => row.createdAt.getTime() >= threshold) ||
+        contact.invoices.some((row) => row.createdAt.getTime() >= threshold) ||
+        contact.conversations.some(
+          (row) => row.lastMessageAt !== null && row.lastMessageAt.getTime() >= threshold,
+        )
+      );
+    }).length;
   }
 
   // -------------------------------------------------------------------------
@@ -255,100 +223,7 @@ export class AnalyticsRepository {
 
   /** Conversation + escalation + assignee workload + first-response time. */
   async performance(range: DateRange): Promise<PerformanceRow> {
-    const [conversations, escalated, assigneeRows, responseTimeSeconds] =
-      await Promise.all([
-        this.db.conversation.count({
-          where: { createdAt: { gte: range.from, lte: range.to } },
-        }),
-        this.db.conversation.count({
-          where: {
-            createdAt: { gte: range.from, lte: range.to },
-            isEscalated: true,
-          },
-        }),
-        this.db.conversation.groupBy({
-          by: ['assigneeId'],
-          where: { createdAt: { gte: range.from, lte: range.to } },
-          _count: { _all: true },
-          orderBy: { _count: { assigneeId: 'desc' } },
-        }),
-        this.averageResponseTimeSeconds(range),
-      ]);
-
-    // Resolve assignee names (groupBy cannot include the relation).
-    const userIds = assigneeRows
-      .map((row) => row.assigneeId)
-      .filter((id): id is string => id !== null);
-    const users =
-      userIds.length > 0
-        ? await this.db.user.findMany({
-            where: { id: { in: userIds } },
-            select: { id: true, name: true },
-          })
-        : [];
-    const nameById = new Map(users.map((user) => [user.id, user.name]));
-
-    const assignedConversations = assigneeRows.map((row) => ({
-      assigneeName: row.assigneeId
-        ? (nameById.get(row.assigneeId) ?? 'Unassigned')
-        : 'Unassigned',
-      count: row._count._all,
-    }));
-
-    return {
-      conversations,
-      escalated,
-      assignedConversations,
-      responseTimeSeconds,
-    };
-  }
-
-  /** Average first-response time in seconds for conversations in the range. */
-  private async averageResponseTimeSeconds(range: DateRange): Promise<number | null> {
-    const conversations = await this.db.conversation.findMany({
-      where: {
-        createdAt: { gte: range.from, lte: range.to },
-        messages: { some: { direction: 'inbound' } },
-      },
-      select: {
-        id: true,
-        messages: {
-          where: { direction: 'inbound' },
-          orderBy: { createdAt: 'asc' },
-          take: 1,
-          select: { createdAt: true },
-        },
-      },
-    });
-
-    if (conversations.length === 0) return null;
-
-    let totalSeconds = 0;
-    let measured = 0;
-
-    for (const conversation of conversations) {
-      const firstInbound = conversation.messages[0];
-      if (!firstInbound) continue;
-
-      const firstOutbound = await this.db.message.findFirst({
-        where: {
-          conversationId: conversation.id,
-          direction: 'outbound',
-        },
-        orderBy: { createdAt: 'asc' },
-        select: { createdAt: true },
-      });
-
-      if (!firstOutbound) continue;
-
-      const gapMs = firstOutbound.createdAt.getTime() - firstInbound.createdAt.getTime();
-      if (gapMs < 0) continue;
-
-      totalSeconds += gapMs / 1000;
-      measured += 1;
-    }
-
-    return measured === 0 ? null : totalSeconds / measured;
+    return this.performanceReads.performance(range);
   }
 
   // -------------------------------------------------------------------------
@@ -357,12 +232,7 @@ export class AnalyticsRepository {
 
   /** Campaign recipients grouped by delivery status within a range. */
   async campaignDeliveries(range: DateRange): Promise<CampaignDeliveryRow[]> {
-    const rows = await this.db.campaignRecipient.groupBy({
-      by: ['status'],
-      where: { createdAt: { gte: range.from, lte: range.to } },
-      _count: { _all: true },
-    });
-    return rows.map((row) => ({ status: row.status, count: row._count._all }));
+    return this.performanceReads.campaignDeliveries(range);
   }
 
   // -------------------------------------------------------------------------
@@ -415,23 +285,4 @@ export class AnalyticsRepository {
       .map(([month, amount]) => ({ month, amount }))
       .sort((a, b) => a.month.localeCompare(b.month));
   }
-}
-
-/** Collapses rows with a nullable date + amount into daily totals. */
-function collapseToDay<T extends { [key: string]: unknown }>(
-  rows: T[],
-  dateOf: (row: T) => Date | null,
-  amountOf: (row: T) => number,
-): RevenueSeriesPoint[] {
-  const byDay = new Map<string, number>();
-  for (const row of rows) {
-    const date = dateOf(row);
-    if (!date) continue;
-    const key = date.toISOString().slice(0, 10);
-    byDay.set(key, (byDay.get(key) ?? 0) + amountOf(row));
-  }
-
-  return [...byDay.entries()]
-    .map(([date, amount]) => ({ date: new Date(`${date}T00:00:00Z`), amount }))
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
 }

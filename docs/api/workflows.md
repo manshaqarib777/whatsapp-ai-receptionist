@@ -46,7 +46,8 @@ Node types: `trigger | condition | action | delay`. Action kinds:
 The server validates the graph before saving (`validateGraph`): node ids must be
 unique, every edge must reference known nodes, a condition node must have
 exactly two outgoing edges labelled `true` and `false`, branch labels may only
-appear on condition edges, and variable names must be non-empty and unique. An
+appear on condition edges, exactly one trigger is required, non-condition nodes
+have at most one outgoing edge, and variable names must be non-empty and unique. An
 invalid graph is a **409**, never a saved half-graph.
 
 ## Workflows
@@ -110,6 +111,12 @@ Versions are never mutated after creation — each save increments
 
 Response (201): `{ data: { version } }`.
 
+### `POST /api/workflows/[id]/clone`
+
+Creates a disabled workflow with version 1 copied from the source workflow's
+current immutable definition. Body: `{ "name": "Welcome template copy" }`.
+The source must have a saved version. Response (201): `{ data: { workflow } }`.
+
 ## Runs
 
 ### `POST /api/workflows/[id]/runs`
@@ -117,10 +124,16 @@ Response (201): `{ data: { version } }`.
 Starts a manual (test) run against the current version. Requires
 `workflow:write`. A workflow with no saved version cannot run (409).
 
-The run walks the graph from the trigger along the true path: condition nodes
-take their `true` branch, action nodes succeed, and delay nodes land `pending`
+Optional body: `{ "variables": { "leadScore": 75, "vip": true } }`.
+Supplied variables override defaults stored in the definition. Conditions use
+`equals`, `not_equals`, `contains`, `greater_than`, or `exists` and follow the
+matching labelled branch. Action nodes succeed, and delay nodes land `pending`
 with a `scheduledFor` set from `config.delaySeconds` (default 1 hour). One
 `WorkflowRunStep` row is written per executed node.
+
+Runs without a delay finish immediately. Runs with a delay remain `running`;
+`npm run workflow:work` atomically claims due steps, reloads persisted run
+context, resumes the selected graph path, and records success or failure.
 
 Response (201): `{ data: { run, steps } }` — `steps` are `{ nodeId, status }`
 in execution order.

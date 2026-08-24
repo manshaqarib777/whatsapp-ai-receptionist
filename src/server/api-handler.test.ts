@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ConflictError, NotFoundError, RateLimitError } from '@/lib/errors';
-import { CORRELATION_ID_HEADER, withApiHandler } from '@/server/api-handler';
+import {
+  CORRELATION_ID_HEADER,
+  TRACEPARENT_HEADER,
+  withApiHandler,
+} from '@/server/api-handler';
 
 /**
  * The handler wrapper is the single place errors become responses. If it leaks a
@@ -45,6 +49,19 @@ describe('withApiHandler', () => {
     const response = await handler(request({ [CORRELATION_ID_HEADER]: 'trace-abc' }));
 
     expect(response.headers.get(CORRELATION_ID_HEADER)).toBe('trace-abc');
+  });
+
+  it('continues valid W3C trace context without reflecting the caller span', async () => {
+    const incoming = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+    const handler = withApiHandler('GET /api/test', async (_request, context) => {
+      expect(context.trace.traceId).toBe('4bf92f3577b34da6a3ce929d0e0e4736');
+      return NextResponse.json({ data: null });
+    });
+
+    const response = await handler(request({ [TRACEPARENT_HEADER]: incoming }));
+    expect(response.headers.get(TRACEPARENT_HEADER)).toMatch(
+      /^00-4bf92f3577b34da6a3ce929d0e0e4736-(?!00f067aa0ba902b7)[0-9a-f]{16}-01$/,
+    );
   });
 
   it('maps a domain error to its documented status and envelope', async () => {

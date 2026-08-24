@@ -58,14 +58,17 @@ function formatDate(date: Date | null): string {
  */
 export function renderQuotePdf(
   quote: QuoteRow,
-  branding?: { footer?: string | null } | null,
+  branding?: {
+    footer?: string | null;
+    colors?: Record<string, string> | null;
+  } | null,
 ): Buffer {
   const pages: string[][] = [[]];
   let y = MARGIN;
   const currentPage = () => pages[pages.length - 1] as string[];
   const push = (line: string) => currentPage().push(line);
 
-  const headerColor = '0.18 0.35 0.62';
+  const headerColor = pdfColor(branding?.colors?.['primary']) ?? '0.18 0.35 0.62';
   const muted = '0.45 0.45 0.45';
 
   // Header
@@ -140,6 +143,7 @@ export function renderQuotePdf(
 /** Serialises content pages into a valid PDF 1.4 document with xref. */
 function buildPdf(pages: string[][]): Buffer {
   const objects: { stream?: string; dict: Record<string, PdfPrimitive> }[] = [];
+  const fontObjectId = 3 + pages.length * 2;
 
   // Object 1: Catalog
   objects.push({ dict: { Type: '/Catalog', Pages: '2 0 R' } });
@@ -160,7 +164,7 @@ function buildPdf(pages: string[][]): Buffer {
         Parent: '2 0 R',
         MediaBox: `[0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}]`,
         Contents: `${objects.length + 2} 0 R`,
-        Resources: `<< /Font << /F1 4 0 R >> >>`,
+        Resources: `<< /Font << /F1 ${fontObjectId} 0 R >> >>`,
       },
     });
     // Content stream
@@ -169,15 +173,14 @@ function buildPdf(pages: string[][]): Buffer {
   }
 
   // Font object (always after all pages, referenced as 4 0 R above)
-  const fontObjectIndex = 3 + pages.length * 2 + 1;
-  objects[fontObjectIndex - 1] = {
+  objects.push({
     dict: {
       Type: '/Font',
       Subtype: '/Type1',
       BaseFont: '/Helvetica',
       Encoding: '/WinAnsiEncoding',
     },
-  };
+  });
 
   let pdf = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
   const offsets: number[] = [];
@@ -199,6 +202,17 @@ function buildPdf(pages: string[][]): Buffer {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
 
   return Buffer.from(pdf, 'latin1');
+}
+
+function pdfColor(value: string | undefined): string | null {
+  const match = value?.match(/^#([0-9a-f]{6})$/i);
+  if (!match) return null;
+  const hex = match[1] ?? '';
+  return [0, 2, 4]
+    .map((offset) =>
+      (Number.parseInt(hex.slice(offset, offset + 2), 16) / 255).toFixed(3),
+    )
+    .join(' ');
 }
 
 function serializeDict(dict: Record<string, PdfPrimitive>): string {

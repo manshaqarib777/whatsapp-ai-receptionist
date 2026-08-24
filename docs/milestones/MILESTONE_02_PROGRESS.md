@@ -1,11 +1,34 @@
 # Milestone 2 — Progress
 
-Status: Complete
+Status: Repair complete
 Started: 2026-08-01
 Completed: 2026-08-01
-Last updated: 2026-08-01
+Last updated: 2026-08-23
 
-See [`MILESTONE_02_COMPLETED.md`](MILESTONE_02_COMPLETED.md) for the final report.
+The 2026-08-01 completion report is retained as the historical claim. A structural
+audit on 2026-08-23 reopened the milestone because that claim conflicts with the plan
+and the current implementation.
+
+## 2026-08-23 Repair Checklist
+
+- [x] Compare the PRD, plan, progress, completion report, implementation, and tests
+- [x] Confirm invitation API and acceptance UI are absent
+- [x] Confirm session-management UI is absent
+- [x] Confirm progressive lockout is absent
+- [x] Confirm auth services and auth context directly access Prisma
+- [x] Introduce repositories and restore controller → service → repository layering
+- [x] Atomically create the default branch with an organization
+- [x] Add invitation API, UI, acceptance flow, and tests
+- [x] Add session list/revocation UI and tests
+- [x] Add progressive lockout and auth-event audit tests
+- [x] Add strict audit-log query validation
+- [x] Replace deprecated middleware convention with Next.js 16 proxy convention
+- [x] Run unit, integration, component, E2E, type, lint, format, build, audit, and drift gates
+- [x] Amend the completion report with measured evidence
+
+Repair completed: 2026-08-23. OAuth redirect verification remains credential-dependent;
+preview deployment remains assigned to Milestone 25. Neither is represented as locally
+exercised.
 
 ---
 

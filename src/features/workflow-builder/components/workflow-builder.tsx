@@ -5,10 +5,9 @@ import { useState } from 'react';
 import { EmptyState, ErrorState, LoadingState } from '@/components/states';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 import {
+  useCloneWorkflow,
   useCreateRun,
   useSaveVersion,
   useWorkflow,
@@ -21,6 +20,7 @@ import {
 } from '@/features/workflow-builder/services/graph';
 
 import { WorkflowRuns } from './workflow-runs';
+import { WorkflowNodeCard } from './workflow-node-card';
 
 /**
  * Workflow builder (M13) — the visual graph editor.
@@ -90,6 +90,7 @@ function WorkflowEditor({
 }) {
   const save = useSaveVersion();
   const run = useCreateRun();
+  const clone = useCloneWorkflow();
 
   const [definition, setDefinition] = useState<WorkflowDefinition>(initialDefinition);
   const [saved, setSaved] = useState(false);
@@ -145,6 +146,14 @@ function WorkflowEditor({
           <Button
             variant="outline"
             size="sm"
+            disabled={versionNumber === 0 || clone.isPending}
+            onClick={() => clone.mutate({ id: workflowId, name: `${workflowName} copy` })}
+          >
+            {clone.isPending ? 'Copying…' : 'Use as template'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             disabled={run.isPending}
             onClick={() => run.mutate(workflowId)}
           >
@@ -187,7 +196,7 @@ function WorkflowEditor({
 
       <ol className="mt-4 space-y-3">
         {definition.nodes.map((node, index) => (
-          <NodeCard
+          <WorkflowNodeCard
             key={node.id}
             node={node}
             index={index}
@@ -209,114 +218,5 @@ function WorkflowEditor({
         </p>
       ) : null}
     </section>
-  );
-}
-
-function NodeCard({
-  node,
-  index,
-  onRemove,
-  onChange,
-}: {
-  node: WorkflowNode;
-  index: number;
-  onRemove: () => void;
-  onChange: (next: WorkflowNode) => void;
-}) {
-  return (
-    <li className="border-input flex flex-col gap-2 rounded-lg border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">{index + 1}.</span>
-          <Badge variant="outline">{node.type}</Badge>
-          {node.actionKind ? <Badge variant="secondary">{node.actionKind}</Badge> : null}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onRemove}
-          aria-label={`Remove ${node.type} node`}
-        >
-          Remove
-        </Button>
-      </div>
-
-      {node.type === 'action' ? (
-        <div className="space-y-1.5">
-          <Label htmlFor={`${node.id}-kind`}>Action</Label>
-          <select
-            id={`${node.id}-kind`}
-            className="border-input bg-background h-8 w-full rounded-md border px-2 text-sm"
-            value={node.actionKind ?? 'send_message'}
-            onChange={(event) =>
-              onChange({
-                ...node,
-                actionKind: event.target.value as WorkflowNode['actionKind'],
-              })
-            }
-          >
-            <option value="send_message">Send message</option>
-            <option value="tag">Add tag</option>
-            <option value="assign">Assign</option>
-            <option value="create_task">Create task</option>
-          </select>
-          {node.actionKind === 'send_message' ? (
-            <div className="space-y-1.5">
-              <Label htmlFor={`${node.id}-text`}>Message text</Label>
-              <Input
-                id={`${node.id}-text`}
-                defaultValue={(node.config['text'] as string) ?? ''}
-                onBlur={(event) =>
-                  onChange({
-                    ...node,
-                    config: { ...node.config, text: event.target.value },
-                  })
-                }
-              />
-            </div>
-          ) : null}
-          {node.actionKind === 'tag' ? (
-            <div className="space-y-1.5">
-              <Label htmlFor={`${node.id}-tag`}>Tag name</Label>
-              <Input
-                id={`${node.id}-tag`}
-                defaultValue={(node.config['tagName'] as string) ?? ''}
-                onBlur={(event) =>
-                  onChange({
-                    ...node,
-                    config: { ...node.config, tagName: event.target.value },
-                  })
-                }
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {node.type === 'delay' ? (
-        <div className="space-y-1.5">
-          <Label htmlFor={`${node.id}-delay`}>Delay (seconds)</Label>
-          <Input
-            id={`${node.id}-delay`}
-            type="number"
-            min={1}
-            defaultValue={(node.config['delaySeconds'] as number) ?? 3600}
-            onBlur={(event) =>
-              onChange({
-                ...node,
-                config: { ...node.config, delaySeconds: Number(event.target.value) },
-              })
-            }
-          />
-        </div>
-      ) : null}
-
-      {node.type === 'condition' ? (
-        <p className="text-muted-foreground text-xs">
-          A condition branches on its true/false edges. The builder follows the true path
-          in test runs.
-        </p>
-      ) : null}
-    </li>
   );
 }

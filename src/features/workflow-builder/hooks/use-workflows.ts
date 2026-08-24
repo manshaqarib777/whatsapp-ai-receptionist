@@ -99,6 +99,19 @@ export function useCreateWorkflow() {
   });
 }
 
+export function useCloneWorkflow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; name: string }) =>
+      sendJson<{ workflow: WorkflowRow }>(`/api/workflows/${input.id}/clone`, 'POST', {
+        name: input.name,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: workflowKeys.list() });
+    },
+  });
+}
+
 export function useUpdateWorkflow() {
   const queryClient = useQueryClient();
   return useMutation({

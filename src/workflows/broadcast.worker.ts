@@ -1,5 +1,6 @@
 import { logger } from '@/lib/logger';
 import { BroadcastService } from '@/features/broadcast/services/broadcast.service';
+import { listOrganizationIds } from '@/lib/db/system-discovery.repository';
 
 /**
  * Broadcast send worker — Milestone 14 (AD-4).
@@ -17,11 +18,8 @@ import { BroadcastService } from '@/features/broadcast/services/broadcast.servic
 const POLL_INTERVAL_MS = 30_000;
 
 export async function processDueBroadcastCampaigns(): Promise<number> {
-  const { prisma } = await import('@/lib/prisma');
-  const organizations = await prisma.organization.findMany({ select: { id: true } });
-
   let processed = 0;
-  for (const { id: organizationId } of organizations) {
+  for (const organizationId of await listOrganizationIds()) {
     const service = BroadcastService.forOrganization(organizationId);
     processed += await service.processDueCampaigns();
   }

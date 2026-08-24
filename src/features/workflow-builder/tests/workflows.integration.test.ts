@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 import { WorkflowsService } from '@/features/workflow-builder/services/workflows.service';
+import { processDueWorkflowStep } from '@/workflows/workflow-delay.worker';
 import { ConflictError, UnprocessableError } from '@/lib/errors';
 import type { WorkflowDefinition } from '@/features/workflow-builder/services/graph';
 
@@ -157,6 +158,27 @@ describe('workflows — versions', () => {
     expect(v1.id).not.toBe(v2.id);
   });
 
+  it('creates a reusable copy from the current definition', async () => {
+    const service = serviceFor(f.orgA);
+    const source = await service.createWorkflow({ name: 'Source' });
+    await service.saveVersion({
+      workflowId: source.id,
+      definition: simpleGraph(),
+      triggerKind: 'message_received',
+    });
+
+    const copy = await service.cloneWorkflow(source.id, { name: 'From template' });
+    expect(copy.name).toBe('From template');
+    expect(copy.isEnabled).toBe(false);
+    const versions = await service.listVersions(copy.id);
+    expect(versions).toHaveLength(1);
+    expect(versions[0]).toMatchObject({
+      versionNumber: 1,
+      triggerKind: 'message_received',
+      definition: simpleGraph(),
+    });
+  });
+
   it('refuses an invalid graph with 409', async () => {
     const service = serviceFor(f.orgA);
     const workflow = await service.createWorkflow({ name: 'F' });
@@ -256,7 +278,7 @@ describe('workflows — runs', () => {
     });
 
     const { run, steps } = await service.createRun({ workflowId: workflow.id });
-    expect(run.status).toBe('succeeded');
+    expect(run.status).toBe('running');
 
     const delayStep = steps.find((step) => step.nodeId === 'delay');
     expect(delayStep?.status).toBe('pending');
@@ -266,6 +288,17 @@ describe('workflows — runs', () => {
       select: { scheduledFor: true },
     });
     expect(row?.scheduledFor).not.toBeNull();
+
+    await prisma.workflowRunStep.updateMany({
+      where: { workflowRunId: run.id, nodeId: 'delay' },
+      data: { scheduledFor: new Date(Date.now() - 1_000) },
+    });
+    await expect(processDueWorkflowStep()).resolves.toBe(true);
+    await expect(service.listRuns(workflow.id)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: run.id, status: 'succeeded' }),
+      ]),
+    );
   });
 
   it('org A never sees org B runs', async () => {

@@ -1,6 +1,6 @@
 # Milestone 11 — Completed
 
-Completed: 2026-08-14
+Completed: 2026-08-14; re-certified 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 11`
 
 ---
@@ -118,6 +118,15 @@ the non-negotiable — org B never sees org A's quotes.
   image embedding is a later milestone.
 - **`?download=1`** — documented on the PDF route; the UI opens inline.
 
+### Re-certification additions (2026-08-23)
+
+- Fixed the PDF object graph: multi-page documents now reference the actual shared
+  font object rather than a content stream.
+- Template primary colors now affect PDF headings instead of being stored and ignored.
+- Enforced the documented lifecycle rule that only a draft can be sent.
+- Re-ran 26 focused tests, static gates, drift, production build, and 10
+  desktop/mobile E2E checks including PDF download and axe.
+
 ---
 
 ## Performance
@@ -137,8 +146,8 @@ time, so there is no per-read money math beyond formatting.
    a draft (revise before sending) is API-only until a later milestone.
 3. **Templates are branch-scoped but not org-editable in bulk** — list + create
    today; rename/delete and applying at creation are later.
-4. **PDF is single-page-capped Helvetica text** — no embedded images, no logo, no
-   page-break reflow; branding colors and footer are supported.
+4. **PDF uses Helvetica text and automatic line-item page breaks** — embedded logo
+   images remain outside M11; branding colors and footer are supported.
 
 ---
 

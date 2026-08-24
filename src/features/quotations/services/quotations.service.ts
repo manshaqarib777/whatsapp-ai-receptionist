@@ -207,8 +207,8 @@ export class QuotationsService {
 
     switch (action) {
       case 'send': {
-        if (quote.status === 'sent' || quote.status === 'accepted') {
-          throw new ConflictError('This quote is already sent or accepted.');
+        if (quote.status !== 'draft') {
+          throw new ConflictError('Only a draft quote can be sent.');
         }
         const versionNumber = await this.repo.nextVersionNumber(id);
         await this.repo.createVersion(id, versionNumber, quote);

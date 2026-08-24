@@ -13,10 +13,12 @@ import { resolveScope } from '@/server/scope';
 export abstract class AppointmentsBaseRepository {
   protected readonly db: ReturnType<typeof forScope>;
   readonly organizationId: string;
+  readonly branchId: string | null;
 
   constructor(scope: Scope) {
     this.db = forScope(scope);
     this.organizationId = scope.organizationId;
+    this.branchId = scope.branchId;
   }
 
   /** Builds a repository from an organization id (org-level scope, all branches). */
@@ -33,6 +35,7 @@ export abstract class AppointmentsBaseRepository {
   }
 
   async resolveDefaultBranch(): Promise<string> {
+    if (this.branchId) return this.branchId;
     const branch = await this.db.branch.findFirst({
       where: { isDefault: true },
       select: { id: true },

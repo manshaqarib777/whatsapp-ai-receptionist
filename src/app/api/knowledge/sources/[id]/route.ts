@@ -1,4 +1,4 @@
-import { requireOrg } from '@/server/auth-context';
+import { requireBranch } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { KnowledgeService } from '@/features/knowledge/services/knowledge.service';
 
@@ -13,9 +13,9 @@ type Params = { id: string };
 export const GET = withApiHandler(
   'GET /api/knowledge/sources/[id]',
   async (_request, { correlationId }, routeParams: RouteParams<Params>) => {
-    const { organizationId } = await requireOrg();
+    const { organizationId, branchId } = await requireBranch();
     const { id } = await routeParams.params;
-    const service = KnowledgeService.forOrganization(organizationId);
+    const service = KnowledgeService.forScope({ organizationId, branchId });
     const source = await service.getSource(id);
     return jsonSuccess({ source }, { correlationId });
   },

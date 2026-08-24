@@ -2,7 +2,7 @@
 
 Created: 2026-08-14
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 12`
-Status: Draft for approval
+Status: Approved implementation complete; external gateway rollout remains M19
 
 ---
 

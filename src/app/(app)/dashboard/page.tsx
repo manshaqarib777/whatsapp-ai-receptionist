@@ -7,6 +7,7 @@ import { RangePicker } from '@/features/dashboard/components/range-picker';
 import { RecentConversations } from '@/features/dashboard/components/recent-conversations';
 import { RevenueChart } from '@/features/dashboard/components/revenue-chart';
 import { UpcomingAppointments } from '@/features/dashboard/components/upcoming-appointments';
+import { DashboardWidgetBoundary } from '@/features/dashboard/components/dashboard-widget-boundary';
 import { greetingForHour } from '@/features/dashboard/lib/greeting';
 import { parseDashboardRange, rangeToDates } from '@/features/dashboard/lib/range';
 import {
@@ -68,64 +69,76 @@ export default async function DashboardPage() {
         <RangePicker value={rangeValue} />
       </div>
 
-      <Suspense fallback={<KpiGridSkeleton />}>
-        <KpiSection organizationId={organizationId} range={range} />
-      </Suspense>
+      <DashboardWidgetBoundary title="Dashboard statistics">
+        <Suspense fallback={<KpiGridSkeleton />}>
+          <KpiSection organizationId={organizationId} range={range} />
+        </Suspense>
+      </DashboardWidgetBoundary>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <DashboardWidgetBoundary title="Conversations over time">
+          <Suspense
+            fallback={
+              <CardSkeleton
+                title="Conversations over time"
+                description="Loading conversations…"
+              />
+            }
+          >
+            <div className="lg:col-span-2">
+              <ConversationsSection
+                organizationId={organizationId}
+                range={range}
+                rangeValue={rangeValue}
+              />
+            </div>
+          </Suspense>
+        </DashboardWidgetBoundary>
+
+        <DashboardWidgetBoundary title="Activity">
+          <Suspense
+            fallback={<CardSkeleton title="Activity" description="Loading activity…" />}
+          >
+            <ActivitySection organizationId={organizationId} />
+          </Suspense>
+        </DashboardWidgetBoundary>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DashboardWidgetBoundary title="Upcoming appointments">
+          <Suspense
+            fallback={
+              <CardSkeleton
+                title="Upcoming appointments"
+                description="Loading appointments…"
+              />
+            }
+          >
+            <AppointmentsSection organizationId={organizationId} />
+          </Suspense>
+        </DashboardWidgetBoundary>
+
+        <DashboardWidgetBoundary title="Revenue">
+          <Suspense
+            fallback={<CardSkeleton title="Revenue" description="Loading revenue…" />}
+          >
+            <RevenueSection organizationId={organizationId} range={range} />
+          </Suspense>
+        </DashboardWidgetBoundary>
+      </div>
+
+      <DashboardWidgetBoundary title="Recent conversations">
         <Suspense
           fallback={
             <CardSkeleton
-              title="Conversations over time"
+              title="Recent conversations"
               description="Loading conversations…"
             />
           }
         >
-          <div className="lg:col-span-2">
-            <ConversationsSection
-              organizationId={organizationId}
-              range={range}
-              rangeValue={rangeValue}
-            />
-          </div>
+          <RecentConversationsSection organizationId={organizationId} />
         </Suspense>
-
-        <Suspense
-          fallback={<CardSkeleton title="Activity" description="Loading activity…" />}
-        >
-          <ActivitySection organizationId={organizationId} />
-        </Suspense>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Suspense
-          fallback={
-            <CardSkeleton
-              title="Upcoming appointments"
-              description="Loading appointments…"
-            />
-          }
-        >
-          <AppointmentsSection organizationId={organizationId} />
-        </Suspense>
-
-        <Suspense
-          fallback={<CardSkeleton title="Revenue" description="Loading revenue…" />}
-        >
-          <RevenueSection organizationId={organizationId} range={range} />
-        </Suspense>
-      </div>
-
-      <Suspense
-        fallback={
-          <CardSkeleton
-            title="Recent conversations"
-            description="Loading conversations…"
-          />
-        }
-      >
-        <RecentConversationsSection organizationId={organizationId} />
-      </Suspense>
+      </DashboardWidgetBoundary>
     </div>
   );
 }

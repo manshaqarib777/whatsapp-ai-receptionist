@@ -51,6 +51,12 @@ describe('platform seam', () => {
     const adapter = new UnconfiguredPlatform('google');
     expect(adapter.configured).toBe(false);
   });
+
+  it('unconfigured adapters fail loudly on fetch and webhook verification', async () => {
+    const adapter = new UnconfiguredPlatform('facebook');
+    await expect(adapter.fetchReviews()).rejects.toThrow(/not configured/i);
+    expect(() => adapter.verifyWebhook()).toThrow(/not configured/i);
+  });
 });
 
 describe('automation constants', () => {

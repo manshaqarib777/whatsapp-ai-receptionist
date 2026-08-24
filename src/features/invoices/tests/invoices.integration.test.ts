@@ -402,4 +402,25 @@ describe('invoices integration', () => {
     // Org B cannot read org A's invoice by id.
     await expect(serviceB.getInvoice(invoice.id)).rejects.toThrow();
   });
+
+  it('records an auditable succeeded payment for manual settlement', async () => {
+    const service = serviceFor(f.orgA);
+    const invoice = await service.createInvoice({
+      contactId: f.contactId,
+      lineItems: LINES,
+    });
+    await service.transition(invoice.id, 'issue');
+
+    const paid = await service.transition(invoice.id, 'mark_paid');
+    const payments = await service.listPayments(invoice.id);
+
+    expect(paid.status).toBe('paid');
+    expect(paid.amountPaid).toBeCloseTo(invoice.totalAmount, 4);
+    expect(payments).toHaveLength(1);
+    expect(payments[0]).toMatchObject({
+      gateway: 'manual',
+      status: 'succeeded',
+      amount: invoice.totalAmount,
+    });
+  });
 });

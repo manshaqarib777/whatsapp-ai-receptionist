@@ -90,8 +90,8 @@ export class StripePaymentAdapter implements PaymentGatewayAdapter {
           quantity: 1,
         },
       ],
-      success_url: `${env.NEXT_PUBLIC_APP_URL}/invoices/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.NEXT_PUBLIC_APP_URL}/invoices`,
+      success_url: `${env.APP_URL ?? env.NEXT_PUBLIC_APP_URL}/invoices/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${env.APP_URL ?? env.NEXT_PUBLIC_APP_URL}/invoices`,
       metadata: { invoiceNumber: input.invoice.number },
     });
     return { checkoutUrl: session.url, gatewayPaymentId: session.id };

@@ -1,10 +1,21 @@
 # Milestone 7 — Progress
 
-Status: Complete
+Status: Complete — structurally re-certified 2026-08-23
 Started: 2026-08-12
-Last updated: 2026-08-13
+Last updated: 2026-08-23
 
 Plan: `MILESTONE_07_PLAN.md` (approved 2026-08-12).
+
+## 2026-08-23 Sequential Review
+
+- [x] Rechecked ingestion, parsing/OCR, chunking, embeddings, job claiming, lifecycle,
+      raw-SQL tenant predicates, retrieval approval gate, UI/API, tests, and limitations.
+- [x] Closed redirect-based SSRF bypass, capped redirects, streamed the 2 MB limit,
+      and added a private-redirect regression test.
+- [x] Made approval/current promotion one scoped transaction and split ingestion into
+      a dedicated service (293/71 lines).
+- [x] Current evidence: knowledge tests 53/53, E2E 10/10 desktop/mobile, typecheck/lint
+      clean, production build successful, drift limited to documented indexes.
 
 ## Completed Tasks
 

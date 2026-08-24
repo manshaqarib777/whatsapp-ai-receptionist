@@ -2,6 +2,8 @@ import { requireOrg, requirePermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { InboxService } from '@/features/inbox/services/inbox.service';
 import { updateConversationSchema } from '@/features/inbox/validators/inbox.validators';
+import * as organizationService from '@/features/auth/services/organization.service';
+import { NotFoundError } from '@/lib/errors';
 
 /**
  * GET  /api/inbox/conversations/[id] — the full thread (conversation, messages,
@@ -39,6 +41,13 @@ export const PATCH = withApiHandler(
 
     if (input.assigneeId !== undefined && input.assigneeId !== user.id) {
       await requirePermission('conversation:assign');
+    }
+
+    if (input.assigneeId) {
+      const members = await organizationService.listMembers(organizationId);
+      if (!members.some((member) => member.userId === input.assigneeId)) {
+        throw new NotFoundError('Organization member not found.');
+      }
     }
 
     const service = InboxService.forOrganization(organizationId);

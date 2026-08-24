@@ -41,14 +41,8 @@ async function seedQuoteOrg(email: string, organizationId: string): Promise<Seed
   const client = new PrismaClient({ adapter });
 
   try {
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -196,31 +190,23 @@ test.describe('quotes', () => {
   test('creates a quote from the dialog', async ({ page }) => {
     const seeded = await openQuotes(page);
 
-    // Track the created quote so cleanup is deterministic even if the dialog
-    // create landed in the active org before the switch settled.
     let createdQuoteId: string | null = null;
-    page.on('response', (response) => {
-      if (
-        response.url().includes('/api/quotes') &&
-        response.request().method() === 'POST'
-      ) {
-        void response
-          .json()
-          .then((payload) => {
-            const id = (payload as { data?: { quote?: { id?: string } } })?.data?.quote
-              ?.id;
-            if (id) createdQuoteId = id;
-          })
-          .catch(() => undefined);
-      }
-    });
 
     try {
       await page.getByRole('button', { name: 'New quote' }).click();
       await page.getByLabel('Contact id').fill(seeded.contactId);
       await page.getByLabel('Line 1 description').fill('E2E Scale and polish');
       await page.getByLabel('Line 1 unit price').fill('320');
+      const createdResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/quotes') &&
+          response.request().method() === 'POST',
+      );
       await page.getByRole('button', { name: 'Create quote' }).click();
+      const payload = (await (await createdResponse).json()) as {
+        data?: { quote?: { id?: string } };
+      };
+      createdQuoteId = payload.data?.quote?.id ?? null;
 
       // The created quote (320 SAR + 15% VAT = 368) appears in the list; the
       // seeded quote totals 1,150, so this assertion is unambiguous.

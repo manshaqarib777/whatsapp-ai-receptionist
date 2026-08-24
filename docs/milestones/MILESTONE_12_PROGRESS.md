@@ -1,8 +1,8 @@
 # Milestone 12 — Invoicing and Payments — Progress
 
-Status: In Progress → Completed
+Status: Core complete and re-certified 2026-08-23; four external adapters deferred to M19
 Started: 2026-08-14
-Last updated: 2026-08-15
+Last updated: 2026-08-23
 
 > **Batch decision**: Milestones 12–14 were executed as one approved batch
 > ("proceed on green"): sequential implementation, per-milestone exit gates,

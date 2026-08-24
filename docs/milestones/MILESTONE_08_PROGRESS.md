@@ -1,63 +1,60 @@
 # Milestone 8 — Progress
 
-Status: In Progress
+Status: Complete — re-certified 2026-08-23
 Started: 2026-08-13
-Last updated: 2026-08-13
+Completed: 2026-08-23
 
 Plan: `MILESTONE_08_PLAN.md` (approved 2026-08-13).
 
 ## Completed Tasks
 
-- [x] `MILESTONE_08_PLAN.md` written
-- [x] `src/lib/llm-gateway.ts` — LLM provider seam (openai + deterministic local)
-- [x] `src/lib/env.ts` — `LLM_PROVIDER`, `LLM_CLASSIFY_MODEL`, `LLM_REPLY_MODEL`
-- [x] `knowledge:read/write/approve` → added `ai:read/manage/run`,
-      `appointment:read/write`, `crm:read/write` permission matrix
-- [x] `src/features/ai/` — repository, classifier, memory, prompts, engine service
-- [x] Tool registry — knowledge lookup, availability proposal, booking proposal,
-      escalation (write tools confirmation-gated)
-- [x] API routes — `/api/ai/runs`, `/api/ai/templates`, template versions + activate
-- [x] `/ai` page — run log, template list, run-turn test surface
-- [x] AI seed — prompt templates (active versions) + demo runs
-- [x] Integration tests (7), unit tests (9), E2E (3)
-- [ ] Docs: `CHANGELOG.md`, `docs/api/ai.md`, `MILESTONE_08_COMPLETED.md`
+- [x] Provider gateway with deterministic local and OpenAI implementations
+- [x] Intent classification, windowed memory, versioned prompts, and authorized tools
+- [x] Retrieval-backed citations, confidence/refusal behavior, and human escalation
+- [x] Injection/hard-trigger detection, output sanitation, budgets, timeout, and retry
+- [x] Durable `ai_turn_jobs` queue carrying only a persisted inbound message reference
+- [x] Idempotent enqueue, bounded attempts, stale-claim recovery, and deterministic run ids
+- [x] Tenant-scoped job status API and `npm run ai:work` worker entry point
+- [x] Run/template UI, component accessibility coverage, and deterministic safety evals
+- [x] API, database, changelog, progress, and completion documentation
+- [x] Typecheck, lint, focused tests, schema drift, production build, and M8 E2E gates
 
-## Pending Tasks
+## Resolved Issues
 
-- [ ] `docs/api/ai.md`
-- [ ] `CHANGELOG.md` entry
-- [ ] `MILESTONE_08_COMPLETED.md`
-- [ ] Exit gate
-
-## Issues
-
-| # | Issue | Status | Resolution |
-|---|---|---|---|
-| 1 | `AiRun`/`PromptTemplate` are branch-scoped; `resolveScope` (branchId null) refused writes | Resolved | Repository derives a branch scope (`writeScope(branchId)`) for writes — the branch comes from the conversation or the org's default branch, never a request param |
-
-## Technical Decisions
-
-| Date | Decision | Rationale | Alternatives rejected |
-|---|---|---|---|
-| 2026-08-13 | LLM provider seam mirrors M7's embedding seam | Tests/CI run deterministic local provider; live provider behind `LLM_PROVIDER=openai` | Hardcoding the OpenAI SDK at call sites |
-| 2026-08-13 | Engine is read-mostly in M8 (reply not auto-persisted) | The caller (inbox/webhook) decides when to write the reply; keeps the surface testable | Auto-sending from the engine |
+| Issue | Resolution |
+|---|---|
+| Provider exhaustion was recorded as answered | Three bounded attempts now end in `failed` and human escalation. |
+| Tool authorization existed only in documentation | Every tool executes through the server-side authorized registry. |
+| Citation ids were placeholders | Retrieval carries and persists real tenant-scoped chunk ids. |
+| Guardrails and evaluations were incomplete | Injection/hard triggers, sanitation, URL/id filtering, budgets, and deterministic evals are covered. |
+| Build downloaded Google Fonts | The application uses packaged local Geist assets and builds offline. |
+| API accepted duplicated raw message text | It now accepts only an existing inbound customer-message UUID. |
+| AI execution was synchronous and not crash-safe | A DB-polled worker claims jobs atomically and reuses a deterministic run after a crash. |
+| Engine orchestration exceeded the 300-line structural target | Run recording and tool-context resolution were extracted; the orchestrator is 294 lines. |
+| Run-log hook called an absent GET endpoint | `GET /api/ai/runs` is implemented and covered by the production E2E path. |
 
 ## Database Changes
 
-| Migration | Description | Applied to |
-|---|---|---|
-| None (M4 schema) | — | — |
+| Migration | Description |
+|---|---|
+| `20260823133000_ai_turn_jobs` | Adds job status enum, durable AI job table, tenant/branch/message/run relations, unique idempotency keys, and claim indexes. |
+| `20260823134500_align_ai_turn_jobs` | Aligns hand-authored defaults and foreign-key update actions with the Prisma schema. |
 
-## API Changes
+## Verification
 
-| Route | Change | Breaking? |
-|---|---|---|
-| `GET/POST /api/ai/runs` | New | No |
-| `GET/POST /api/ai/templates` | New | No |
-| `GET /api/ai/templates/[id]` | New | No |
-| `POST /api/ai/templates/[id]/versions` | New | No |
-| `POST /api/ai/templates/[id]/versions/[versionId]/activate` | New | No |
+- `npm run typecheck` — pass
+- `npm run lint` — pass, zero warnings
+- Focused AI Vitest — 39/39 pass
+- `npm run db:check-drift` — pass; only documented HNSW/trigram indexes
+- `npm run build` — pass; 55 static pages generated
+- `npx playwright test tests/e2e/ai.spec.ts` — 6/6 pass across desktop and mobile
+
+The fixture-onboarding notification bell still logs the previously documented
+operational “Select an organization to continue” message before an organization is
+selected; it does not fail or mask the tested AI behavior.
 
 ## Breaking Changes
 
-None.
+`POST /api/ai/runs` now requires `{ "inputMessageId": "uuid" }`, returns HTTP 202 with
+`{ "job": ... }`, and no longer accepts caller-supplied conversation text. This is an
+intentional privacy and durability correction made before a stable external API release.

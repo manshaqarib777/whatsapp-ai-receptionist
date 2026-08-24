@@ -1,4 +1,4 @@
-import { requireOrg, requirePermission } from '@/server/auth-context';
+import { requireBranch, requireBranchPermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 import { AiService } from '@/features/ai/services/ai.service';
 import { createTemplateSchema } from '@/features/ai/validators/ai.validators';
@@ -13,8 +13,8 @@ import { createTemplateSchema } from '@/features/ai/validators/ai.validators';
 export const GET = withApiHandler(
   'GET /api/ai/templates',
   async (_request, { correlationId }) => {
-    const { organizationId } = await requireOrg();
-    const service = AiService.forOrganization(organizationId);
+    const { organizationId, branchId } = await requireBranch();
+    const service = AiService.forScope({ organizationId, branchId });
     const templates = await service.listTemplates();
     return jsonSuccess({ templates }, { correlationId });
   },
@@ -23,11 +23,11 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   'POST /api/ai/templates',
   async (request, { correlationId }) => {
-    const { organizationId } = await requirePermission('ai:manage');
+    const { organizationId, branchId } = await requireBranchPermission('ai:manage');
     const body: unknown = await request.json();
     const input = createTemplateSchema.parse(body);
 
-    const service = AiService.forOrganization(organizationId);
+    const service = AiService.forScope({ organizationId, branchId });
     const result = await service.createTemplate(input);
 
     return jsonSuccess(result, { status: 201, correlationId });

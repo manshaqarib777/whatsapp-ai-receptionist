@@ -1,6 +1,6 @@
 # Milestone 15 — Completed
 
-Completed: 2026-08-16
+Completed: 2026-08-16; re-certified: 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 15`
 
 ---
@@ -117,6 +117,17 @@ bookings count by status and value at service price (2 × 150 = 300, no-show rat
 50%); lifecycle counts split by org; performance counts conversations and
 escalations per org. The non-negotiable org A never sees org B is asserted for
 invoices, deals, appointments, and contacts.
+
+### Re-certification repairs (2026-08-23)
+
+- Collected revenue and its series now use succeeded payments by `capturedAt`.
+- Conversion rates and won/lost deals honor the selected date range.
+- Retention now measures only contacts mature for 30 days and activity after
+  each contact's own 30-day threshold.
+- First-response timing loads inbound/outbound timestamps in one scoped read,
+  removing the per-conversation query.
+- Split the 437-line repository and 370-line service into bounded domain files.
+- Gates: 23 focused tests, lint, typecheck, drift check, 55-page build, 6/6 E2E.
 
 ### Deliberately not covered
 

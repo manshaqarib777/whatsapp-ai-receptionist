@@ -1,6 +1,6 @@
 # Milestone 14 — Completed
 
-Completed: 2026-08-16
+Completed: 2026-08-16; re-certified: 2026-08-23
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 14`
 
 ---
@@ -31,9 +31,9 @@ Against the plan's objective, all of the following are now true and were not bef
   `DeliveryStatus` rows. A zero-eligible campaign is refused (422).
 - **A DB-polled worker sends the materialised recipients** (`npm run
   broadcast:work`): it claims due `scheduled` campaigns (and in-flight
-  `sending` ones), marks recipients `sent`, and advances the campaign to `sent`
-  (`finishedAt`). The WhatsApp send path is the same stub seam as the reminder
-  worker — the status columns are real.
+  `sending` ones), materialises scheduled recipients, and delivers through an
+  injectable transport. A recipient becomes `sent` only after acknowledgement;
+  an unavailable transport records `failed` with a reason.
 - **Analytics exist**: per-campaign totals (total, sent, delivered, read,
   failed, delivered rate) derived from the recipient rows, plus a segment
   preview count before send.
@@ -136,11 +136,17 @@ campaign cancelling before send (and never being sent); analytics computed from
 recipient rows (total, sent, delivered, read, failed, 50% delivered rate); and —
 the non-negotiable — org B never sees org A's campaigns or analytics.
 
+### Re-certification repairs (2026-08-23)
+
+- Removed false-positive delivery from the no-op worker.
+- Fixed scheduled campaigns being finalized with zero materialised recipients.
+- Added acknowledged-delivery, fail-closed, and scheduled-materialisation tests.
+- Gates: 38 focused tests, lint, typecheck, drift check, 55-page build, 8/8 E2E.
+
 ### Deliberately not covered
 
-- **A real WhatsApp transport.** The worker marks recipients `sent` through the
-  same stub seam as the M9 reminder worker; the real Meta transport lands with
-  the messaging milestone.
+- **A real Meta WhatsApp adapter.** The injectable boundary is ready, but the
+  default fails visibly until M19 supplies credentials and delivery.
 - **Template submission to Meta.** `metaStatus` gates use but new templates are
   seeded/created `approved`; the Meta submission + approval webhook path is a
   later milestone.

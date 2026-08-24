@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryKey,
-} from '@tanstack/react-query';
+import { useQuery, type QueryKey } from '@tanstack/react-query';
 
 import type {
   ConversationDetail,
@@ -32,6 +27,7 @@ export const inboxKeys = {
   conversation: (id: string) => [...inboxKeys.all, 'conversation', id] as const,
   thread: (id: string) => [...inboxKeys.all, 'thread', id] as const,
   labels: () => [...inboxKeys.all, 'labels'] as const,
+  members: () => [...inboxKeys.all, 'members'] as const,
   search: (q: string) => [...inboxKeys.all, 'search', q] as const,
 };
 
@@ -68,7 +64,7 @@ function rehydrateConversationRows(rows: ConversationRow[]): ConversationRow[] {
   }));
 }
 
-async function sendJson<T>(
+export async function sendJson<T>(
   url: string,
   method: 'POST' | 'PATCH' | 'DELETE',
   body?: unknown,
@@ -187,6 +183,15 @@ export function useLabels() {
   });
 }
 
+export type AssignableMember = { userId: string; name: string; email: string };
+
+export function useAssignableMembers() {
+  return useQuery({
+    queryKey: inboxKeys.members(),
+    queryFn: () => fetchJson<AssignableMember[]>('/api/members'),
+  });
+}
+
 export function useSearch(q: string) {
   return useQuery({
     queryKey: inboxKeys.search(q),
@@ -195,115 +200,18 @@ export function useSearch(q: string) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Mutations
-// ---------------------------------------------------------------------------
-
-/** Invalidates every conversation/thread cache entry after a mutation. */
-function invalidateInbox(queryClient: ReturnType<typeof useQueryClient>) {
-  void queryClient.invalidateQueries({ queryKey: inboxKeys.all });
-}
-
-export function useSendMessage(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: string) =>
-      sendJson<MessageRow>(
-        `/api/inbox/conversations/${conversationId}/messages`,
-        'POST',
-        {
-          body,
-        },
-      ),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useCreateNote(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: string) =>
-      sendJson<NoteRow>(`/api/inbox/conversations/${conversationId}/notes`, 'POST', {
-        body,
-      }),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useMarkRead(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}/read`, 'POST'),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useSetTyping(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}/typing`, 'POST'),
-    onSuccess: () => {
-      // Only the typing state changes; no need to blow away the whole cache.
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(conversationId) });
-    },
-  });
-}
-
-export function useArchiveConversation(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (archive: boolean) =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}/archive`, 'POST', {
-        archive,
-      }),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useUpdateConversation(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (patch: { assigneeId?: string | null; isPinned?: boolean }) =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}`, 'PATCH', patch),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useAddLabel(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (labelId: string) =>
-      sendJson<void>(`/api/inbox/conversations/${conversationId}/labels`, 'POST', {
-        labelId,
-      }),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useRemoveLabel(conversationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (labelId: string) =>
-      sendJson<void>(
-        `/api/inbox/conversations/${conversationId}/labels/${labelId}`,
-        'DELETE',
-      ),
-    onSuccess: () => invalidateInbox(queryClient),
-  });
-}
-
-export function useCreateLabel() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { name: string; color: string }) =>
-      sendJson<LabelRow>('/api/inbox/labels', 'POST', input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: inboxKeys.labels() });
-    },
-  });
-}
+export {
+  useAddLabel,
+  useArchiveConversation,
+  useCreateLabel,
+  useCreateNote,
+  useMarkRead,
+  useRemoveLabel,
+  useSendMessage,
+  useSetTyping,
+  useUpdateConversation,
+  useUploadAttachment,
+} from './use-inbox-mutations';
 
 // ---------------------------------------------------------------------------
 // Type helpers for invalidating a specific conversation

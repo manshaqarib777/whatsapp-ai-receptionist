@@ -5,9 +5,13 @@ import { seedCommerce } from './seed/commerce';
 import { seedContacts } from './seed/contacts';
 import { seedCrm } from './seed/crm';
 import { seedAi } from './seed/ai';
+import { seedAdmin } from './seed/admin';
 import { seedBroadcast } from './seed/broadcast';
 import { seedInbox } from './seed/inbox';
+import { seedIntegrations } from './seed/integrations';
 import { seedKnowledge } from './seed/knowledge';
+import { seedLoyalty } from './seed/loyalty';
+import { seedPrivacy } from './seed/privacy';
 import { seedReviews } from './seed/reviews';
 import { seedScheduling } from './seed/scheduling';
 import { seedTenants } from './seed/tenants';
@@ -47,6 +51,15 @@ const SEEDED_ORG_IDS = [seedId('org', 1), seedId('org', 2)];
 async function clearSeededData() {
   const org = { organizationId: { in: SEEDED_ORG_IDS } };
 
+  await prisma.subscription.deleteMany({ where: org });
+  await prisma.plan.deleteMany({
+    where: { id: { in: [seedId('plan', 1), seedId('plan', 2), seedId('plan', 3)] } },
+  });
+
+  await prisma.integrationConnection.deleteMany({ where: org });
+  await prisma.privacyRequest.deleteMany({ where: org });
+  await prisma.transcription.deleteMany({ where: org });
+
   await prisma.paymentEvent.deleteMany({ where: org });
   await prisma.refund.deleteMany({ where: org });
   await prisma.payment.deleteMany({ where: org });
@@ -71,6 +84,13 @@ async function clearSeededData() {
   await prisma.reviewRequest.deleteMany({ where: org });
   await prisma.reviewPlatform.deleteMany({ where: org });
 
+  await prisma.loyaltyTransaction.deleteMany({ where: org });
+  await prisma.loyaltyAccount.deleteMany({ where: org });
+  await prisma.loyaltyProgram.deleteMany({ where: org });
+  await prisma.couponRedemption.deleteMany({ where: org });
+  await prisma.coupon.deleteMany({ where: org });
+  await prisma.referral.deleteMany({ where: org });
+
   await prisma.activity.deleteMany({ where: org });
   await prisma.taggable.deleteMany({ where: org });
   await prisma.tag.deleteMany({ where: org });
@@ -89,6 +109,7 @@ async function clearSeededData() {
 
   await prisma.aiRunCitation.deleteMany({ where: org });
   await prisma.aiRun.deleteMany({ where: org });
+  await prisma.aiAgent.deleteMany({ where: org });
   await prisma.promptTemplateVersion.deleteMany({ where: org });
   await prisma.promptTemplate.deleteMany({ where: org });
 
@@ -121,6 +142,7 @@ async function clearSeededData() {
     where: { email: { endsWith: '@northwind.test' } },
   });
   await prisma.user.deleteMany({ where: { email: 'consultant@example.test' } });
+  await prisma.user.deleteMany({ where: { email: 'operator@platform.test' } });
 }
 
 async function main() {
@@ -137,7 +159,10 @@ async function main() {
   const random = createRandom(20260802);
 
   const tenants = await seedTenants(prisma);
+  const admin = await seedAdmin(prisma, tenants);
+  const integrations = await seedIntegrations(prisma, tenants);
   const contacts = await seedContacts(prisma, tenants, random);
+  const privacy = await seedPrivacy(prisma, tenants, contacts);
   const inbox = await seedInbox(prisma, tenants, contacts, random);
   const scheduling = await seedScheduling(prisma, tenants, contacts);
   const crm = await seedCrm(prisma, tenants, contacts, random);
@@ -147,6 +172,7 @@ async function main() {
   const workflows = await seedWorkflows(prisma, tenants);
   const broadcast = await seedBroadcast(prisma, tenants, contacts.riyadhContacts);
   const reviews = await seedReviews(prisma, tenants);
+  await seedLoyalty(prisma, tenants);
 
   const contactTotal =
     contacts.riyadhContacts.length +
@@ -161,14 +187,19 @@ async function main() {
       `  contacts        ${contactTotal} (one opted out, one never consented, RTL names)`,
       `  conversations   ${inbox.conversationCount} across every state`,
       `  messages        ${inbox.messageCount} including long, emoji-only, attachment, failed`,
+      `  voice           1 audio note with a completed local transcript`,
       `  appointments    ${scheduling.appointments} past/upcoming/cancelled/rescheduled/recurring`,
       `  deals           ${crm.dealIds.length} across 5 pipeline stages, plus 5 lost`,
       `  quotes          ${commerce.quoteIds.length}   invoices ${commerce.invoiceIds.length}`,
       `  knowledge       ${knowledge.sourceIds.length} sources, ${knowledge.documentIds.length} documents (FAQ + policy approved, HR draft gated)`,
-      `  ai              ${ai.templateIds.length} prompt templates, ${ai.runIds.length} runs`,
+      `  ai              ${ai.agentIds.length} specialist agents, ${ai.templateIds.length} prompt templates, ${ai.runIds.length} runs`,
       `  workflows       ${workflows.workflowIds.length} (one enabled with a version, one draft), ${workflows.runIds.length} run`,
       `  broadcast       ${broadcast.campaignIds.length} campaigns (cancelled, scheduled, sent), 1 segment, 1 template`,
       `  reviews         ${reviews.platformIds.length} platforms, ${reviews.requestIds.length} request, ${reviews.reviewIds.length} review`,
+      `  loyalty         1 program, 1 account (silver, 450 pts), 1 coupon, 1 referral`,
+      `  integrations    ${integrations.connectionCount} sandbox connections across all 11 providers`,
+      `  admin portal    ${admin.planCount} plans, ${admin.subscriptionCount} subscriptions, 1 platform operator`,
+      `  privacy         ${privacy.requestCount} completed access request`,
       `  in              ${Date.now() - started}ms`,
     ].join('\n'),
   );

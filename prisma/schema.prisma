@@ -33,14 +33,18 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
 
-  twoFactorEnabled Boolean? @default(false) @map("two_factor_enabled")
+  twoFactorEnabled    Boolean?     @default(false) @map("two_factor_enabled")
+  failedLoginAttempts Int          @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?    @map("locked_until") @db.Timestamptz(3)
+  platformRole        PlatformRole @default(user) @map("platform_role")
 
-  sessions    Session[]
-  accounts    Account[]
-  members     Member[]
-  invitations Invitation[]
-  twofactors  TwoFactor[]
-  auditLogs   AuditLog[]
+  sessions        Session[]
+  accounts        Account[]
+  members         Member[]
+  invitations     Invitation[]
+  twofactors      TwoFactor[]
+  auditLogs       AuditLog[]
+  privacyRequests PrivacyRequest[] @relation("PrivacyRequestRequester")
 
   // Milestone 4. All SetNull on delete: a departing user must not take
   // conversations, messages, or audit history with them.
@@ -57,7 +61,15 @@ model User {
 
   @@index([email])
   @@index([deletedAt])
+  @@index([lockedUntil])
   @@map("users")
+}
+
+enum PlatformRole {
+  user
+  operator
+
+  @@map("platform_role")
 }
 
 /// An active login. Database-backed so revocation is immediate (ADR-0001).
@@ -77,10 +89,13 @@ model Session {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   activeOrganizationId String? @map("active_organization_id") @db.Uuid
+  activeBranchId       String? @map("active_branch_id") @db.Uuid
+  activeBranch         Branch? @relation(fields: [activeBranchId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([token])
   @@index([expiresAt])
+  @@index([activeBranchId])
   @@map("sessions")
 }
 
@@ -165,66 +180,199 @@ model Organization {
 
   // Milestone 4. Every business table carries organization_id; Prisma requires
   // the inverse side of each relation to be declared here.
-  branches              Branch[]
-  whatsappAccounts      WhatsappAccount[]
-  contacts              Contact[]
-  companies             Company[]
-  conversations         Conversation[]
-  messages              Message[]
-  messageAttachments    MessageAttachment[]
-  labels                Label[]
-  conversationLabels    ConversationLabel[]
-  conversationNotes     ConversationNote[]
-  knowledgeSources      KnowledgeSource[]
-  knowledgeDocs         KnowledgeDocument[]
-  knowledgeVersions     KnowledgeDocumentVersion[]
-  knowledgeChunks       KnowledgeChunk[]
-  ingestionJobs         IngestionJob[]
-  promptTemplates       PromptTemplate[]
-  promptVersions        PromptTemplateVersion[]
-  aiRuns                AiRun[]
-  aiRunCitations        AiRunCitation[]
-  services              Service[]
-  resources             Resource[]
-  availabilityRules     AvailabilityRule[]
-  availabilityExc       AvailabilityException[]
-  appointments          Appointment[]
-  apptReminders         AppointmentReminder[]
-  pipelines             Pipeline[]
-  pipelineStages        PipelineStage[]
-  deals                 Deal[]
-  tags                  Tag[]
-  taggables             Taggable[]
-  activities            Activity[]
-  tasks                 Task[]
-  notifications         Notification[]
-  quoteTemplates        QuoteTemplate[]
-  quotes                Quote[]
-  quoteLineItems        QuoteLineItem[]
-  quoteVersions         QuoteVersion[]
-  invoices              Invoice[]
-  invoiceLineItems      InvoiceLineItem[]
-  payments              Payment[]
-  refunds               Refund[]
-  paymentEvents         PaymentEvent[]
-  workflows             Workflow[]
-  workflowVersions      WorkflowVersion[]
-  workflowRuns          WorkflowRun[]
-  workflowRunSteps      WorkflowRunStep[]
-  segments              Segment[]
-  messageTemplates      WhatsappMessageTemplate[]
-  campaigns             Campaign[]
-  campaignRecipients    CampaignRecipient[]
-  reviewPlatforms       ReviewPlatform[]
-  reviewRequests        ReviewRequest[]
-  reviews               Review[]
-  conversationReads     ConversationRead[]
-  conversationTypings   ConversationTyping[]
-  conversationSummaries ConversationSummary[]
+  branches               Branch[]
+  whatsappAccounts       WhatsappAccount[]
+  contacts               Contact[]
+  companies              Company[]
+  conversations          Conversation[]
+  messages               Message[]
+  messageAttachments     MessageAttachment[]
+  labels                 Label[]
+  conversationLabels     ConversationLabel[]
+  conversationNotes      ConversationNote[]
+  knowledgeSources       KnowledgeSource[]
+  knowledgeDocs          KnowledgeDocument[]
+  knowledgeVersions      KnowledgeDocumentVersion[]
+  knowledgeChunks        KnowledgeChunk[]
+  ingestionJobs          IngestionJob[]
+  promptTemplates        PromptTemplate[]
+  promptVersions         PromptTemplateVersion[]
+  aiRuns                 AiRun[]
+  aiAgents               AiAgent[]
+  aiTurnJobs             AiTurnJob[]
+  aiRunCitations         AiRunCitation[]
+  services               Service[]
+  resources              Resource[]
+  availabilityRules      AvailabilityRule[]
+  availabilityExc        AvailabilityException[]
+  appointments           Appointment[]
+  apptReminders          AppointmentReminder[]
+  pipelines              Pipeline[]
+  pipelineStages         PipelineStage[]
+  deals                  Deal[]
+  tags                   Tag[]
+  taggables              Taggable[]
+  activities             Activity[]
+  tasks                  Task[]
+  notifications          Notification[]
+  quoteTemplates         QuoteTemplate[]
+  quotes                 Quote[]
+  quoteLineItems         QuoteLineItem[]
+  quoteVersions          QuoteVersion[]
+  invoices               Invoice[]
+  invoiceLineItems       InvoiceLineItem[]
+  payments               Payment[]
+  refunds                Refund[]
+  paymentEvents          PaymentEvent[]
+  workflows              Workflow[]
+  workflowVersions       WorkflowVersion[]
+  workflowRuns           WorkflowRun[]
+  workflowRunSteps       WorkflowRunStep[]
+  segments               Segment[]
+  messageTemplates       WhatsappMessageTemplate[]
+  campaigns              Campaign[]
+  campaignRecipients     CampaignRecipient[]
+  reviewPlatforms        ReviewPlatform[]
+  reviewRequests         ReviewRequest[]
+  reviews                Review[]
+  loyaltyPrograms        LoyaltyProgram[]
+  loyaltyAccounts        LoyaltyAccount[]
+  loyaltyTransactions    LoyaltyTransaction[]
+  coupons                Coupon[]
+  couponRedemptions      CouponRedemption[]
+  referrals              Referral[]
+  conversationReads      ConversationRead[]
+  conversationTypings    ConversationTyping[]
+  conversationSummaries  ConversationSummary[]
+  integrationConnections IntegrationConnection[]
+  transcriptions         Transcription[]
+  subscriptions          Subscription[]
+  privacyRequests        PrivacyRequest[]
 
   @@index([slug])
   @@index([deletedAt])
   @@map("organizations")
+}
+
+enum BillingInterval {
+  month
+  year
+
+  @@map("billing_interval")
+}
+
+enum SubscriptionStatus {
+  trialing
+  active
+  past_due
+  cancelled
+
+  @@map("subscription_status")
+}
+
+/// Global commercial catalog. It carries no organization_id because all tenants may
+/// be assigned the same plan and only platform operators can mutate it.
+model Plan {
+  id          String          @id @default(uuid()) @db.Uuid
+  slug        String          @unique
+  name        String
+  description String          @db.VarChar(500)
+  amount      Decimal         @db.Decimal(15, 4)
+  currency    String          @default("USD")
+  interval    BillingInterval
+  features    Json            @default("[]")
+  limits      Json            @default("{}")
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  version     Int             @default(1)
+
+  subscriptions Subscription[]
+
+  @@index([active, amount])
+  @@map("plans")
+}
+
+/// One current commercial contract per organization. Billing is organization-wide,
+/// never branch-scoped.
+model Subscription {
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @unique @map("organization_id") @db.Uuid
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  planId            String             @map("plan_id") @db.Uuid
+  plan              Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status            SubscriptionStatus @default(trialing)
+  amount            Decimal            @db.Decimal(15, 4)
+  currency          String             @default("USD")
+  interval          BillingInterval
+  periodStartsAt    DateTime           @map("period_starts_at") @db.Timestamptz(3)
+  periodEndsAt      DateTime           @map("period_ends_at") @db.Timestamptz(3)
+  trialEndsAt       DateTime?          @map("trial_ends_at") @db.Timestamptz(3)
+  cancelAtPeriodEnd Boolean            @default(false) @map("cancel_at_period_end")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt         DateTime?          @map("deleted_at") @db.Timestamptz(3)
+  version           Int                @default(1)
+
+  @@index([status, periodEndsAt])
+  @@index([planId, status])
+  @@index([deletedAt])
+  @@map("subscriptions")
+}
+
+// ===========================================================================
+// Milestone 19 — Integrations
+// ===========================================================================
+
+enum IntegrationProvider {
+  meta
+  google
+  outlook
+  slack
+  hubspot
+  stripe
+  zapier
+  make
+  n8n
+  salla
+  shopify
+
+  @@map("integration_provider")
+}
+
+enum IntegrationStatus {
+  disconnected
+  connected
+  error
+
+  @@map("integration_status")
+}
+
+model IntegrationConnection {
+  id                   String              @id @default(uuid()) @db.Uuid
+  organizationId       String              @map("organization_id") @db.Uuid
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider             IntegrationProvider
+  status               IntegrationStatus   @default(disconnected)
+  enabled              Boolean             @default(false)
+  mode                 String              @default("sandbox")
+  config               Json                @default("{}")
+  credentialHint       String?             @map("credential_hint")
+  credentialCiphertext String?             @map("credential_ciphertext") @db.Text
+  credentialKeyVersion Int?                @map("credential_key_version")
+  lastTestedAt         DateTime?           @map("last_tested_at") @db.Timestamptz(3)
+  lastHealthyAt        DateTime?           @map("last_healthy_at") @db.Timestamptz(3)
+  lastError            String?             @map("last_error") @db.VarChar(500)
+  version              Int                 @default(1)
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt            DateTime?           @map("deleted_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, provider])
+  @@index([organizationId, status])
+  @@index([organizationId, updatedAt])
+  @@index([deletedAt])
+  @@map("integration_connections")
 }
 
 /// User ↔ Organization, carrying the role. This is where RBAC lives: a person may
@@ -316,6 +464,57 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([action])
   @@map("audit_logs")
+}
+
+enum PrivacyRequestType {
+  access
+  erasure
+
+  @@map("privacy_request_type")
+}
+
+enum PrivacyRequestStatus {
+  pending
+  completed
+  rejected
+  failed
+
+  @@map("privacy_request_status")
+}
+
+model PrivacyRequest {
+  id             String               @id @default(uuid()) @db.Uuid
+  organizationId String               @map("organization_id") @db.Uuid
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requesterId    String               @map("requester_id") @db.Uuid
+  requester      User                 @relation("PrivacyRequestRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  contactId      String               @map("contact_id") @db.Uuid
+  contact        Contact              @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  type           PrivacyRequestType
+  status         PrivacyRequestStatus @default(pending)
+  completedAt    DateTime?            @map("completed_at") @db.Timestamptz(3)
+  failureCode    String?              @map("failure_code") @db.VarChar(100)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  version        Int                  @default(1)
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, contactId, type, status])
+  @@index([requesterId, createdAt])
+  @@index([deletedAt])
+  @@map("privacy_requests")
+}
+
+model RateLimitBucket {
+  keyHash   String   @id @map("key_hash") @db.Char(64)
+  count     Int
+  resetAt   DateTime @map("reset_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([resetAt])
+  @@map("rate_limit_buckets")
 }
 
 // ---------------------------------------------------------------------------
@@ -457,34 +656,44 @@ model Branch {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
   version   Int       @default(1)
 
-  whatsappAccounts WhatsappAccount[]
-  contacts         Contact[]
-  companies        Company[]
-  conversations    Conversation[]
-  labels           Label[]
-  knowledgeSources KnowledgeSource[]
-  knowledgeDocs    KnowledgeDocument[]
-  knowledgeChunks  KnowledgeChunk[]
-  promptTemplates  PromptTemplate[]
-  aiRuns           AiRun[]
-  services         Service[]
-  resources        Resource[]
-  appointments     Appointment[]
-  pipelines        Pipeline[]
-  deals            Deal[]
-  tags             Tag[]
-  activities       Activity[]
-  tasks            Task[]
-  quoteTemplates   QuoteTemplate[]
-  quotes           Quote[]
-  invoices         Invoice[]
-  workflows        Workflow[]
-  segments         Segment[]
-  messageTemplates WhatsappMessageTemplate[]
-  campaigns        Campaign[]
-  reviewPlatforms  ReviewPlatform[]
-  reviewRequests   ReviewRequest[]
-  reviews          Review[]
+  whatsappAccounts    WhatsappAccount[]
+  contacts            Contact[]
+  companies           Company[]
+  conversations       Conversation[]
+  labels              Label[]
+  knowledgeSources    KnowledgeSource[]
+  knowledgeDocs       KnowledgeDocument[]
+  knowledgeChunks     KnowledgeChunk[]
+  promptTemplates     PromptTemplate[]
+  aiRuns              AiRun[]
+  aiAgents            AiAgent[]
+  aiTurnJobs          AiTurnJob[]
+  services            Service[]
+  resources           Resource[]
+  appointments        Appointment[]
+  pipelines           Pipeline[]
+  deals               Deal[]
+  tags                Tag[]
+  activities          Activity[]
+  tasks               Task[]
+  quoteTemplates      QuoteTemplate[]
+  quotes              Quote[]
+  invoices            Invoice[]
+  workflows           Workflow[]
+  segments            Segment[]
+  messageTemplates    WhatsappMessageTemplate[]
+  campaigns           Campaign[]
+  reviewPlatforms     ReviewPlatform[]
+  reviewRequests      ReviewRequest[]
+  reviews             Review[]
+  loyaltyPrograms     LoyaltyProgram[]
+  loyaltyAccounts     LoyaltyAccount[]
+  loyaltyTransactions LoyaltyTransaction[]
+  coupons             Coupon[]
+  couponRedemptions   CouponRedemption[]
+  referrals           Referral[]
+  activeSessions      Session[]
+  transcriptions      Transcription[]
 
   @@index([organizationId])
   @@index([organizationId, deletedAt])
@@ -574,6 +783,11 @@ model Contact {
   campaignRecipients CampaignRecipient[]
   reviewRequests     ReviewRequest[]
   reviews            Review[]
+  loyaltyAccounts    LoyaltyAccount[]
+  couponRedemptions  CouponRedemption[]
+  referralsMade      Referral[]          @relation("Referrer")
+  referralsReceived  Referral[]          @relation("ReferredContact")
+  privacyRequests    PrivacyRequest[]
 
   @@index([organizationId, phoneNumber])
   @@index([branchId])
@@ -647,13 +861,14 @@ model Conversation {
   redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
   version    Int       @default(1)
 
-  messages  Message[]
-  labels    ConversationLabel[]
-  notes     ConversationNote[]
-  aiRuns    AiRun[]
-  reads     ConversationRead[]
-  typing    ConversationTyping[]
-  summaries ConversationSummary[]
+  messages   Message[]
+  labels     ConversationLabel[]
+  notes      ConversationNote[]
+  aiRuns     AiRun[]
+  reads      ConversationRead[]
+  typing     ConversationTyping[]
+  summaries  ConversationSummary[]
+  aiTurnJobs AiTurnJob[]
 
   @@index([organizationId, lastMessageAt])
   @@index([branchId, status])
@@ -749,7 +964,9 @@ model Message {
 
   attachments        MessageAttachment[]
   aiRuns             AiRun[]
+  aiTurnJob          AiTurnJob?
   campaignRecipients CampaignRecipient[]
+  transcriptions     Transcription[]
 
   /// THE webhook idempotency key (DATABASE_RULES.md). Postgres permits many
   /// NULLs in a unique index, which is exactly right: outbound messages have no
@@ -785,9 +1002,54 @@ model MessageAttachment {
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(3)
   redactedAt DateTime? @map("redacted_at") @db.Timestamptz(3)
 
+  transcription Transcription?
+
   @@index([messageId])
   @@index([organizationId])
   @@map("message_attachments")
+}
+
+enum TranscriptionStatus {
+  pending
+  processing
+  completed
+  failed
+
+  @@map("transcription_status")
+}
+
+/// Voice-note transcript and durable STT job. `text` is customer PII.
+model Transcription {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branchId       String              @map("branch_id") @db.Uuid
+  branch         Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  messageId      String              @map("message_id") @db.Uuid
+  message        Message             @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  attachmentId   String              @unique @map("attachment_id") @db.Uuid
+  attachment     MessageAttachment   @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  status         TranscriptionStatus @default(pending)
+  language       String              @default("auto")
+  provider       String              @default("local")
+  model          String              @default("demo-stt-v1")
+  text           String?             @db.Text
+  confidence     Decimal?            @db.Decimal(5, 4)
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(3) @map("max_attempts")
+  lockedAt       DateTime?           @map("locked_at") @db.Timestamptz(3)
+  lastError      String?             @map("last_error") @db.VarChar(500)
+  completedAt    DateTime?           @map("completed_at") @db.Timestamptz(3)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  redactedAt     DateTime?           @map("redacted_at") @db.Timestamptz(3)
+
+  @@index([organizationId, status, createdAt])
+  @@index([branchId, status])
+  @@index([messageId, createdAt])
+  @@index([deletedAt])
+  @@map("transcriptions")
 }
 
 model Label {
@@ -1082,12 +1344,65 @@ enum AiRunOutcome {
   @@map("ai_run_outcome")
 }
 
+enum AiTurnJobStatus {
+  queued
+  running
+  succeeded
+  failed
+
+  @@map("ai_turn_job_status")
+}
+
 enum PromptVersionStatus {
   draft
   active
   archived
 
   @@map("prompt_version_status")
+}
+
+enum AiAgentKind {
+  reception
+  sales
+  support
+  marketing
+  analytics
+  billing
+  manager
+  knowledge
+
+  @@map("ai_agent_kind")
+}
+
+/// A tenant-configurable specialist whose maximum capabilities remain server-owned.
+model AiAgent {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branchId       String       @map("branch_id") @db.Uuid
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  kind        AiAgentKind
+  displayName String      @map("display_name")
+  description String      @db.VarChar(500)
+  enabled     Boolean     @default(true)
+
+  promptTemplateId String?         @map("prompt_template_id") @db.Uuid
+  promptTemplate   PromptTemplate? @relation(fields: [promptTemplateId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  runs AiRun[]
+
+  @@unique([branchId, kind])
+  @@index([organizationId, enabled])
+  @@index([branchId, enabled])
+  @@index([promptTemplateId])
+  @@map("ai_agents")
 }
 
 /// Branch-scoped: Milestone 18 gives each branch separate AI.
@@ -1111,6 +1426,7 @@ model PromptTemplate {
   version   Int       @default(1)
 
   versions PromptTemplateVersion[]
+  agents   AiAgent[]
 
   @@index([organizationId])
   @@index([branchId, key])
@@ -1161,6 +1477,9 @@ model AiRun {
   promptVersionId String?                @map("prompt_version_id") @db.Uuid
   promptVersion   PromptTemplateVersion? @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
 
+  agentId String?  @map("agent_id") @db.Uuid
+  agent   AiAgent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
   /// "provider/model" through the AI Gateway, e.g. "anthropic/claude-sonnet-5".
   model  String
   intent String?
@@ -1181,11 +1500,43 @@ model AiRun {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   citations AiRunCitation[]
+  turnJob   AiTurnJob?
 
   @@index([organizationId, createdAt])
   @@index([branchId, createdAt])
   @@index([conversationId])
+  @@index([agentId])
   @@map("ai_runs")
+}
+
+/// Durable, PII-minimizing execution request. The message body remains in `messages`;
+/// the queue carries only its id and can safely retry after a worker crash.
+model AiTurnJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  branchId       String       @map("branch_id") @db.Uuid
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inputMessageId String       @unique @map("input_message_id") @db.Uuid
+  inputMessage   Message      @relation(fields: [inputMessageId], references: [id], onDelete: Cascade)
+  runId          String?      @unique @map("run_id") @db.Uuid
+  run            AiRun?       @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  status      AiTurnJobStatus @default(queued)
+  attempts    Int             @default(0)
+  maxAttempts Int             @default(3) @map("max_attempts")
+  lockedAt    DateTime?       @map("locked_at") @db.Timestamptz(3)
+  lastError   String?         @map("last_error") @db.Text
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([organizationId, status, createdAt])
+  @@index([branchId])
+  @@index([conversationId])
+  @@map("ai_turn_jobs")
 }
 
 /// A table, not a JSON column: Milestone 8 requires citation and Milestone 7
@@ -1472,6 +1823,7 @@ enum TaggableType {
   contact
   deal
   conversation
+  company
 
   @@map("taggable_type")
 }
@@ -1763,6 +2115,7 @@ enum PaymentStatus {
 }
 
 enum PaymentGateway {
+  manual
   stripe
   hyperpay
   paytabs
@@ -1919,6 +2272,7 @@ model Invoice {
 
   subtotalAmount Decimal @default(0) @map("subtotal_amount") @db.Decimal(15, 4)
   taxAmount      Decimal @default(0) @map("tax_amount") @db.Decimal(15, 4)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(15, 4)
   totalAmount    Decimal @default(0) @map("total_amount") @db.Decimal(15, 4)
   amountPaid     Decimal @default(0) @map("amount_paid") @db.Decimal(15, 4)
   currency       String  @default("SAR")
@@ -1932,8 +2286,10 @@ model Invoice {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
   version   Int       @default(1)
 
-  lineItems InvoiceLineItem[]
-  payments  Payment[]
+  lineItems           InvoiceLineItem[]
+  payments            Payment[]
+  loyaltyTransactions LoyaltyTransaction[]
+  couponRedemption    CouponRedemption?
 
   @@index([organizationId, status])
   @@index([branchId, issuedAt])
@@ -2148,6 +2504,7 @@ model WorkflowRun {
 
   triggerEntityType String? @map("trigger_entity_type")
   triggerEntityId   String? @map("trigger_entity_id") @db.Uuid
+  context           Json    @default("{}")
 
   status WorkflowRunStatus @default(running)
   error  String?           @db.Text
@@ -2345,9 +2702,9 @@ model ReviewPlatform {
   branchId String @map("branch_id") @db.Uuid
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
-  name     String
-  provider ReviewPlatformProvider
-  isConnected Boolean @default(false) @map("is_connected")
+  name        String
+  provider    ReviewPlatformProvider
+  isConnected Boolean                @default(false) @map("is_connected")
 
   /// A key into the secret store for the OAuth token. NEVER the token itself.
   credentialsRef String? @map("credentials_ref")
@@ -2383,7 +2740,7 @@ model ReviewRequest {
   appointmentId String      @map("appointment_id") @db.Uuid
   appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
 
-  platformId String        @map("platform_id") @db.Uuid
+  platformId String         @map("platform_id") @db.Uuid
   platform   ReviewPlatform @relation(fields: [platformId], references: [id], onDelete: Restrict)
 
   status ReviewRequestStatus @default(created)
@@ -2421,10 +2778,10 @@ model Review {
   contactId String  @map("contact_id") @db.Uuid
   contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
 
-  requestId String?       @unique @map("request_id") @db.Uuid
+  requestId String?        @unique @map("request_id") @db.Uuid
   request   ReviewRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
 
-  platformId String        @map("platform_id") @db.Uuid
+  platformId String         @map("platform_id") @db.Uuid
   platform   ReviewPlatform @relation(fields: [platformId], references: [id], onDelete: Restrict)
 
   rating Int
@@ -2446,4 +2803,231 @@ model Review {
   @@index([requestId])
   @@index([organizationId, externalReviewId])
   @@map("reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 17 — Loyalty
+// ---------------------------------------------------------------------------
+
+enum LoyaltyTier {
+  bronze
+  silver
+  gold
+
+  @@map("loyalty_tier")
+}
+
+enum LoyaltyTransactionKind {
+  earn
+  spend
+  referral_bonus
+
+  @@map("loyalty_transaction_kind")
+}
+
+enum CouponType {
+  percent
+  fixed
+
+  @@map("coupon_type")
+}
+
+enum ReferralStatus {
+  pending
+  rewarded
+
+  @@map("referral_status")
+}
+
+/// The loyalty program: points-per-currency earn rate and enabled state.
+model LoyaltyProgram {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  name              String
+  /// Points earned per currency unit (e.g. 1 point per 1 SAR).
+  pointsPerCurrency Decimal @default(1) @map("points_per_currency") @db.Decimal(6, 4)
+  isEnabled         Boolean @default(true) @map("is_enabled")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  accounts LoyaltyAccount[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@map("loyalty_programs")
+}
+
+/// One loyalty account per contact per program.
+model LoyaltyAccount {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  programId String         @map("program_id") @db.Uuid
+  program   LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Restrict)
+
+  /// The running balance — the ledger is the source of truth, never recomputed.
+  balance     Int         @default(0)
+  /// Lifetime earned points, the basis for the tier.
+  totalEarned Int         @default(0) @map("total_earned")
+  tier        LoyaltyTier @default(bronze)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  transactions LoyaltyTransaction[]
+
+  @@unique([contactId, programId])
+  @@index([organizationId, tier])
+  @@index([programId])
+  @@map("loyalty_accounts")
+}
+
+/// The points ledger. `invoice_id` + kind unique means a paid invoice earns
+/// exactly once, no matter how often the worker runs.
+model LoyaltyTransaction {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  accountId String         @map("account_id") @db.Uuid
+  account   LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  invoiceId String?  @map("invoice_id") @db.Uuid
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  kind        LoyaltyTransactionKind
+  /// Signed: positive for earn/bonus, negative for spend.
+  pointsDelta Int                    @map("points_delta")
+  reason      String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  @@unique([invoiceId, kind])
+  @@index([organizationId, createdAt])
+  @@index([accountId])
+  @@index([invoiceId])
+  @@map("loyalty_transactions")
+}
+
+/// A discount coupon. Percent or fixed value, with an expiry and a redemption
+/// limit.
+model Coupon {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  code           String
+  type           CouponType
+  /// Percent (0–100) or fixed currency amount, depending on type.
+  value          Decimal    @db.Decimal(15, 4)
+  expiresAt      DateTime?  @map("expires_at") @db.Timestamptz(3)
+  maxRedemptions Int        @default(1) @map("max_redemptions")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  redemptions CouponRedemption[]
+
+  @@unique([branchId, code])
+  @@index([organizationId])
+  @@map("coupons")
+}
+
+/// A coupon used by a contact. Unique (coupon, contact) — one use per contact.
+model CouponRedemption {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  couponId String @map("coupon_id") @db.Uuid
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  contactId String  @map("contact_id") @db.Uuid
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  invoiceId String?  @unique @map("invoice_id") @db.Uuid
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  /// Snapshot of the monetary discount applied to the draft invoice.
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(15, 4)
+
+  redeemedAt DateTime @default(now()) @map("redeemed_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  @@unique([couponId, contactId])
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([invoiceId])
+  @@map("coupon_redemptions")
+}
+
+/// A contact referring another. When the referred contact's account first
+/// earns points, the referrer earns a bonus.
+model Referral {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  branchId String @map("branch_id") @db.Uuid
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  referrerId String  @map("referrer_id") @db.Uuid
+  referrer   Contact @relation("Referrer", fields: [referrerId], references: [id], onDelete: Restrict)
+
+  referredContactId String  @map("referred_contact_id") @db.Uuid
+  referredContact   Contact @relation("ReferredContact", fields: [referredContactId], references: [id], onDelete: Restrict)
+
+  bonusPoints Int            @default(0) @map("bonus_points")
+  status      ReferralStatus @default(pending)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  version   Int       @default(1)
+
+  @@unique([referrerId, referredContactId])
+  @@index([organizationId])
+  @@index([referredContactId])
+  @@map("referrals")
 }

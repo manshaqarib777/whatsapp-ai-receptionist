@@ -1,6 +1,5 @@
 import { ConflictError, UnprocessableError } from '@/lib/errors';
-import { chunkText, checksum } from '@/features/knowledge/services/chunker';
-import { fetchWebsiteText, parseUpload } from '@/features/knowledge/services/parsers';
+import { KnowledgeIngestionService } from '@/features/knowledge/services/knowledge-ingestion.service';
 import {
   KnowledgeRepository,
   type KnowledgeDocumentDetail,
@@ -8,15 +7,9 @@ import {
   type KnowledgeSourceKind,
   type KnowledgeSourceRow,
 } from '@/features/knowledge/repositories/knowledge.repository';
-import {
-  hybridSearch,
-  insertChunks,
-  type SearchHit,
-} from '@/features/knowledge/lib/retrieval';
-import {
-  knowledgeEmbeddingModel,
-  knowledgeEmbeddingProvider,
-} from '@/features/knowledge/lib/embeddings';
+import { hybridSearch, type SearchHit } from '@/features/knowledge/lib/retrieval';
+import { knowledgeEmbeddingProvider } from '@/features/knowledge/lib/embeddings';
+import type { BranchScope } from '@/lib/db/scope';
 
 /**
  * Knowledge base orchestration — Milestone 7.
@@ -32,19 +25,21 @@ import {
 export class KnowledgeService {
   private readonly repo: KnowledgeRepository;
   private readonly organizationId: string;
+  private readonly ingestion: KnowledgeIngestionService;
 
   constructor(repo: KnowledgeRepository) {
     this.repo = repo;
     this.organizationId = repo.organizationId;
+    this.ingestion = new KnowledgeIngestionService(repo, repo.organizationId);
   }
 
   static forOrganization(organizationId: string): KnowledgeService {
     return new KnowledgeService(KnowledgeRepository.forOrganization(organizationId));
   }
 
-  // -------------------------------------------------------------------------
-  // Sources
-  // -------------------------------------------------------------------------
+  static forScope(scope: BranchScope): KnowledgeService {
+    return new KnowledgeService(KnowledgeRepository.forScope(scope));
+  }
 
   async listSources(): Promise<KnowledgeSourceRow[]> {
     return this.repo.listSources();
@@ -220,10 +215,6 @@ export class KnowledgeService {
     return { documentId: document.id, versionId: version.id, jobId: job.id };
   }
 
-  // -------------------------------------------------------------------------
-  // Documents + versions + approval
-  // -------------------------------------------------------------------------
-
   async getDocument(id: string): Promise<KnowledgeDocumentDetail> {
     return this.repo.getDocument(id);
   }
@@ -243,16 +234,7 @@ export class KnowledgeService {
       throw new ConflictError('Only a version awaiting approval can be approved.');
     }
 
-    await this.repo.transitionVersionStatus({
-      versionId,
-      from: 'pending_approval',
-      to: 'approved',
-      approvedById: approverId,
-      approvedAt: new Date(),
-    });
-
-    // Point the document's current version at this one — the retrieval gate.
-    await this.repo.setCurrentVersion(version.documentId, versionId);
+    await this.repo.approveAndSetCurrent(versionId, approverId);
   }
 
   async archiveVersion(versionId: string): Promise<void> {
@@ -267,10 +249,6 @@ export class KnowledgeService {
     });
   }
 
-  // -------------------------------------------------------------------------
-  // Ingestion pipeline
-  // -------------------------------------------------------------------------
-
   /**
    * Runs the parse → chunk → embed → persist pipeline for a version.
    *
@@ -282,38 +260,7 @@ export class KnowledgeService {
     branchId: string;
     extractedText: string;
   }): Promise<{ chunkCount: number }> {
-    const text = input.extractedText.trim();
-    if (text.length === 0) {
-      throw new UnprocessableError('The document contained no text to index.');
-    }
-
-    const chunks = chunkText(text);
-    const model = knowledgeEmbeddingModel();
-    const provider = knowledgeEmbeddingProvider();
-
-    const embeddings = await provider.embed(chunks.map((c) => c.content));
-
-    await insertChunks(
-      { organizationId: this.organizationId, branchId: input.branchId },
-      {
-        versionId: input.versionId,
-        branchId: input.branchId,
-        chunks: chunks.map((chunk, index) => ({
-          ordinal: chunk.ordinal,
-          content: chunk.content,
-          vector: embeddings[index]?.vector ?? [],
-          model,
-        })),
-      },
-    );
-
-    await this.repo.updateVersionChunks({
-      versionId: input.versionId,
-      chunkCount: chunks.length,
-      checksum: checksum(text),
-    });
-
-    return { chunkCount: chunks.length };
+    return this.ingestion.ingestVersion(input);
   }
 
   /** Extracts text for an upload (parse → OCR fallback). */
@@ -322,19 +269,13 @@ export class KnowledgeService {
     mimeType: string;
     fileName: string;
   }): Promise<{ text: string | null; needsOcr: boolean }> {
-    const { getStorage } = await import('@/lib/storage');
-    const buffer = await getStorage(input.storageKey);
-    return parseUpload(buffer, input.mimeType, input.fileName);
+    return this.ingestion.extractUploadText(input);
   }
 
   /** Fetches a website's text (worker path). */
   async fetchWebsite(url: string): Promise<string> {
-    return fetchWebsiteText(url);
+    return this.ingestion.fetchWebsite(url);
   }
-
-  // -------------------------------------------------------------------------
-  // Jobs + search
-  // -------------------------------------------------------------------------
 
   async listJobs(limit = 20): Promise<KnowledgeJobRow[]> {
     return this.repo.listJobs(limit);

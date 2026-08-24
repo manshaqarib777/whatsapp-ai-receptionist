@@ -80,6 +80,17 @@ export function SystemStatus() {
             </div>
 
             <div className="flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Cache</dt>
+              <dd className="font-medium">
+                {data.checks.redis === 'ok'
+                  ? 'Connected'
+                  : data.checks.redis === 'not-configured'
+                    ? 'Optional'
+                    : 'Unavailable'}
+              </dd>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
               <dt className="text-muted-foreground">Uptime</dt>
               <dd className="font-mono font-medium tabular-nums">
                 {data.uptimeSeconds}s

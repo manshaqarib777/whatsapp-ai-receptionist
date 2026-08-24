@@ -10,6 +10,8 @@ import {
   parseRecurrenceRule,
 } from '@/features/appointments/services/recurrence';
 import { ConflictError, UnprocessableError } from '@/lib/errors';
+import { localDateInZone } from '@/features/appointments/services/timezone';
+import type { BranchScope } from '@/lib/db/scope';
 
 /**
  * Appointment Engine orchestration — Milestone 9.
@@ -40,6 +42,10 @@ export class AppointmentsService {
     );
   }
 
+  static forScope(scope: BranchScope): AppointmentsService {
+    return new AppointmentsService(AppointmentsRepository.forScope(scope));
+  }
+
   // -------------------------------------------------------------------------
   // Services + resources
   // -------------------------------------------------------------------------
@@ -61,6 +67,25 @@ export class AppointmentsService {
       throw new UnprocessableError('Service duration must be between 5 and 480 minutes.');
     }
     return this.repo.createService({ branchId, ...input });
+  }
+
+  async updateService(
+    id: string,
+    input: Partial<{
+      name: string;
+      description: string;
+      durationMinutes: number;
+      priceAmount: number;
+      priceCurrency: string;
+    }>,
+  ): Promise<ServiceRow> {
+    if (
+      input.durationMinutes !== undefined &&
+      (input.durationMinutes < 5 || input.durationMinutes > 480)
+    ) {
+      throw new UnprocessableError('Service duration must be between 5 and 480 minutes.');
+    }
+    return this.repo.updateService(id, input);
   }
 
   async listResources(): Promise<ResourceRow[]> {
@@ -138,7 +163,7 @@ export class AppointmentsService {
     const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
 
     // Availability check before insert (the DB constraint is the backstop).
-    const date = startsAt.toISOString().slice(0, 10);
+    const date = localDateInZone(startsAt, input.timezone);
     const slots = await computeSlots(this.repo, {
       branchId,
       serviceId: input.serviceId,
@@ -163,6 +188,7 @@ export class AppointmentsService {
       endsAt,
       timezone: input.timezone,
       notes: input.notes,
+      recurrenceRule: input.recurrenceRule,
     });
 
     // Schedule reminders: 24h and 1h before.
@@ -186,6 +212,7 @@ export class AppointmentsService {
           startsAt: occurrence,
           endsAt: new Date(occurrence.getTime() + service.durationMinutes * 60_000),
           timezone: input.timezone,
+          recurrenceParentId: appointment.id,
         });
       }
     }
@@ -213,6 +240,22 @@ export class AppointmentsService {
     const startsAt = new Date(newStartsAt);
     const endsAt = new Date(startsAt.getTime() + service.durationMinutes * 60_000);
 
+    const slots = await computeSlots(this.repo, {
+      branchId,
+      serviceId: appointment.serviceId,
+      durationMinutes: service.durationMinutes,
+      resourceId: appointment.resourceId,
+      date: localDateInZone(startsAt, appointment.timezone),
+      timezone: appointment.timezone,
+    });
+    if (
+      !slots.some((group) =>
+        group.slots.some((slot) => slot.startsAt.getTime() === startsAt.getTime()),
+      )
+    ) {
+      throw new ConflictError('This time slot is not available.');
+    }
+
     const replacement = await this.repo.book({
       branchId,
       contactId: appointment.contactId,
@@ -226,6 +269,13 @@ export class AppointmentsService {
 
     await this.repo.linkReschedule(replacement.id, appointment.id);
     await this.repo.cancelReminders(id);
+
+    const reminderLeads = REMINDER_LEADS_HOURS.map(
+      (hours) => new Date(startsAt.getTime() - hours * 3_600_000),
+    ).filter((sendAt) => sendAt > new Date());
+    if (reminderLeads.length > 0) {
+      await this.repo.createReminders(replacement.id, reminderLeads);
+    }
 
     return replacement;
   }

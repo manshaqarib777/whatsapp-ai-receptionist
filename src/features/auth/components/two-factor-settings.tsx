@@ -4,7 +4,12 @@ import { ShieldCheck, ShieldOff } from 'lucide-react';
 import { useState } from 'react';
 
 import { TextField } from '@/components/form-field';
-import { authClient } from '@/lib/auth-client';
+import {
+  disableAccountTwoFactor,
+  enableAccountTwoFactor,
+  verifyAccountTotp,
+} from '@/features/auth/services/account.client';
+import { TotpQrCode } from '@/features/auth/components/totp-qr-code';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -43,21 +48,19 @@ export function TwoFactorSettings({ enabled }: { enabled: boolean }) {
     setError(null);
     setIsPending(true);
 
-    const { data, error: enableError } = await authClient.twoFactor.enable({
-      password,
-    });
-
-    setIsPending(false);
-
-    if (enableError || !data) {
-      setError('That password is not correct.');
-      return;
+    try {
+      const data = await enableAccountTwoFactor(password);
+      setTotpUri(data.totpURI);
+      setBackupCodes(data.backupCodes);
+      setPassword('');
+      setStage('verify');
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'That password is not correct.',
+      );
+    } finally {
+      setIsPending(false);
     }
-
-    setTotpUri(data.totpURI);
-    setBackupCodes(data.backupCodes);
-    setPassword('');
-    setStage('verify');
   }
 
   async function confirmEnable(event: React.FormEvent) {
@@ -65,16 +68,15 @@ export function TwoFactorSettings({ enabled }: { enabled: boolean }) {
     setError(null);
     setIsPending(true);
 
-    const { error: verifyError } = await authClient.twoFactor.verifyTotp({ code });
-
-    setIsPending(false);
-
-    if (verifyError) {
-      setError('That code is not correct. Check your authenticator app.');
+    try {
+      await verifyAccountTotp(code);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'That code is not correct.');
       setCode('');
+      setIsPending(false);
       return;
     }
-
+    setIsPending(false);
     setIsEnabled(true);
     setStage('backup-codes');
   }
@@ -84,15 +86,16 @@ export function TwoFactorSettings({ enabled }: { enabled: boolean }) {
     setError(null);
     setIsPending(true);
 
-    const { error: disableError } = await authClient.twoFactor.disable({ password });
-
-    setIsPending(false);
-
-    if (disableError) {
-      setError('That password is not correct.');
+    try {
+      await disableAccountTwoFactor(password);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'That password is not correct.',
+      );
+      setIsPending(false);
       return;
     }
-
+    setIsPending(false);
     setIsEnabled(false);
     setPassword('');
     setStage('idle');
@@ -178,6 +181,7 @@ export function TwoFactorSettings({ enabled }: { enabled: boolean }) {
               <p className="text-muted-foreground text-xs">
                 Scan the QR code in your app, or enter the setup key manually.
               </p>
+              <TotpQrCode key={totpUri} uri={totpUri} />
               {/* The URI is shown as selectable text rather than only as a QR image,
                   so it is usable on the device running the browser and by screen
                   reader users. */}

@@ -9,6 +9,10 @@ import {
   evaluateSegment,
   type SegmentDefinition,
 } from '@/features/broadcast/services/segments';
+import {
+  unavailableBroadcastTransport,
+  type BroadcastTransport,
+} from '@/features/broadcast/services/broadcast-transport';
 
 /**
  * Broadcast orchestration — Milestone 14.
@@ -30,15 +34,30 @@ export type CampaignAnalytics = {
 
 export class BroadcastService {
   private readonly repo: BroadcastRepository;
+  private readonly transport: BroadcastTransport;
   readonly organizationId: string;
 
-  constructor(repo: BroadcastRepository) {
+  constructor(
+    repo: BroadcastRepository,
+    transport: BroadcastTransport = unavailableBroadcastTransport,
+  ) {
     this.repo = repo;
+    this.transport = transport;
     this.organizationId = repo.organizationId;
   }
 
   static forOrganization(organizationId: string): BroadcastService {
     return new BroadcastService(BroadcastRepository.forOrganization(organizationId));
+  }
+
+  static forOrganizationWithTransport(
+    organizationId: string,
+    transport: BroadcastTransport,
+  ): BroadcastService {
+    return new BroadcastService(
+      BroadcastRepository.forOrganization(organizationId),
+      transport,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -216,14 +235,32 @@ export class BroadcastService {
 
   /**
    * Worker step: claim due campaigns (scheduled ≤ now, or in-flight sending),
-   * mark their queued recipients `sent`, and advance to `sent`.
+   * materialise scheduled campaigns, deliver each queued recipient, and only
+   * mark a recipient sent after transport acknowledgement.
    */
   async processDueCampaigns(now = new Date()): Promise<number> {
     const due = await this.repo.listDueCampaigns(now);
     let processed = 0;
 
     for (const campaign of due) {
-      await this.repo.markRecipientsSent(campaign.id);
+      if (campaign.status === 'scheduled') await this.materialiseAndSend(campaign.id);
+      const deliveries = await this.repo.listQueuedDeliveries(campaign.id);
+      for (const delivery of deliveries) {
+        try {
+          await this.transport.send({
+            organizationId: this.organizationId,
+            campaignId: campaign.id,
+            recipientId: delivery.id,
+            phoneNumber: delivery.contact.phoneNumber,
+            template: delivery.campaign.template,
+          });
+          await this.repo.markRecipientDelivered(delivery.id);
+        } catch (error) {
+          const reason =
+            error instanceof Error ? error.message : 'Broadcast delivery failed.';
+          await this.repo.markRecipientFailed(delivery.id, reason);
+        }
+      }
       await this.repo.updateCampaignStatus(campaign.id, 'sent', {
         finishedAt: new Date(),
       });

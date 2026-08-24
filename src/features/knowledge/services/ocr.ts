@@ -1,5 +1,4 @@
-import { PDFParse } from 'pdf-parse';
-import { createWorker, type Worker } from 'tesseract.js';
+import type { Worker } from 'tesseract.js';
 
 import { UnprocessableError } from '@/lib/errors';
 
@@ -17,11 +16,11 @@ import { UnprocessableError } from '@/lib/errors';
 
 let sharedWorker: Promise<Worker> | null = null;
 
-function getWorker(): Promise<Worker> {
+async function getWorker(): Promise<Worker> {
   if (!sharedWorker) {
-    sharedWorker = createWorker('eng').then((worker) => worker);
+    sharedWorker = import('tesseract.js').then(({ createWorker }) => createWorker('eng'));
   }
-  return sharedWorker;
+  return await sharedWorker;
 }
 
 /**
@@ -31,6 +30,7 @@ function getWorker(): Promise<Worker> {
  * @param pageCount The number of pages to OCR (the parser reports the total).
  */
 export async function ocrPdf(buffer: Buffer, pageCount: number): Promise<string> {
+  const { PDFParse } = await import('pdf-parse');
   const worker = await getWorker();
   const parser = new PDFParse({ data: new Uint8Array(buffer) });
   const pages: string[] = [];

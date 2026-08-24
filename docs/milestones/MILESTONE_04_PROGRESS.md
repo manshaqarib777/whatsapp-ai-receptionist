@@ -1,10 +1,21 @@
 # Milestone 4 — Progress
 
-Status: Complete — see `MILESTONE_04_COMPLETED.md`
+Status: Complete — structurally re-certified 2026-08-23
 Started: 2026-08-02
-Last updated: 2026-08-10
+Last updated: 2026-08-23
 
 Plan: `MILESTONE_04_PLAN.md` (approved 2026-08-02, both open questions answered).
+
+## 2026-08-23 Sequential Review
+
+- [x] Rechecked the schema, migrations, model classification, erasure registry,
+      isolation tests, direct-client imports, seed, drift guard, and completion claims.
+- [x] Replaced six dynamic unscoped-client imports in workers with a reviewed
+      database-layer system repository.
+- [x] Extended lint enforcement to reject dynamic imports of `@/lib/prisma`; verified
+      with a failing stdin probe rather than assuming the selector worked.
+- [x] Re-ran isolation/erasure/seed tests (75/75), schema drift (known HNSW/trgm only),
+      typecheck, lint, and diff checks.
 
 ## Completed Tasks
 
@@ -55,7 +66,7 @@ Plan: `MILESTONE_04_PLAN.md` (approved 2026-08-02, both open questions answered)
 
 | # | Issue | Status | Resolution |
 |---|---|---|---|
-| 1 | `DATABASE_RULES.md:66` forbids hard deletion; `:182` requires a purge path for deletion requests. Directly contradictory. | Open | Plan AD-4 separates soft delete from erasure, and implements erasure as redaction in place. The rule file still needs amending — tracked in Pending Tasks. |
+| 1 | `DATABASE_RULES.md:66` forbids hard deletion; `:182` requires a purge path for deletion requests. Directly contradictory. | Resolved | Plan AD-4 separates soft delete from erasure, implements erasure as redaction in place, and the rule file now documents that distinction. |
 | 2 | PRD "Every table" pulls against `MILESTONE_RULES.md:19` "never add features from future milestones" | Resolved | Tiering approved 2026-08-02. Design all, migrate the Tier-1 spine. Plan AD-6. |
 | 3 | Table count is 85, not the ~75 estimated in the plan | Resolved | Counted precisely while drawing the ER diagram: 10 existing, 50 Tier 1, 25 Tier 2. The plan's estimate was made before the derivation; the diagram is authoritative. |
 | 4 | `postgres:17-alpine` does not ship pgvector — plan risk R-3, hitting locally before it could hit a host | Resolved | Moved to `pgvector/pgvector:pg17` in both docker-compose and CI. Same PG 17 major, so the volume carried over: all 11 tables and the migration history survived, verified rather than assumed. Both files had to change together or `CREATE EXTENSION vector` would pass locally and fail in CI. |
@@ -69,6 +80,7 @@ Plan: `MILESTONE_04_PLAN.md` (approved 2026-08-02, both open questions answered)
 | 12 | Three auth component tests and two gallery E2E tests failed in the full suite but passed alone — flaky, which `TESTING_RULES.md:118` forbids leaving | Resolved | Both were under-provisioned wait budgets, reproduced deliberately rather than assumed: the component tests failed 6/6 runs under CPU contention with `push` at **0 calls**, because a mocked promise resolved but React did not flush state inside testing-library's 1s `asyncUtilTimeout`. The gallery axe audits cost 14–21s on an idle machine against a 30s default, so a second worker tipped them over. Fixed by setting `asyncUtilTimeout` to 5s (`vitest.setup.ts`), `testTimeout` to 15s, and a 90s budget on the four gallery audits. Verified by re-running the exact load that failed: 6/6 clean, then 118/118 E2E. No assertion was weakened and no retry was added — `retries: 0` still stands. |
 | 13 | **`@/lib/prisma` was not restricted anywhere, so Milestone 4's entire isolation control was bypassable** — and the existing lint message told authors to import it | Resolved | Found by the `SECURITY_RULES.md` review, not by a test. `scoped-prisma.ts` claimed the boundary was "enforced by an ESLint rule"; only `@prisma/client` was restricted, and its message read "Import the shared client from `@/lib/prisma`" — actively directing people around `forScope()`. With RLS deferred (Issue 10) this extension is the *only* isolation layer, so an unenforced boundary meant any Milestone 5+ feature could query unscoped with nothing failing. Added `@/lib/prisma` to `no-restricted-imports` with a path allow-list of the five callers that genuinely pre-date a scope, and verified the rule actually errors on a probe file. The same review found `scoped-prisma.ts` asserting "Postgres RLS is enabled as a second layer (see the RLS migration)" — no such migration exists; corrected to state it is the only layer. |
 | 14 | Four pre-existing suites failed under Vite 8: `email.test.ts`, `api-handler.test.ts`, and both health tests — `Error: No such built-in module: node:` | Resolved | `vitest.config.ts` sets `environment: 'jsdom'` globally, and jsdom maps to Vite's *client* environment, where `node:crypto` imports are externalized for browser compatibility and then fail to load ("No such built-in module: node:"). Only the four suites importing server modules (`@/lib/email`, `@/server/api-handler`, `@/app/api/health/route`) were affected — they need no DOM APIs. Fixed with `// @vitest-environment node` on each, routing them through the SSR resolver where `node:` builtins resolve natively. Verified by reproducing with a bare `import { createHash } from 'node:crypto'` (fails under jsdom, passes under node) before fixing. Full suite is green again: 465/465, matching the count recorded at close. |
+| 15 | Six later background workers bypassed the static unscoped-Prisma import restriction with dynamic imports; the reminder worker also performed tenant-owned reads/writes globally. | Resolved | Added `system-discovery.repository.ts` as the explicit pre-scope seam, returned organization IDs with discovered work, rebound reminder writes through `forScope()`, and added a `no-restricted-syntax` guard for dynamic imports. A real lint probe proves the guard fails closed. |
 
 ## Technical Decisions
 

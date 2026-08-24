@@ -119,4 +119,27 @@ describe('renderQuotePdf', () => {
 
     expect(buffer.toString('latin1')).toContain('Valid for 30 days.');
   });
+
+  it('uses a valid shared font object across multiple pages', () => {
+    const quote = makeQuote({
+      lineItems: Array.from({ length: 60 }, (_, index) => ({
+        id: `line-${index}`,
+        position: index,
+        description: `Treatment ${index}`,
+        quantity: 1,
+        unitPriceAmount: 10,
+        taxRate: 0.15,
+        taxAmount: 1.5,
+        lineTotalAmount: 11.5,
+      })),
+    });
+    const text = renderQuotePdf(quote, {
+      colors: { primary: '#ff0000' },
+    }).toString('latin1');
+
+    expect(text).toContain('/Count 2');
+    expect(text).toContain('/F1 7 0 R');
+    expect(text).toContain('1.000 0.000 0.000 rg');
+    expect(text).toContain('7 0 obj\n<< /Type /Font');
+  });
 });

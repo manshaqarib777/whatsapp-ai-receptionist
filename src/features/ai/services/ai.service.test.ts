@@ -8,6 +8,7 @@ import {
   MEMORY_WINDOW_TURNS,
 } from '@/features/ai/services/memory';
 import { renderPrompt } from '@/features/ai/services/prompts';
+import { runTurnSchema } from '@/features/ai/validators/ai.validators';
 
 /**
  * AI Engine unit tests — the deterministic local provider, memory windowing,
@@ -44,6 +45,18 @@ describe('classifier (local provider)', () => {
     expect(classifyLocal(text, [...INTENT_LABELS])).toEqual(
       classifyLocal(text, [...INTENT_LABELS]),
     );
+  });
+});
+
+describe('AI request validation', () => {
+  it('rejects unknown fields at the API boundary', () => {
+    expect(() =>
+      runTurnSchema.parse({
+        conversationId: '123e4567-e89b-12d3-a456-426614174000',
+        message: 'Hello',
+        organizationId: '123e4567-e89b-12d3-a456-426614174001',
+      }),
+    ).toThrow();
   });
 });
 

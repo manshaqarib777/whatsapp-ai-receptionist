@@ -490,5 +490,53 @@ async function seedEdgeCases(
     },
   });
 
-  return 4;
+  const voice = await prisma.message.create({
+    data: {
+      id: seedId('edge', 5),
+      organizationId: org,
+      conversationId,
+      whatsappMessageId: 'wamid.seed.edge.voice',
+      direction: 'inbound',
+      authorType: 'contact',
+      contentType: 'audio',
+      body: null,
+      deliveryStatus: 'delivered',
+      createdAt: daysFromNow(0, 15, 5),
+      updatedAt: SEED_NOW,
+    },
+  });
+  const voiceAttachment = await prisma.messageAttachment.create({
+    data: {
+      id: seedId('attachment', 2),
+      organizationId: org,
+      messageId: voice.id,
+      storageKey: 'seed/attachments/appointment-voice-note.ogg',
+      mimeType: 'audio/ogg',
+      sizeBytes: BigInt(48_000),
+      fileName: 'appointment-voice-note.ogg',
+      createdAt: daysFromNow(0, 15, 5),
+      updatedAt: SEED_NOW,
+    },
+  });
+  await prisma.transcription.create({
+    data: {
+      id: seedId('transcription', 1),
+      organizationId: org,
+      branchId: tenants.northwind.riyadh,
+      messageId: voice.id,
+      attachmentId: voiceAttachment.id,
+      status: 'completed',
+      language: 'en',
+      provider: 'local',
+      model: 'demo-stt-v1',
+      text: 'I would like to confirm my appointment tomorrow at ten in the morning.',
+      confidence: 0.98,
+      attempts: 1,
+      completedAt: daysFromNow(0, 15, 5),
+      createdAt: daysFromNow(0, 15, 5),
+      updatedAt: SEED_NOW,
+    },
+  });
+
+  return 5;
 }

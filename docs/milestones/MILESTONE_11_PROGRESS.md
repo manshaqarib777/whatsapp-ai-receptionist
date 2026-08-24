@@ -1,8 +1,8 @@
 # Milestone 11 — Quotation System — Progress
 
-Status: In Progress → Completed
+Status: Complete — re-certified 2026-08-23
 Started: 2026-08-14
-Last updated: 2026-08-14
+Last updated: 2026-08-23
 
 > **Batch decision**: Work on milestones 9–11 was executed as one approved batch
 > ("approved through M11, proceed on green"): sequential implementation, per-milestone
@@ -26,6 +26,8 @@ Last updated: 2026-08-14
 - [x] Quote list + create dialog (live VAT preview) + detail page (lifecycle, PDF, versions)
 - [x] Feature renamed `quotes` → `quotations` per architecture doc (user-approved)
 - [x] Typecheck, lint, unit/integration/E2E, build all pass; axe audits clean
+- [x] Multi-page PDF object graph and configured primary branding color repaired;
+      send transition restricted to drafts as documented
 
 ## Pending Tasks
 
@@ -40,6 +42,9 @@ None — milestone complete.
 | 3 | E2E create-test cleanup raced the org switch — created quote could survive `deleteMany by org` | Resolved | Test captures the created quote id from the POST response and deletes by id first |
 | 4 | Full-suite E2E stalled randomly under 4-way parallel load (ai/inbox/knowledge, not quotes) | Resolved | `playwright.config.ts` capped to `workers: 1` matching CI; deterministic |
 | 5 | One-off `ECONNRESET` on `POST /api/organizations` during the CRM E2E setup in a full 186-test run | Resolved (environmental) | Infra-level connection drop, not a code defect; the CRM spec passes 10/10 at `workers: 1` in isolation and in its full spec |
+| 6 | Every PDF page referenced object 4 as the font, but object 4 is a content stream | Resolved 2026-08-23 | Font object id is computed after all page/content pairs and shared by every page; multi-page regression added. |
+| 7 | Template branding colors were stored but ignored by PDF output | Resolved 2026-08-23 | Valid `branding.colors.primary` hex values are emitted as PDF RGB commands. |
+| 8 | Rejected/expired quotes could be sent again despite the draft-only lifecycle | Resolved 2026-08-23 | `send` now accepts only `draft`. |
 
 ## Technical Decisions
 

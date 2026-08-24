@@ -36,6 +36,32 @@ const serverSchema = z.object({
       'AUTH_SECRET must be at least 32 characters. Generate one with: openssl rand -base64 32',
     ),
 
+  DATA_ENCRYPTION_KEY: z
+    .string()
+    .refine((value) => {
+      try {
+        return Buffer.from(value, 'base64').length === 32;
+      } catch {
+        return false;
+      }
+    }, 'DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.')
+    .optional(),
+
+  REDIS_URL: z
+    .string()
+    .url()
+    .refine(
+      (value) => value.startsWith('redis://') || value.startsWith('rediss://'),
+      'REDIS_URL must use redis:// or rediss://.',
+    )
+    .optional(),
+  APP_URL: z.string().url('APP_URL must be a valid URL').optional(),
+  CACHE_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9_-]+$/i)
+    .default('war'),
+  CACHE_TTL_SECONDS: z.coerce.number().int().min(1).max(300).default(30),
+
   EMAIL_FROM: z.string().email().default('noreply@whatsapp-receptionist.local'),
 
   /**
@@ -162,6 +188,10 @@ const serverSchema = z.object({
    */
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  INTEGRATIONS_LIVE_ENABLED: z.enum(['true', 'false']).default('false'),
+  SPEECH_PROVIDER: z.enum(['local', 'openai']).default('local'),
+  SPEECH_TO_TEXT_MODEL: z.string().min(1).default('gpt-4o-mini-transcribe'),
+  TEXT_TO_SPEECH_MODEL: z.string().min(1).default('gpt-4o-mini-tts'),
 });
 
 /**
@@ -207,6 +237,13 @@ const envSchema = serverSchema.merge(clientSchema).superRefine((env, ctx) => {
       code: 'custom',
       path: ['OPENAI_API_KEY'],
       message: 'OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai.',
+    });
+  }
+  if (env.SPEECH_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['OPENAI_API_KEY'],
+      message: 'OPENAI_API_KEY is required when SPEECH_PROVIDER=openai.',
     });
   }
 

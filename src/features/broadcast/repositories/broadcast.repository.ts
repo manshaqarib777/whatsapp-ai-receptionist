@@ -117,10 +117,23 @@ export class BroadcastRepository {
     return this.campaigns.countRecipientsByStatus(campaignId);
   }
 
-  markRecipientsSent(
+  listQueuedDeliveries(
     campaignId: string,
-  ): ReturnType<CampaignsRepository['markRecipientsSent']> {
-    return this.campaigns.markRecipientsSent(campaignId);
+  ): ReturnType<CampaignsRepository['listQueuedDeliveries']> {
+    return this.campaigns.listQueuedDeliveries(campaignId);
+  }
+
+  markRecipientDelivered(
+    recipientId: string,
+  ): ReturnType<CampaignsRepository['markRecipientDelivered']> {
+    return this.campaigns.markRecipientDelivered(recipientId);
+  }
+
+  markRecipientFailed(
+    recipientId: string,
+    reason: string,
+  ): ReturnType<CampaignsRepository['markRecipientFailed']> {
+    return this.campaigns.markRecipientFailed(recipientId, reason);
   }
 
   listDueCampaigns(now: Date): ReturnType<CampaignsRepository['listDueCampaigns']> {

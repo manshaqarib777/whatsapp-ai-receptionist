@@ -1,4 +1,5 @@
 import type { ConversationDetail, ConversationRow, MessageRow } from './inbox.types';
+import { signStorageKey } from '@/lib/storage';
 
 export const messageSelect = {
   id: true,
@@ -58,6 +59,7 @@ export function mapMessageRow(row: {
     attachments: row.attachments.map((a) => ({
       id: a.id,
       storageKey: a.storageKey,
+      downloadUrl: `/api/storage/${signStorageKey(a.storageKey)}`,
       mimeType: a.mimeType,
       sizeBytes: a.sizeBytes.toString(),
       fileName: a.fileName,

@@ -2,7 +2,7 @@
 
 Created: 2026-08-13
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 8`
-Status: Draft for approval
+Status: Approved 2026-08-13; completed and re-certified 2026-08-23
 
 ---
 
@@ -31,6 +31,8 @@ True after this milestone, and not true now:
   answer.
 - Every turn records an `AiRun` row (model, tokens, cost, latency, outcome,
   intent, confidence) and surfaces in a run log.
+- Every turn starts from a persisted inbound message id and runs through an
+  idempotent database-backed job that can recover after a worker crash.
 
 Measurable: `npm run typecheck`, `npm run lint` → 0 errors; `npm run test` +
 `npm run test:e2e` pass; `npm run build` succeeds; axe clean on the new AI pages.
@@ -180,7 +182,8 @@ to take effect. Template CRUD is admin/owner-only (`ai:manage`).
 | `GET /api/ai/templates/[id]` | `ai:read` | Template + versions |
 | `POST /api/ai/templates/[id]/versions` | `ai:manage` | Add a draft version |
 | `POST /api/ai/templates/[id]/versions/[versionId]/activate` | `ai:manage` | Set currentVersionId |
-| `POST /api/ai/runs` | `ai:run` | Run a turn (message + conversation) — the engine entry |
+| `POST /api/ai/runs` | `ai:run` | Idempotently enqueue a persisted inbound message |
+| `GET /api/ai/jobs/[id]` | `ai:read` | Read tenant-scoped job status and linked run id |
 
 ---
 
@@ -197,9 +200,9 @@ tests/CI).
 
 ## Database Impact
 
-No migration needed — the M4 schema already has `prompt_templates`,
-`prompt_template_versions`, `ai_runs`, `ai_run_citations`, and
-`conversation_summaries` carries a `model` column for the AI-engine summary.
+The M4 schema already supplied prompts, runs, citations, and summaries. The
+completion repair adds `ai_turn_jobs`, keyed uniquely by `input_message_id`, so
+queue payloads reference persisted content instead of duplicating customer PII.
 
 **Seed**: `prisma/seed/ai.ts` adds a system/booking/FAQ prompt template (active
 versions) and a couple of `ai_runs` from the demo conversation so the run log
@@ -264,8 +267,8 @@ memory windowed, write tools confirmation-gated, token/cost ceilings enforced.
   retrieval-backed answers, escalation on low confidence, org A never sees org B's
   runs/templates.
 - **Component**: template list/editor/run log states, axe-clean.
-- **E2E**: seeded templates render; run log renders after a turn; axe audits the
-  AI pages.
+- **E2E**: seeded templates render; a persisted message is queued, processed by
+  the worker, and visible in the run log; axe audits the AI pages.
 - **Seed**: prompt templates + demo runs.
 
 **Exit gate**: typecheck (0), lint (0), `npm run test`, `npm run test:e2e`,

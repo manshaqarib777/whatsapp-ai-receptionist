@@ -1,4 +1,28 @@
 services:
+  redis:
+    image: redis:8.2-alpine
+    container_name: war_redis
+    restart: unless-stopped
+    command:
+      [
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '128mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
+      ]
+    ports:
+      - '127.0.0.1:6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   postgres:
     # pgvector, not stock postgres: Milestone 4 stores knowledge-base embeddings in
     # Postgres (MILESTONE_04_PLAN.md AD-5) and postgres:17-alpine does not ship the

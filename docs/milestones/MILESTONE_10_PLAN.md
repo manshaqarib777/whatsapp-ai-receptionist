@@ -2,7 +2,7 @@
 
 Created: 2026-08-13
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 10`
-Status: Draft for approval
+Status: Approved 2026-08-13; re-certified 2026-08-23
 
 ---
 

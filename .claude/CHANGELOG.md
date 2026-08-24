@@ -1,5 +1,97 @@
 # Changelog
 
+## Unreleased — Sequential verification repair
+
+### Changed
+
+- **BREAKING** `POST /api/ai/runs` now queues an existing inbound-message id and
+  returns HTTP 202 with a durable job instead of accepting duplicated conversation
+  text and running synchronously. Poll `/api/ai/jobs/:id` for completion.
+- AI turns execute through an idempotent database queue with bounded retries,
+  stale-claim recovery, and deterministic run ids, so a worker crash cannot silently
+  lose work or invoke the provider twice after the run was persisted.
+
+- Milestone 2 structural repair restored auth persistence/client layering; added durable
+  progressive lockout, invitation acceptance, session management, local TOTP QR output,
+  auth-event auditing, strict query validation, and atomic default-branch provisioning.
+- Migrated the optimistic auth guard to the documented Next.js 16 `proxy.ts` convention.
+- Verified 944 unit/integration/component tests and 234 zero-retry E2E tests, plus build,
+  types, lint, formatting, dependency audit, and schema drift.
+
+- Production builds self-host the packaged Geist fonts and no longer download them
+  from Google during compilation.
+- Playwright loads the same `.env*` files as Next before collecting database-backed
+  E2E tests.
+
+- AI turns now fail closed: human-owned threads receive no AI reply, suspected prompt
+  injection is withheld from the provider, failed provider attempts escalate the
+  conversation, and replies are bounded and stripped of internal ids and arbitrary
+  links.
+- AI tools execute through a server-side allow-list, independent of model output.
+- Knowledge retrieval now carries real chunk ids into persisted AI citations.
+
+### Fixed
+
+- Re-certified Milestone 17 loyalty: coupons now atomically discount draft
+  invoices, concurrent points spends cannot overdraw, and the loyalty
+  repository is split into bounded domains.
+
+- Re-certified Milestone 16 reviews: request delivery is fail-closed and
+  retryable, platform adapters expose fail-loud operations, and the reviews
+  repository is split into bounded domains.
+
+- Re-certified Milestone 15 analytics: range-aware conversion, captured-payment
+  revenue, true 30-day retention cohorts, batched response-time reads, and
+  repository/service splits under the structural line budget.
+
+- Re-certified Milestone 14 broadcast delivery: scheduled campaigns now
+  materialise before processing, transport acknowledgement gates `sent`, and
+  unavailable WhatsApp delivery records a recipient failure.
+
+- Re-certified Milestone 13: workflow conditions now evaluate real run variables,
+  delayed steps resume through an atomic worker, reusable workflow copies are
+  available in API/UI, and the builder/repository meet the structural line budget.
+
+- Manual invoice settlement now creates a succeeded payment/receipt and reconciles the
+  paid balance instead of changing invoice status without financial history.
+- Multi-page invoice PDFs now reference a valid shared font object; invoice lifecycle
+  orchestration was extracted below the structural line target.
+- Multi-page quote PDFs now reference a valid shared font object, honor the template's
+  primary branding color, and enforce draft-only sending.
+- CRM company updates now live at the reachable dynamic route, and company automation
+  records first-class company tags/activities instead of attaching contact subjects to
+  company UUIDs.
+- Split CRM client DTOs out of the oversized query-hook module.
+- Appointment availability now converts local business hours through the requested
+  IANA zone, including DST-aware day boundaries, rather than treating them as UTC.
+- Reminder jobs no longer mark no-op delivery as sent; transport acknowledgement is
+  required, and an unconfigured Meta transport fails visibly.
+- Recurring appointment children now retain their parent link and the parent stores
+  its RRULE; reschedules revalidate availability and schedule replacement reminders.
+- Added the planned service-update API at `PATCH /api/appointments/services/:id`.
+- Restored the missing `GET /api/ai/runs` handler used by the run log.
+- Split AI run persistence and tool-context resolution out of the oversized engine
+  orchestrator, bringing it below the repository's 300-line structural target.
+
+- Production E2E email sends now honor the explicit test-run exception already
+  accepted by environment validation.
+- Replaced ambiguous mobile E2E text queries with semantic scoped locators.
+- Made the appointment-reminder integration fixture independent of the 2026 wall
+  clock.
+
+- Provider exhaustion previously returned a holding message but recorded the run as
+  `answered`; it now records `failed` and marks the conversation escalated.
+- AI citation placeholders were filtered before persistence, leaving supported answers
+  without an audit trail.
+
+### Security
+
+- Pinned patched `deepmerge-ts` 8 for Prisma tooling; `npm audit` now reports zero
+  vulnerabilities.
+
+- Added deterministic injection-resistance evaluations, strict AI request/tool schemas,
+  output leak filtering, per-turn token/cost ceilings, and unauthorized-tool tests.
+
 All notable changes to this project are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
@@ -27,6 +119,29 @@ change gets an entry in the same PR.
 ## [Unreleased]
 
 ### Added
+
+**Milestone 17 — Loyalty**
+
+- A loyalty system at `/loyalty`: an account list with membership tiers and
+  balances, an account detail with the points ledger and a redeem doorway, a
+  program manager, a coupon manager, and a referral list.
+- The six Tier-2 loyalty tables from the M4 ER diagram are migrated now:
+  `loyalty_programs`, `loyalty_accounts`, `loyalty_transactions`, `coupons`,
+  `coupon_redemptions`, `referrals`. The ledger is the source of truth —
+  balances only change by applying a transaction, never by recomputation.
+- Points: a DB-polled worker (`npm run loyalty:work`) finds paid invoices that
+  have not yet earned, credits the contact's account
+  (`floor(totalAmount × rate)`), and updates the tier — idempotent via the
+  unique `(invoiceId, kind)` transaction guard, so a re-run cannot double-award.
+- Membership tiers are derived from lifetime earned points (`bronze < 500`,
+  `silver 500–1999`, `gold ≥ 2000`); rewards are redeemed against the balance,
+  and a spend can never take it below zero (409 + DB CHECK).
+- Coupons are percent or fixed with an expiry and a redemption limit; one use
+  per contact (unique guard). Referrals earn the referrer a bonus when the
+  referred contact first earns.
+- The loyalty API is fully tenant-scoped: every query runs through `forScope`,
+  and the integration suite proves org A can never see org B's accounts,
+  coupons, or referrals.
 
 **Milestone 16 — Reviews**
 
@@ -558,6 +673,18 @@ change gets an entry in the same PR.
 
 ---
 
+## [Milestone 18] - 2026-08-23
+
+### Added
+- Multi-branch management, session-backed switching, branch settings, and branch-level
+  isolation for appointments, knowledge, and AI.
+- Active-session branch migration, strict branch APIs, audit events, and desktop/mobile
+  E2E isolation coverage.
+
+### Security
+- Organization and branch selectors now update atomically and are verified from the
+  database session on every request. Disabled stale session cookie caching.
+
 ## Template
 
 ```markdown
@@ -579,3 +706,56 @@ change gets an entry in the same PR.
 ### Security
 - Webhook signatures are now compared in constant time.
 ```
+# 2026-08-24 — Milestone 19 integrations
+
+- Added tenant-scoped sandbox/live connection management for all 11 PRD providers,
+  strict safe configuration, health testing, RBAC, audit events, settings UI, and
+  deterministic demo connections.
+- Added login-ready synthetic demo accounts documented in `docs/DEMO_DATA.md`.
+
+# 2026-08-24 — Milestone 20 Voice AI
+
+- Added durable voice-note transcription, local and opt-in live speech adapters,
+  user-initiated text-to-speech, and a closed, confirmation-aware voice-command model.
+- Added accessible inbox recording/transcript controls, scoped voice APIs, a retrying
+  worker, transcript erasure, and deterministic voice demo data.
+
+# 2026-08-24 — Milestone 21 AI agents
+
+- Added eight branch-scoped specialist agents on one guarded execution pipeline with
+  deterministic routing, immutable capability ceilings, run attribution, optimistic
+  configuration, safe local tests, management UI, and realistic demo data.
+
+# 2026-08-24 — Milestone 22 Admin Portal
+
+- Added an independently authorized platform-operator portal covering tenants, plans,
+  billing, sanitized logs, AI usage, analytics, and monitoring without weakening tenant
+  repositories or exposing customer content.
+- Added global plans, organization subscription snapshots, audited optimistic updates,
+  deterministic operator demo data, and desktop/mobile access-isolation coverage.
+
+# 2026-08-24 — Milestone 23 Security
+
+- Added atomic durable rate limiting, versioned AES-256-GCM credential envelopes,
+  owner/admin privacy access and erasure workflows, PII-free audit evidence, and
+  deterministic privacy demo data.
+- Added request-nonce script CSP, guarded backup/restore tooling with a successful
+  disposable restore drill, OWASP coverage documentation, and desktop/mobile security tests.
+
+# 2026-08-24 — Milestone 24 Performance
+
+- Added optional Redis 8 caching and atomic rate limits with direct-read/PostgreSQL
+  fallbacks, tenant-digested keys, deterministic exact invalidation, and safe health status.
+- Added streamed route loading, dynamic workflow-editor loading, accessible inbox
+  windowing, immutable asset verification, and enforced production bundle budgets.
+
+# 2026-08-24 — Milestone 25 Production readiness
+
+- Added a non-root standalone production image, non-publishing release artifact workflow,
+  CI container smoke gate, separated liveness/readiness probes, W3C trace propagation,
+  runtime canonical URLs, and public robots/sitemap metadata.
+- Added symptom-based monitoring and alert guidance plus provider-neutral deployment and
+  rollback runbooks. Final QA certifies the local artifact only; no external deployment
+  was performed.
+- Replaced deletion-only Redis cache invalidation with generation-versioned cache keys so
+  an in-flight stale load cannot overwrite a post-mutation invalidation.

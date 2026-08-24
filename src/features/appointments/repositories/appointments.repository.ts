@@ -33,6 +33,10 @@ export class AppointmentsRepository {
     return new AppointmentsRepository(resolveScope(organizationId));
   }
 
+  static forScope(scope: Scope): AppointmentsRepository {
+    return new AppointmentsRepository(scope);
+  }
+
   async resolveDefaultBranch(): Promise<string> {
     return this.services.resolveDefaultBranch();
   }
@@ -51,6 +55,13 @@ export class AppointmentsRepository {
     input: Parameters<AppointmentsServicesRepository['createService']>[0],
   ): ReturnType<AppointmentsServicesRepository['createService']> {
     return this.services.createService(input);
+  }
+
+  updateService(
+    id: string,
+    input: Parameters<AppointmentsServicesRepository['updateService']>[1],
+  ): ReturnType<AppointmentsServicesRepository['updateService']> {
+    return this.services.updateService(id, input);
   }
 
   getService(id: string): ReturnType<AppointmentsServicesRepository['getService']> {
@@ -133,6 +144,17 @@ export class AppointmentsRepository {
     sendAts: Date[],
   ): ReturnType<BookingsRepository['createReminders']> {
     return this.bookings.createReminders(appointmentId, sendAts);
+  }
+
+  getReminderDelivery(id: string): ReturnType<BookingsRepository['getReminderDelivery']> {
+    return this.bookings.getReminderDelivery(id);
+  }
+
+  setReminderStatus(
+    id: string,
+    status: 'sent' | 'failed',
+  ): ReturnType<BookingsRepository['setReminderStatus']> {
+    return this.bookings.setReminderStatus(id, status);
   }
 }
 

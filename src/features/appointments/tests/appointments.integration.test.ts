@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { prisma } from '@/lib/prisma';
 import { AppointmentsRepository } from '@/features/appointments/repositories/appointments.repository';
@@ -9,6 +9,7 @@ import {
   expandRecurrence,
   parseRecurrenceRule,
 } from '@/features/appointments/services/recurrence';
+import { processDueReminders } from '@/workflows/appointment-reminders.worker';
 
 /**
  * Appointment Engine integration tests — real Postgres.
@@ -186,14 +187,11 @@ describe('availability (AD-2)', () => {
 describe('booking (AD-3)', () => {
   it('books an appointment and schedules reminders', async () => {
     const service = AppointmentsService.forOrganization(f.orgA);
-    // Reminders are only scheduled when their lead time is still in the
-    // future, so the booking must always be ahead of "now". The fixture's
-    // availability rule is a Sunday 08:00–17:00; book the nearest Sunday 09:00
-    // UTC that has not passed.
-    const now = new Date();
-    const booked = new Date('2026-08-16T09:00:00.000Z');
-    const startsAt =
-      booked > now ? booked : new Date(booked.getTime() + 7 * 24 * 3_600_000);
+    // Reminders are only scheduled when their lead time is in the future. Use a
+    // fixed future Sunday covered by the fixture's availability rule so this test
+    // does not change behavior based on the wall clock. The previous fixture added
+    // only one week to an expired 2026 date and began failing on 2026-08-23.
+    const startsAt = new Date('2099-08-16T09:00:00.000Z');
     const appointment = await service.book({
       contactId: f.contactId,
       serviceId: f.serviceId,
@@ -285,7 +283,7 @@ describe('org isolation', () => {
       contactId: f.contactId,
       serviceId: f.serviceId,
       resourceId: f.resourceId,
-      startsAt: '2026-08-16T14:00:00.000Z',
+      startsAt: '2026-08-16T08:00:00.000Z',
       timezone: 'Asia/Riyadh',
     });
 
@@ -315,7 +313,7 @@ describe('recurrence (AD-4)', () => {
       contactId: f.contactId,
       serviceId: f.serviceId,
       resourceId: f.resourceId,
-      startsAt: '2026-08-16T15:00:00.000Z',
+      startsAt: '2026-08-16T09:00:00.000Z',
       timezone: 'Asia/Riyadh',
       recurrenceRule: 'FREQ=WEEKLY;COUNT=3',
     });
@@ -326,5 +324,69 @@ describe('recurrence (AD-4)', () => {
     // Parent + 2 weekly children.
     expect(series.length).toBe(3);
     expect(series.some((a) => a.id === appointment.id)).toBe(true);
+    expect(series.find((item) => item.id === appointment.id)?.recurrenceRule).toBe(
+      'FREQ=WEEKLY;COUNT=3',
+    );
+    expect(
+      series
+        .filter((item) => item.id !== appointment.id)
+        .every((item) => item.recurrenceParentId === appointment.id),
+    ).toBe(true);
+  });
+});
+
+describe('reminder delivery (AD-5)', () => {
+  it('marks a reminder sent only after transport acknowledgement', async () => {
+    const appointment = await AppointmentsRepository.forOrganization(f.orgA).book({
+      branchId: f.branchA,
+      contactId: f.contactId,
+      serviceId: f.serviceId,
+      resourceId: f.resourceId,
+      startsAt: new Date('2026-08-16T05:00:00.000Z'),
+      endsAt: new Date('2026-08-16T05:30:00.000Z'),
+      timezone: 'Asia/Riyadh',
+    });
+    const reminder = await prisma.appointmentReminder.create({
+      data: {
+        organizationId: f.orgA,
+        appointmentId: appointment.id,
+        sendAt: new Date('2026-08-15T05:00:00.000Z'),
+      },
+    });
+    const send = vi.fn(async () => undefined);
+
+    await processDueReminders({ send });
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ reminderId: reminder.id }),
+    );
+    await expect(
+      prisma.appointmentReminder.findUniqueOrThrow({ where: { id: reminder.id } }),
+    ).resolves.toMatchObject({ status: 'sent' });
+  });
+
+  it('fails closed when no WhatsApp transport is configured', async () => {
+    const appointment = await AppointmentsRepository.forOrganization(f.orgA).book({
+      branchId: f.branchA,
+      contactId: f.contactId,
+      serviceId: f.serviceId,
+      resourceId: f.resourceId,
+      startsAt: new Date('2026-08-16T05:00:00.000Z'),
+      endsAt: new Date('2026-08-16T05:30:00.000Z'),
+      timezone: 'Asia/Riyadh',
+    });
+    const reminder = await prisma.appointmentReminder.create({
+      data: {
+        organizationId: f.orgA,
+        appointmentId: appointment.id,
+        sendAt: new Date('2026-08-15T05:00:00.000Z'),
+      },
+    });
+
+    await processDueReminders();
+
+    await expect(
+      prisma.appointmentReminder.findUniqueOrThrow({ where: { id: reminder.id } }),
+    ).resolves.toMatchObject({ status: 'failed' });
   });
 });

@@ -1,5 +1,14 @@
 # Milestone 7 — Completed
 
+> **Authoritative structural re-certification — 2026-08-23:** The sequential review
+> found that automatic redirect following could bypass the website SSRF guard and that
+> approval/current-version promotion contradicted AD-4's atomicity promise. Redirects
+> are now followed manually with protocol and public-host validation on every hop, a
+> five-hop ceiling, and a streaming 2 MB byte cap. Approval and promotion now execute
+> in one scoped transaction. Ingestion orchestration was extracted, bringing the main
+> service to 293 lines. Current evidence: knowledge tests 53/53, E2E 10/10 across
+> desktop/mobile, typecheck/lint clean, successful production build, drift guard clean.
+
 Completed: 2026-08-13
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 7`
 

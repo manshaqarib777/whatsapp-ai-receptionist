@@ -153,12 +153,34 @@ export class CampaignsRepository extends BroadcastBaseRepository {
     return Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
   }
 
-  async markRecipientsSent(campaignId: string): Promise<number> {
-    const result = await this.db.campaignRecipient.updateMany({
+  async listQueuedDeliveries(campaignId: string) {
+    return this.db.campaignRecipient.findMany({
       where: { campaignId, status: 'queued' },
-      data: { status: 'sent', updatedAt: new Date() },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        contact: { select: { phoneNumber: true } },
+        campaign: {
+          select: {
+            template: { select: { name: true, language: true, body: true } },
+          },
+        },
+      },
     });
-    return result.count;
+  }
+
+  async markRecipientDelivered(recipientId: string): Promise<void> {
+    await this.db.campaignRecipient.updateMany({
+      where: { id: recipientId, status: 'queued' },
+      data: { status: 'sent', failureReason: null },
+    });
+  }
+
+  async markRecipientFailed(recipientId: string, reason: string): Promise<void> {
+    await this.db.campaignRecipient.updateMany({
+      where: { id: recipientId, status: 'queued' },
+      data: { status: 'failed', failureReason: reason.slice(0, 500) },
+    });
   }
 
   /** Due scheduled/sending campaigns, for the worker to claim. */

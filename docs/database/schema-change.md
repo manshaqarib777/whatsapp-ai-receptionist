@@ -666,3 +666,331 @@ refusals (never-consented and opted-out), non-completed appointment refusal,
 automation (grace window, consent skip, idempotency), review recording +
 feedback threshold, out-of-range rating refusal, and **org A never sees org B**
 for platforms and reviews.
+
+---
+
+# Schema Change — Milestone 17 (Loyalty)
+
+Date: 2026-08-17
+Migrations: `20260817100000_loyalty`, `20260817110000_loyalty_indexes`
+Plan: `docs/milestones/MILESTONE_17_PLAN.md` (approved)
+Status: Applied (local)
+
+## New Tables
+
+The six Tier-2 loyalty tables designed in the M4 ER diagram (§10), migrated at
+their owning milestone.
+
+| Table | Purpose |
+|---|---|
+| `loyalty_programs` | The program: name, points-per-currency earn rate, enabled state. |
+| `loyalty_accounts` | One per contact per program: running `balance`, lifetime `total_earned`, derived `tier`. |
+| `loyalty_transactions` | The points ledger: signed `points_delta`, kind (earn/spend/referral_bonus), optional invoice link. |
+| `coupons` | Discount codes: percent or fixed, expiry, per-coupon redemption limit. |
+| `coupon_redemptions` | A coupon used by a contact. Unique `(coupon_id, contact_id)` — one use per contact. |
+| `referrals` | A contact referring another. Unique `(referrer_id, referred_contact_id)`. |
+
+## Enums
+
+| Enum | Values |
+|---|---|
+| `loyalty_tier` | `bronze`, `silver`, `gold` |
+| `loyalty_transaction_kind` | `earn`, `spend`, `referral_bonus` |
+| `coupon_type` | `percent`, `fixed` |
+| `referral_status` | `pending`, `rewarded` |
+
+## Constraints
+
+- `loyalty_accounts_balance_check` — `balance >= 0` (a ledger never goes
+  negative in the database).
+- `loyalty_accounts_total_earned_check` — `total_earned >= 0`.
+- `loyalty_programs_points_per_currency_check` — `points_per_currency >= 0`.
+- `coupons_max_redemptions_check` — `max_redemptions >= 1`.
+- `coupons_value_check` — `value >= 0`; percent coupons additionally capped at
+  100 by the service.
+
+## Indexes
+
+Every FK plus the query patterns: `loyalty_accounts (organization_id, tier)`
+(the member-list filter), `loyalty_transactions (organization_id, created_at)`
+(the ledger feed), `loyalty_transactions (invoice_id, kind)` unique (a paid
+invoice earns exactly once — the worker's idempotency key).
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI;
+the documented restore-from-backup path for any live env (exercised in M25).
+
+## Verification
+
+`src/features/loyalty/tests/loyalty.integration.test.ts` — 13 tests against real
+Postgres: program create + negative-rate refusal, the earn worker (credits a
+paid invoice exactly once, creates the account, floors partial rates, no-ops
+without a program), redemption (decrements, refuses above balance), coupons
+(create, percent-cap, one-use-per-contact), referrals (referrer rewarded when
+the referral earns, self-referral refused), and **org A never sees org B**.
+
+---
+
+# Schema Change — Milestone 18 (Multi Branch)
+
+Date: 2026-08-22
+Migration: `20260822090000_active_branch_session`
+Plan: `docs/milestones/MILESTONE_18_PLAN.md`
+Status: Planned; implementation paused until Milestone 8 closes
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `sessions` | Add nullable `active_branch_id UUID` | Persist a trusted branch selection beside the trusted active organization instead of accepting branch scope from a request body, query string, header, or client-only cookie. |
+
+`active_branch_id` references `branches.id` with `ON DELETE SET NULL`. A deleted branch
+must not delete login sessions; a null selection is recovered by validating and
+persisting the active organization's default branch.
+
+## Existing Constraints Reused
+
+- `uq_branches_organization_id_slug` keeps live branch slugs unique per organization.
+- `uq_branches_one_default_per_organization` permits one live default branch per
+  organization.
+- Every calendar, knowledge, and AI-owned row already carries a non-null `branch_id`
+  from Milestone 4. Milestone 18 changes runtime scoping rather than rewriting those
+  tables.
+
+## Indexes
+
+- `sessions_active_branch_id_idx` supports referential integrity operations and
+  branch cleanup without a session-table scan.
+
+## Migration Strategy
+
+1. Add the nullable column and index without changing existing request behavior.
+2. Backfill sessions with an active organization to that organization's live default
+   branch.
+3. Add the foreign key after the backfill.
+4. Deploy auth-context compatibility logic that resolves a missing selection to the
+   organization's default branch and persists it.
+
+The column remains nullable because a session may legitimately have no active
+organization during onboarding.
+
+## Rollback Plan
+
+Drop the foreign key, index, and `active_branch_id` column. No branch or business data
+is deleted, and pre-Milestone-18 behavior resumes by resolving the default branch.
+
+## Verification
+
+Integration tests will prove the backfill, valid branch persistence, rejection of a
+branch from another organization, null behavior during onboarding, and safe fallback
+when a selected branch is soft-deleted.
+
+# Milestone 8 repair — durable AI turn jobs (2026-08-23)
+
+## Change
+
+`ai_turn_jobs` stores an organization/branch/conversation-scoped reference to one
+persisted inbound customer message. The raw body remains exclusively in `messages`.
+`input_message_id` is unique for idempotent enqueue; `run_id` is unique and nullable
+until completion. Status, attempt limit, lock timestamp, and bounded last-error text
+support database polling, retry, and stale-work recovery.
+
+## Relations and indexes
+
+Conversation and input-message deletion cascade to the job; organization and branch
+deletion remain restricted; run deletion clears the optional completion link. The
+worker scans `(organization_id, status, created_at)` and claim SQL uses `FOR UPDATE
+SKIP LOCKED`. Branch and conversation foreign keys have supporting indexes.
+
+## Migration strategy and rollback
+
+`20260823133000_ai_turn_jobs` adds the enum/table/indexes. The follow-up
+`20260823134500_align_ai_turn_jobs` removes database defaults that Prisma generates in
+the client and aligns foreign-key update actions, leaving the migration history drift
+clean. Deploy both before starting `npm run ai:work`. Rollback stops the worker, drops
+the table, then drops `ai_turn_job_status`; persisted messages and completed runs remain.
+
+# Milestone 10 repair — company CRM subjects (2026-08-23)
+
+Migration `20260823150000_crm_company_subject` adds `company` to
+`taggable_type`, which is shared by `taggables.taggable_type` and
+`activities.subject_type`. This makes company automation, tags, and timeline events
+refer to their real subject type instead of storing a company UUID as a fictitious
+contact. The enum addition is forward-only in PostgreSQL; rollback first removes any
+company-subject rows, recreates the enum without `company`, and casts both columns.
+
+# Milestone 12 repair — auditable manual payments (2026-08-23)
+
+Migration `20260823160000_manual_payments` adds `manual` to `payment_gateway`.
+Cash/offline “mark paid” now records a succeeded payment for the remaining balance,
+including a unique `manual-<uuid>` gateway reference and capture timestamp, before
+invoice reconciliation. PostgreSQL enum rollback requires recreating the enum after
+removing or remapping manual payment rows.
+
+# Milestone 19 — integration connections (2026-08-24)
+
+## Change
+
+Add `integration_connections`, an organization-owned registry with exactly one live
+record per provider. It stores status, sandbox/live mode, enabled state, allow-listed
+non-secret JSON configuration, masked credential metadata, health timestamps, a
+bounded error summary, optimistic version, timestamps, and soft deletion.
+
+## Constraints and indexes
+
+The primary tenant guard is a foreign key to `organizations` with cascade deletion.
+`(organization_id, provider)` is unique so retries upsert rather than duplicate a
+connection. `(organization_id, status)` and `(organization_id, updated_at)` support
+the settings list and operational health views.
+
+## Migration and rollback
+
+The migration is additive and needs no backfill. Deploy it before the application
+starts writing integration state. Rollback removes the table and its provider/status
+enums; no existing business data changes.
+
+# Milestone 20 — voice transcriptions (2026-08-24)
+
+## Change
+
+Add `transcriptions`, a branch-scoped durable speech-to-text record and job. Each row
+references one audio message and attachment, records provider/model/language, bounded
+attempt and locking state, optional confidence, transcript PII, error summary,
+timestamps, soft deletion, and redaction.
+
+## Constraints and indexes
+
+`attachment_id` is unique, making repeated queue requests idempotent. Composite
+foreign keys are not required because the scoped repository verifies the message and
+attachment under the same organization and branch before creation, while every query
+is filtered by scoped Prisma. `(organization_id, status, created_at)` supports worker
+discovery and `(message_id, created_at)` supports thread rendering. Foreign-key
+columns are indexed.
+
+## Migration and rollback
+
+The migration is additive and needs no backfill. Deploy it before starting the voice
+worker. Rollback stops that worker and drops only `transcriptions` and
+`transcription_status`; messages and stored attachments remain intact.
+# Milestone 22 — platform administration and subscriptions (2026-08-24)
+
+## Change
+
+Add a closed `users.platform_role` whose default is an ordinary user, plus the global
+`plans` catalog and one current organization-owned `subscription`. Subscription rows
+snapshot amount, currency, interval, period, trial, cancellation, status, and optimistic
+version so historical commercial state never changes when a plan is edited.
+
+## Isolation and indexes
+
+Platform role is identity authority and is read fresh from PostgreSQL for every admin
+request; tenant membership never grants it. Plans are intentionally global and may be
+read only through the platform-admin repository. Subscriptions carry
+`organization_id`, so normal scoped Prisma access remains fail-closed. Unique
+organization contracts and status/period/plan indexes support portal operations.
+
+## Migration and rollback
+
+Migration `20260824130000_admin_portal` is additive and defaults every existing user to
+`user`. Deploy it before the admin application. Rollback removes subscriptions, plans,
+then the three enums and user column; it does not modify tenant invoices or payments.
+
+# Milestone 21 — specialist AI agents (2026-08-24)
+
+## Change
+
+Add `ai_agents`, a branch-scoped configuration record for each of the eight closed
+specialist kinds. It stores safe display configuration, activation state, an optional
+prompt-template reference, optimistic version, timestamps, and soft deletion. Add an
+optional `ai_runs.agent_id` relation so usage and outcomes are attributable without
+copying agent configuration into run logs.
+
+## Constraints and indexes
+
+`(branch_id, kind)` is unique, preventing duplicate specialists in one branch.
+Organization/branch enabled indexes support the management list and runtime router;
+foreign-key indexes cover prompt and run attribution. Scoped Prisma derives tenant
+and branch predicates from the verified session for every repository operation.
+
+## Migration and rollback
+
+Migration `20260824120000_ai_agents` is additive. Deploy it before seeding or enabling
+specialist routing. Rollback first removes `ai_runs.agent_id`, then drops `ai_agents`
+and `ai_agent_kind`; existing runs, prompts, and conversations remain intact.
+
+# Milestone 2 repair — durable sign-in lockout (2026-08-23)
+
+## Change
+
+Add `failed_login_attempts` and `locked_until` to `users`. The authentication route
+adapter updates these fields after failed password sign-ins and clears them after a
+successful password check. Keeping this state in PostgreSQL makes the control effective
+across application instances and deploys.
+
+## Relations and indexes
+
+No relation changes. `locked_until` is indexed for operational inspection and cleanup;
+email remains the lookup key for sign-in enforcement.
+
+## Migration strategy
+
+The additive columns are nullable/defaulted and require no backfill. Deploy the migration
+before the application version that writes them.
+
+## Rollback
+
+Roll back the application first, then drop the index and both columns. Existing identity
+and credential data is unaffected.
+## 2026-08-23 — Milestone 13 delayed workflow context
+
+- Added `WorkflowRun.context Json @default("{}")` so delayed continuations replay
+  the same condition variables.
+- Migration: `20260823170000_workflow_run_context`.
+
+## 2026-08-23 — Milestone 17 coupon invoice discounts
+
+- Added `invoices.discount_amount` and optional legacy-compatible
+  `coupon_redemptions.invoice_id` plus `discount_amount` snapshot.
+- New redemptions require a unique draft invoice and update its total in the
+  same locked transaction. Migration: `20260823180000_coupon_invoice_discounts`.
+
+## 2026-08-23 — Milestone 18 trusted active branches
+
+- Added nullable `sessions.active_branch_id`, its branch foreign key with `ON DELETE
+  SET NULL`, and a lookup index.
+- Migration `20260823190000_active_branch_sessions` backfills existing active sessions
+  from each organization's live default branch before application rollout.
+- Organization switching writes active organization and default branch atomically.
+  Rollback removes the FK, index, and nullable column; business data is untouched.
+# Milestone 23 — security and privacy workflow (planned 2026-08-24)
+
+## New tables
+
+- `rate_limit_buckets`: global hashed limiter key, count, and expiry for atomic,
+  multi-process security throttling. It contains no raw IP, email, or tenant PII.
+- `privacy_requests`: organization-scoped access/export or erasure lifecycle record,
+  requester, subject contact, status, completion/failure timestamps, version, and soft
+  deletion. Export payloads are never stored in this table.
+
+## Changed tables
+
+- `integration_connections`: nullable versioned AES-GCM credential envelope and
+  non-secret credential hint. Ciphertext is never selected by normal repositories.
+
+## Relations and indexes
+
+- Privacy requests reference organization, requesting user, and optional subject
+  contact. Index organization/status/created time and subject/type/status.
+- Rate-limit buckets are keyed by a SHA-256 digest and indexed by expiry for cleanup.
+
+## Migration strategy
+
+One additive migration creates nullable/defaulted fields and new tables. Existing
+sandbox integrations remain valid without credentials. No existing PII is copied.
+
+## Rollback plan
+
+Stop credential/privacy writes, export any open request metadata needed for operations,
+then drop the additive tables/columns. Encrypted credentials cannot be downgraded to
+plaintext; operators must re-enter them after rollback.

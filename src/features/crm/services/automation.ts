@@ -55,7 +55,7 @@ export type CrmEvent =
 
 export type RuleAction =
   | { kind: 'assign'; dealId: string; assigneeId: string }
-  | { kind: 'tag'; taggableType: 'deal' | 'contact'; taggableId: string; tagName: string }
+  | { kind: 'tag'; taggableType: 'deal' | 'company'; taggableId: string; tagName: string }
   | { kind: 'noop' };
 
 /**
@@ -91,7 +91,7 @@ export function evaluateRules(event: CrmEvent, rules: CrmAutomationRules): RuleA
     if (rules.companyDefaultTagName) {
       actions.push({
         kind: 'tag',
-        taggableType: 'contact',
+        taggableType: 'company',
         taggableId: event.companyId,
         tagName: rules.companyDefaultTagName,
       });

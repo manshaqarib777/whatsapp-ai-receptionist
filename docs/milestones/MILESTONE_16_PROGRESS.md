@@ -1,8 +1,8 @@
 # Milestone 16 — Reviews — Progress
 
-Status: In Progress
+Status: Completed; re-certified
 Started: 2026-08-16
-Last updated: 2026-08-16
+Last updated: 2026-08-23
 
 ## Completed Tasks
 
@@ -31,6 +31,7 @@ None — milestone complete.
 | 3 | Permissions test caught `review:read` missing on `member` while viewer held it | Resolved | Role matrix completed — all four roles hold `review:read`; owner/admin/member hold `review:write` |
 | 4 | Full-suite run showed 5 failures under parallel DB load | Resolved | All isolated runs green; re-run of the full suite passed 869/869 (the failures were the permissions gap plus contention) |
 | 5 | E2E strict-mode violation on duplicated "Not configured" badges | Resolved | `.first()` matcher |
+| 6 | Request send and automation marked rows `sent` through a no-op; adapter seam exposed no operations; repository was 448 lines | Resolved | Fail-closed injectable transport with durable retry, fail-loud adapter operations, and platform/review repository splits |
 
 ## Technical Decisions
 
@@ -40,6 +41,7 @@ None — milestone complete.
 | 2026-08-16 | Platform seam mirrors the M12 payment gateways | Google/Facebook need OAuth credentials CI lacks; `unconfigured` adapters fail loudly | Building the live integrations now |
 | 2026-08-16 | Consent gate on review requests | The M14 invariants apply to any outbound customer communication | Sending requests regardless |
 | 2026-08-16 | Automation targets the Google platform when present | A sensible default; the worker ensures the default platforms exist first | Prompting per appointment |
+| 2026-08-23 | `sent` requires transport acknowledgement | Delivery state must be truthful while Meta remains M19 | No-op send transition |
 
 ## Database Changes
 

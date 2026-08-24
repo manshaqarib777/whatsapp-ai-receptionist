@@ -4,6 +4,19 @@ import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-hand
 import { putStorage, signStorageKey } from '@/lib/storage';
 import { InboxService } from '@/features/inbox/services/inbox.service';
 
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/ogg',
+  'audio/webm',
+]);
+
 /**
  * POST /api/inbox/conversations/[id]/attachments
  *
@@ -29,6 +42,12 @@ export const POST = withApiHandler(
 
     if (!(file instanceof File) || file.size === 0) {
       throw new UnprocessableError('A non-empty file is required.');
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new UnprocessableError('Attachments must be 10 MB or smaller.');
+    }
+    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+      throw new UnprocessableError('This attachment type is not supported.');
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());

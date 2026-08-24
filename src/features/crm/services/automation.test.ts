@@ -101,7 +101,7 @@ describe('evaluateRules — company.created', () => {
 
     expect(actions).toContainEqual({
       kind: 'tag',
-      taggableType: 'contact',
+      taggableType: 'company',
       taggableId: 'company-1',
       tagName: 'Company',
     });

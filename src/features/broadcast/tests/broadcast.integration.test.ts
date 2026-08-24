@@ -232,7 +232,12 @@ describe('broadcast — campaigns', () => {
   });
 
   it('advances a sent campaign to sent and marks recipients', async () => {
-    const a = serviceFor(f.orgA);
+    const delivered: string[] = [];
+    const a = BroadcastService.forOrganizationWithTransport(f.orgA, {
+      async send(delivery) {
+        delivered.push(delivery.recipientId);
+      },
+    });
     const segmentId = await makeSegment(a, 'Target');
     const templateId = await makeTemplate(a, 'Welcome');
     await makeContact(f.orgA, f.branchA);
@@ -249,6 +254,47 @@ describe('broadcast — campaigns', () => {
 
     const recipients = await a.listRecipients(campaign.id);
     expect(recipients[0]?.status).toBe('sent');
+    expect(delivered).toEqual([recipients[0]?.id]);
+  });
+
+  it('fails closed when the WhatsApp transport is unavailable', async () => {
+    const a = serviceFor(f.orgA);
+    const segmentId = await makeSegment(a, 'Target');
+    const templateId = await makeTemplate(a, 'Welcome');
+    await makeContact(f.orgA, f.branchA);
+    const campaign = await a.createCampaign({ name: 'Wave', segmentId, templateId });
+    await a.materialiseAndSend(campaign.id);
+
+    await expect(a.processDueCampaigns()).resolves.toBe(1);
+    const [recipient] = await a.listRecipients(campaign.id);
+    expect(recipient).toMatchObject({
+      status: 'failed',
+      failureReason: 'WhatsApp broadcast transport is not configured.',
+    });
+  });
+
+  it('materialises a due scheduled campaign before delivery', async () => {
+    const delivered: string[] = [];
+    const a = BroadcastService.forOrganizationWithTransport(f.orgA, {
+      async send(delivery) {
+        delivered.push(delivery.phoneNumber);
+      },
+    });
+    const segmentId = await makeSegment(a, 'Target');
+    const templateId = await makeTemplate(a, 'Welcome');
+    await makeContact(f.orgA, f.branchA);
+    const campaign = await a.createCampaign({ name: 'Scheduled', segmentId, templateId });
+    await a.transition(
+      campaign.id,
+      'schedule',
+      new Date(Date.now() - 1_000).toISOString(),
+    );
+
+    await expect(a.processDueCampaigns()).resolves.toBe(1);
+    expect(delivered).toHaveLength(1);
+    await expect(a.listRecipients(campaign.id)).resolves.toEqual([
+      expect.objectContaining({ status: 'sent' }),
+    ]);
   });
 
   it('cancels a scheduled campaign before it sends', async () => {

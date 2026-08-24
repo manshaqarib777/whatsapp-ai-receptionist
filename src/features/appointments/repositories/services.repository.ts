@@ -77,4 +77,22 @@ export class AppointmentsServicesRepository extends AppointmentsBaseRepository {
     if (!row) throw new NotFoundError('Service not found.');
     return { ...row, priceAmount: Number(row.priceAmount) };
   }
+
+  async updateService(
+    id: string,
+    input: Partial<{
+      name: string;
+      description: string;
+      durationMinutes: number;
+      priceAmount: number;
+      priceCurrency: string;
+    }>,
+  ): Promise<ServiceRow> {
+    const updated = await this.db.service.updateMany({
+      where: { id, deletedAt: null },
+      data: input,
+    });
+    if (updated.count === 0) throw new NotFoundError('Service not found.');
+    return this.getService(id);
+  }
 }

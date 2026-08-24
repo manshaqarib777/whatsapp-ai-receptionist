@@ -82,6 +82,20 @@ describe('fetchWebsiteText — SSRF guard', () => {
     );
   });
 
+  it('revalidates a redirect target before following it', async () => {
+    const request = vi.fn(
+      async () =>
+        new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/' } }),
+    );
+    vi.stubGlobal('fetch', request);
+
+    await expect(fetchWebsiteText('https://example.com/')).rejects.toThrow(
+      'private network',
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
   it('extracts readable text and strips markup', async () => {
     vi.stubGlobal(
       'fetch',

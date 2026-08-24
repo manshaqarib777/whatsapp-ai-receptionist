@@ -4,6 +4,14 @@ import type { BranchScope, Scope } from '@/lib/db/scope';
 import { resolveScope } from '@/server/scope';
 
 import type { WorkflowTriggerKind } from '../services/graph';
+import type { WorkflowRow, WorkflowRunRow, WorkflowVersionRow } from './workflows.types';
+
+export type {
+  WorkflowRow,
+  WorkflowRunRow,
+  WorkflowRunStepRow,
+  WorkflowVersionRow,
+} from './workflows.types';
 
 /**
  * Workflow data access — Milestone 13.
@@ -20,45 +28,6 @@ import type { WorkflowTriggerKind } from '../services/graph';
  * Scoped-model rule: never `findUnique` on a scoped model — use `findFirst` +
  * the count-check helpers. Cross-tenant reads/writes are 404, never 403.
  */
-
-export type WorkflowRow = {
-  id: string;
-  name: string;
-  isEnabled: boolean;
-  currentVersionId: string | null;
-  version: number;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type WorkflowVersionRow = {
-  id: string;
-  versionNumber: number;
-  definition: unknown;
-  triggerKind: string;
-  createdAt: Date;
-};
-
-export type WorkflowRunRow = {
-  id: string;
-  workflowVersionId: string;
-  triggerEntityType: string | null;
-  triggerEntityId: string | null;
-  status: string;
-  error: string | null;
-  startedAt: Date;
-  finishedAt: Date | null;
-};
-
-export type WorkflowRunStepRow = {
-  id: string;
-  workflowRunId: string;
-  nodeId: string;
-  status: string;
-  output: unknown;
-  scheduledFor: Date | null;
-  createdAt: Date;
-};
 
 const WORKFLOW_SELECT = {
   id: true,
@@ -225,6 +194,7 @@ export class WorkflowsRepository {
     workflowVersionId: string;
     triggerEntityType?: string;
     triggerEntityId?: string;
+    context?: Record<string, string | number | boolean | null>;
   }): Promise<{ id: string }> {
     const branchId = await this.resolveDefaultBranch();
     const db = this.writeScope(branchId);
@@ -234,6 +204,7 @@ export class WorkflowsRepository {
         workflowVersionId: input.workflowVersionId,
         triggerEntityType: input.triggerEntityType ?? null,
         triggerEntityId: input.triggerEntityId ?? null,
+        context: input.context ?? {},
         status: 'running',
       },
       select: { id: true },
@@ -287,6 +258,7 @@ export class WorkflowsRepository {
         error: true,
         startedAt: true,
         finishedAt: true,
+        context: true,
       },
     });
   }
@@ -303,9 +275,24 @@ export class WorkflowsRepository {
         error: true,
         startedAt: true,
         finishedAt: true,
+        context: true,
       },
     });
     if (!row) throw new NotFoundError('Run not found.');
     return row;
+  }
+
+  async completeRunStep(stepId: string): Promise<void> {
+    await this.db.workflowRunStep.updateMany({
+      where: { id: stepId, status: 'running' },
+      data: { status: 'succeeded', scheduledFor: null },
+    });
+  }
+
+  async failRunStep(stepId: string, error: string): Promise<void> {
+    await this.db.workflowRunStep.updateMany({
+      where: { id: stepId, status: 'running' },
+      data: { status: 'failed', output: { error: error.slice(0, 1000) } },
+    });
   }
 }

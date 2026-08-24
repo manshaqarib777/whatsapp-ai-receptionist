@@ -41,14 +41,8 @@ async function seedInvoiceOrg(email: string, organizationId: string): Promise<Se
   const client = new PrismaClient({ adapter });
 
   try {
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -185,30 +179,23 @@ test.describe('invoices', () => {
   test('creates an invoice from the dialog', async ({ page }) => {
     const seeded = await openInvoices(page);
 
-    // Track the created invoice so cleanup is deterministic.
     let createdInvoiceId: string | null = null;
-    page.on('response', (response) => {
-      if (
-        response.url().includes('/api/invoices') &&
-        response.request().method() === 'POST'
-      ) {
-        void response
-          .json()
-          .then((payload) => {
-            const id = (payload as { data?: { invoice?: { id?: string } } })?.data
-              ?.invoice?.id;
-            if (id) createdInvoiceId = id;
-          })
-          .catch(() => undefined);
-      }
-    });
 
     try {
       await page.getByRole('button', { name: 'New invoice' }).click();
       await page.getByLabel('Contact id').fill(seeded.contactId);
       await page.getByLabel('Line 1 description').fill('E2E Scale and polish');
       await page.getByLabel('Line 1 unit price').fill('320');
+      const createdResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/invoices') &&
+          response.request().method() === 'POST',
+      );
       await page.getByRole('button', { name: 'Create invoice' }).click();
+      const payload = (await (await createdResponse).json()) as {
+        data?: { invoice?: { id?: string } };
+      };
+      createdInvoiceId = payload.data?.invoice?.id ?? null;
 
       // The created invoice (320 + 15% VAT = 368) appears in the list.
       await expect(page.getByText('368.00 SAR')).toBeVisible();

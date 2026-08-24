@@ -4,6 +4,12 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
 import { magicLink, organization, twoFactor } from 'better-auth/plugins';
+import {
+  adminAc,
+  defaultAc,
+  memberAc,
+  ownerAc,
+} from 'better-auth/plugins/organization/access';
 
 import { env, isProduction } from '@/lib/env';
 import { sendEmail } from '@/lib/email';
@@ -44,9 +50,17 @@ function socialProviders() {
   return providers;
 }
 
+const viewerAc = defaultAc.newRole({
+  organization: [],
+  member: [],
+  invitation: [],
+  team: [],
+  ac: ['read'],
+});
+
 export const auth = betterAuth({
   appName: 'WhatsApp AI Receptionist',
-  baseURL: env.NEXT_PUBLIC_APP_URL,
+  baseURL: env.APP_URL ?? env.NEXT_PUBLIC_APP_URL,
   secret: env.AUTH_SECRET,
 
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -87,8 +101,10 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
     cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
+      // Tenant selectors and revocation are database-backed security state. A
+      // cached session would keep an old organization/branch (or revoked login)
+      // authoritative until cache expiry.
+      enabled: false,
     },
   },
 
@@ -140,12 +156,13 @@ export const auth = betterAuth({
       organizationLimit: 10,
       membershipLimit: 200,
       creatorRole: 'owner',
+      roles: { owner: ownerAc, admin: adminAc, member: memberAc, viewer: viewerAc },
       invitationExpiresIn: 60 * 60 * 48,
       sendInvitationEmail: async ({ email, organization: org, inviter, id }) => {
         await sendEmail({
           to: email,
           subject: `You have been invited to join ${org.name}`,
-          body: `${inviter.user.name ?? 'A colleague'} invited you to join ${org.name}.\n\n${env.NEXT_PUBLIC_APP_URL}/accept-invitation/${id}`,
+          body: `${inviter.user.name ?? 'A colleague'} invited you to join ${org.name}.\n\n${env.APP_URL ?? env.NEXT_PUBLIC_APP_URL}/accept-invitation/${id}`,
         });
       },
     }),

@@ -287,3 +287,42 @@ bar is not yet applicable to it.
 Per the PRD, Milestone 1 ends here. All tests run, everything documented.
 
 **Awaiting approval before Milestone 2 (Authentication).**
+
+---
+
+## 2026-08-23 Verification Addendum
+
+The sequential audit re-opened this milestone because its historical evidence was no
+longer reproducible. The following repairs are now present:
+
+- `next/font/google` was replaced by the packaged local `geist` font, so a production
+  build no longer requires Google Fonts network access.
+- The patched `deepmerge-ts` major is pinned through npm overrides; the current audit
+  reports zero vulnerabilities without downgrading Prisma.
+- Playwright loads `.env*` using Next 16's documented `loadEnvConfig()` before test
+  modules import Prisma.
+- Production E2E runs may use the console email adapter only when
+  `E2E_TEST_RUN=true`; the send guard now matches the environment validator.
+- Ambiguous mobile assertions use semantic, scoped locators.
+- The appointment-reminder integration fixture no longer expires relative to the wall
+  clock.
+
+Fresh local evidence:
+
+| Gate | Result |
+|---|---|
+| Typecheck | Passed |
+| ESLint | Passed, zero warnings |
+| Prettier | Passed |
+| Vitest | 86 files, 927/927 tests passed |
+| Playwright | 232/232 passed; desktop and mobile, one worker, zero retries, 8.4 min |
+| Production build | Passed on Next 16.2.12 without a font download |
+| Schema drift | Only the documented HNSW + trgm indexes Prisma cannot express |
+| Dependency audit | Zero vulnerabilities |
+| Static assets | 4,940 KiB in `.next/static` for the current full M17 application |
+
+The mandatory preview-deployment criterion remains unverified because the repository
+has no deployment target or credentials. On 2026-08-23 the user explicitly directed
+the repair pass to proceed to the next milestone, retaining preview provisioning and
+verification in Milestone 25. With that recorded roadmap decision, the Milestone 1
+repair is closed and Milestone 2 may begin.

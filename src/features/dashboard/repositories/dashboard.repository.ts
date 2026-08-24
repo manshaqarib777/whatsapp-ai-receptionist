@@ -1,6 +1,7 @@
 import { forScope } from '@/lib/db/scoped-prisma';
 import type { Scope } from '@/lib/db/scope';
 import { resolveScope } from '@/server/scope';
+import { DashboardNotificationsRepository } from './dashboard-notifications.repository';
 
 import type {
   ActivityFeedItem,
@@ -36,9 +37,11 @@ import type {
  */
 export class DashboardRepository {
   private readonly db: ReturnType<typeof forScope>;
+  private readonly organizationId: string;
 
   constructor(scope: Scope) {
     this.db = forScope(scope);
+    this.organizationId = scope.organizationId;
   }
 
   /**
@@ -268,32 +271,11 @@ export class DashboardRepository {
     }));
   }
 
-  /**
-   * A user's notifications in the active org, unread first.
-   *
-   * Notifications are org-scoped (a user may be notified about any branch they can
-   * access) and additionally filtered by user id here.
-   *
-   * Ordering: unread (readAt NULL) before read, then newest first. Prisma's default
-   * `asc` sorts NULLs last in Postgres, which would bury the unread row — so the
-   * readAt tie-break is explicit rather than left to the database.
-   */
   async listNotifications(userId: string, limit = 20): Promise<NotificationRow[]> {
-    const rows = await this.db.notification.findMany({
-      where: { userId },
-      orderBy: [{ readAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'desc' }],
-      take: limit,
-      select: {
-        id: true,
-        kind: true,
-        title: true,
-        body: true,
-        readAt: true,
-        createdAt: true,
-      },
-    });
-
-    return rows;
+    return DashboardNotificationsRepository.forOrganization(this.organizationId).list(
+      userId,
+      limit,
+    );
   }
 }
 

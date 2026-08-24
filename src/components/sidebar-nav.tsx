@@ -6,6 +6,7 @@ import {
   Calendar,
   ChartColumn,
   FileText,
+  Gift,
   Inbox,
   LayoutDashboard,
   Megaphone,
@@ -91,6 +92,7 @@ const ICONS = {
   megaphone: Megaphone,
   'chart-column': ChartColumn,
   star: Star,
+  gift: Gift,
   settings: Settings,
 } as const;
 

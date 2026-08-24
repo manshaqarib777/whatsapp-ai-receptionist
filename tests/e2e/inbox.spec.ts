@@ -40,14 +40,8 @@ async function seedInboxOrg(email: string, organizationId: string): Promise<Seed
   try {
     const user = await client.user.findFirstOrThrow({ where: { email } });
 
-    const branch = await client.branch.create({
-      data: {
-        organizationId,
-        name: 'Main',
-        slug: 'main',
-        timezone: 'Asia/Riyadh',
-        isDefault: true,
-      },
+    const branch = await client.branch.findFirstOrThrow({
+      where: { organizationId, isDefault: true, deletedAt: null },
       select: { id: true },
     });
 
@@ -242,6 +236,23 @@ test.describe('inbox', () => {
       await page.getByRole('button', { name: 'Send message' }).click();
 
       await expect(page.getByText('We can do Thursday at 10am')).toBeVisible();
+    } finally {
+      await cleanupOrg(seeded);
+    }
+  });
+
+  test('assigns the conversation and adds an internal note', async ({ page }) => {
+    const seeded = await openInbox(page);
+
+    try {
+      await page.getByText('Inbox Contact').click();
+      await page.getByRole('button', { name: 'Conversation actions' }).click();
+      await page.getByRole('menuitem', { name: /E2E Inbox/ }).click();
+      await expect(page.getByText(/· E2E Inbox/)).toBeVisible();
+
+      await page.getByLabel('Internal note').fill('Follow up with the pricing team.');
+      await page.getByRole('button', { name: 'Add note' }).click();
+      await expect(page.getByText('Follow up with the pricing team.')).toBeVisible();
     } finally {
       await cleanupOrg(seeded);
     }

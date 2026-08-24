@@ -2,7 +2,7 @@
 
 Status: In Progress → Completed
 Started: 2026-08-15
-Last updated: 2026-08-16
+Last updated: 2026-08-23
 
 > **Batch decision**: Milestones 12–14 were executed as one approved batch
 > ("proceed on green"): sequential implementation, per-milestone exit gates,
@@ -17,7 +17,7 @@ Last updated: 2026-08-16
 - [x] API surface (plan AD-6) — segments GET/POST, segment preview POST, templates GET/POST, campaigns GET/POST, campaign detail GET/PATCH, campaign send POST
 - [x] Campaign lifecycle draft → scheduled → sending → sent / cancelled; schedule/send/cancel transitions with 409 guards
 - [x] Send-time materialisation — segment evaluated against contacts, opted-out excluded, one `CampaignRecipient` per contact (unique `(campaignId, contactId)`); zero-eligible campaign refused 422
-- [x] DB-polled send worker (`npm run broadcast:work`) — claims due scheduled/sending campaigns, marks recipients `sent`, advances to `sent` (`finishedAt`); WhatsApp send is the same stub seam as the reminder worker
+- [x] DB-polled worker materialises due scheduled campaigns and updates each recipient only after an injectable transport acknowledges or rejects delivery
 - [x] Analytics — per-campaign totals (total, sent, delivered, read, failed, delivered rate) derived from recipient rows; segment preview count before send
 - [x] `/broadcast` UI — status-filtered campaign list + create dialog (segment + approved template + schedule), campaign detail (lifecycle actions, analytics, recipients), segment manager (create + preview), template manager (create + approval status)
 - [x] Permissions `broadcast:read`/`broadcast:write`, nav item + icon, middleware matcher
@@ -38,13 +38,14 @@ None — milestone complete.
 | 1 | Analytics `total` counted only `queued` recipients — read 0 for a sent campaign (no queued rows left) | Resolved | Total counts every status (`queued + sent + failed`) |
 | 2 | Permissions test caught `broadcast:read/write` missing on `member` while `viewer` held read | Resolved | Role matrix completed — owner/admin/member read+write, viewer read |
 | 3 | Pre-existing time-of-day flake in the appointments integration test (booked a hardcoded past date; the 1h reminder lead was in the past after ~08:00 UTC) | Resolved | Test books the nearest future Sunday 09:00 UTC; verified failing on a clean checkout before fixing |
+| 4 | Worker marked queued recipients sent without delivery and finalized scheduled campaigns without materialising them | Resolved | Added fail-closed transport boundary, per-recipient outcomes, and scheduled materialisation regression tests |
 
 ## Technical Decisions
 
 | Date | Decision | Rationale | Alternatives rejected |
 |---|---|---|---|
 | 2026-08-15 | Segments are a filter tree evaluated at send time, with consent invariants hard-coded in `evaluateSegment` | A segment is a question, not a snapshot; a broadcast to an opted-out contact is a compliance failure, not a filter choice | Storing a materialised member list |
-| 2026-08-15 | WhatsApp send is a stub seam — recipients marked `sent`, status columns real | Same established pattern as the M9 reminder worker; real transport lands with the messaging milestone | Simulating delivery |
+| 2026-08-23 | Unconfigured WhatsApp delivery fails closed per recipient | `sent` means transport acknowledgement; Meta remains M19 | Treating a no-op as delivery |
 | 2026-08-15 | Templates created `approved` | Meta submission is a later-milestone integration; the approval gate is real and gating use today | Building the Meta submission flow now |
 
 ## Database Changes

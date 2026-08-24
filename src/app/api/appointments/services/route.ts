@@ -1,4 +1,4 @@
-import { requireOrg, requirePermission } from '@/server/auth-context';
+import { requireBranch, requireBranchPermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 import { AppointmentsService } from '@/features/appointments/services/appointments.service';
 import { createServiceSchema } from '@/features/appointments/validators/appointments.validators';
@@ -10,8 +10,8 @@ import { createServiceSchema } from '@/features/appointments/validators/appointm
 export const GET = withApiHandler(
   'GET /api/appointments/services',
   async (_request, { correlationId }) => {
-    const { organizationId } = await requireOrg();
-    const service = AppointmentsService.forOrganization(organizationId);
+    const { organizationId, branchId } = await requireBranch();
+    const service = AppointmentsService.forScope({ organizationId, branchId });
     const services = await service.listServices();
     return jsonSuccess({ services }, { correlationId });
   },
@@ -20,11 +20,12 @@ export const GET = withApiHandler(
 export const POST = withApiHandler(
   'POST /api/appointments/services',
   async (request, { correlationId }) => {
-    const { organizationId } = await requirePermission('appointment:write');
+    const { organizationId, branchId } =
+      await requireBranchPermission('appointment:write');
     const body: unknown = await request.json();
     const input = createServiceSchema.parse(body);
 
-    const service = AppointmentsService.forOrganization(organizationId);
+    const service = AppointmentsService.forScope({ organizationId, branchId });
     const created = await service.createService(input);
 
     return jsonSuccess({ service: created }, { status: 201, correlationId });

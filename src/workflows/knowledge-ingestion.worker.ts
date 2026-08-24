@@ -7,6 +7,7 @@ import { ocrPdf } from '@/features/knowledge/services/ocr';
 import { getStorage } from '@/lib/storage';
 import { logger } from '@/lib/logger';
 import type { Scope } from '@/lib/db/scope';
+import { listQueuedIngestionOrganizationIds } from '@/lib/db/system-discovery.repository';
 
 /**
  * Knowledge ingestion worker (AD-3).
@@ -143,21 +144,11 @@ async function ocrPdfForDocument(document: {
  * when `options.once` is set (used by the integration test and one-shot runs).
  */
 export async function runWorker(options: { once?: boolean } = {}): Promise<void> {
-  const { prisma } = await import('@/lib/prisma');
-
   logger.info({ pollIntervalMs: POLL_INTERVAL_MS }, 'knowledge worker started');
 
   for (;;) {
-    const orgs = await prisma.$queryRaw<{ organizationId: string }[]>`
-      SELECT DISTINCT organization_id AS "organizationId"
-      FROM ingestion_jobs
-      WHERE status = 'queued'
-      ORDER BY organization_id
-      LIMIT 50;
-    `;
-
-    for (const org of orgs) {
-      const scope: Scope = { organizationId: org.organizationId, branchId: null };
+    for (const organizationId of await listQueuedIngestionOrganizationIds()) {
+      const scope: Scope = { organizationId, branchId: null };
       const result = await processNextJob(scope);
       if (result) {
         logger.info(

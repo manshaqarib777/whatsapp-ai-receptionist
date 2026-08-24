@@ -20,6 +20,7 @@ const INVOICE = {
   quoteId: null,
   status: 'issued' as const,
   subtotalAmount: 3650,
+  discountAmount: 0,
   taxAmount: 547.5,
   totalAmount: 4197.5,
   amountPaid: 0,
