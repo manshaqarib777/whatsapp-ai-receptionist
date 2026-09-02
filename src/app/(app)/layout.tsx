@@ -12,6 +12,7 @@ import {
 import { NotificationsBell } from '@/features/dashboard/components/notifications-bell';
 import { requireAuth } from '@/server/auth-context';
 import * as branchesService from '@/features/organizations/services/branches.service';
+import { branchesRepository } from '@/lib/db/auth/branches.repository';
 
 /**
  * Authenticated shell.
@@ -38,11 +39,24 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/onboarding/organization');
   }
 
+  if (!context.organizationId) {
+    const firstOrganization = organizations[0];
+    if (!firstOrganization) redirect('/onboarding/organization');
+
+    const branch = await branchesRepository.switchOrganizationSession(
+      context.sessionId,
+      firstOrganization.id,
+    );
+    if (!branch) redirect('/settings/branches');
+
+    // Auth context is request-cached. Start a new request after persisting the trusted
+    // tenant selectors so every page and client query sees the same organization.
+    redirect('/dashboard');
+  }
+
   const active =
     organizations.find((org) => org.id === context.organizationId) ?? organizations[0];
-  const branches = context.organizationId
-    ? await branchesService.list(context.organizationId)
-    : [];
+  const branches = await branchesService.list(context.organizationId);
 
   const cookieStore = await cookies();
   const defaultCollapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === '1';
