@@ -1,6 +1,6 @@
 import type { PaymentGatewayAdapter } from '@/features/invoices/services/invoices.service';
 import type { PaymentRow } from '@/features/invoices/repositories/invoices.repository';
-import { env } from '@/lib/env';
+import { env, serverAppUrl } from '@/lib/env';
 
 /**
  * Stripe gateway adapter — Milestone 12.
@@ -90,8 +90,8 @@ export class StripePaymentAdapter implements PaymentGatewayAdapter {
           quantity: 1,
         },
       ],
-      success_url: `${env.APP_URL ?? env.NEXT_PUBLIC_APP_URL}/invoices/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.APP_URL ?? env.NEXT_PUBLIC_APP_URL}/invoices`,
+      success_url: `${serverAppUrl}/invoices/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${serverAppUrl}/invoices`,
       metadata: { invoiceNumber: input.invoice.number },
     });
     return { checkoutUrl: session.url, gatewayPaymentId: session.id };

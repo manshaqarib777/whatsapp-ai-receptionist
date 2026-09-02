@@ -316,7 +316,10 @@ describe('Composer', () => {
 
   it('uploads the selected attachment as multipart form data', async () => {
     const user = userEvent.setup();
-    const request = vi.fn(() => ok({ data: { message: { id: 'msg-file' } } }));
+    const request = vi
+      .fn()
+      .mockReturnValueOnce(ok({ data: { mode: 'server' } }))
+      .mockReturnValueOnce(ok({ data: { message: { id: 'msg-file' } } }));
     vi.stubGlobal('fetch', request);
     renderWithQuery(<Composer conversationId="conv-1" />);
 
@@ -328,6 +331,11 @@ describe('Composer', () => {
         '/api/inbox/conversations/conv-1/attachments',
         expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
       ),
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      '/api/storage/upload-intents',
+      expect.objectContaining({ method: 'POST' }),
     );
   });
 });

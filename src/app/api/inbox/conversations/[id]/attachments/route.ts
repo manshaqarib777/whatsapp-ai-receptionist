@@ -2,6 +2,7 @@ import { UnprocessableError } from '@/lib/errors';
 import { requirePermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler, type RouteParams } from '@/server/api-handler';
 import { putStorage, signStorageKey } from '@/lib/storage';
+import { completeStorageUpload } from '@/lib/storage-upload';
 import { InboxService } from '@/features/inbox/services/inbox.service';
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -37,38 +38,23 @@ export const POST = withApiHandler(
     const { user, organizationId } = await requirePermission('conversation:write');
     const { id } = await routeParams.params;
 
-    const form = await request.formData();
-    const file = form.get('file');
-
-    if (!(file instanceof File) || file.size === 0) {
-      throw new UnprocessableError('A non-empty file is required.');
-    }
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      throw new UnprocessableError('Attachments must be 10 MB or smaller.');
-    }
-    if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
-      throw new UnprocessableError('This attachment type is not supported.');
-    }
-
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const stored = await putStorage(bytes, {
-      mimeType: file.type,
-      fileName: file.name,
-    });
+    const stored = request.headers.get('content-type')?.includes('application/json')
+      ? await completeDirectUpload(request, { id, organizationId, userId: user.id })
+      : await storeMultipartUpload(request);
 
     const service = InboxService.forOrganization(organizationId);
     const message = await service.sendMessage({
       conversationId: id,
       authorId: user.id,
-      body: file.name,
-      contentType: file.type.startsWith('audio/') ? 'audio' : 'document',
+      body: stored.fileName,
+      contentType: stored.mimeType.startsWith('audio/') ? 'audio' : 'document',
     });
 
     await service.attachToMessage(message.id, {
       storageKey: stored.key,
-      mimeType: file.type,
+      mimeType: stored.mimeType,
       sizeBytes: stored.sizeBytes,
-      fileName: file.name,
+      fileName: stored.fileName,
     });
 
     return jsonSuccess(
@@ -83,3 +69,42 @@ export const POST = withApiHandler(
     );
   },
 );
+
+async function storeMultipartUpload(request: Request) {
+  const file = (await request.formData()).get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    throw new UnprocessableError('A non-empty file is required.');
+  }
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new UnprocessableError('Attachments must be 10 MB or smaller.');
+  }
+  if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+    throw new UnprocessableError('This attachment type is not supported.');
+  }
+  return {
+    ...(await putStorage(Buffer.from(await file.arrayBuffer()), {
+      mimeType: file.type,
+      fileName: file.name,
+    })),
+    fileName: file.name,
+    mimeType: file.type,
+  };
+}
+
+async function completeDirectUpload(
+  request: Request,
+  context: { id: string; organizationId: string; userId: string },
+) {
+  const input = (await request.json()) as { storageKey?: unknown; uploadToken?: unknown };
+  if (typeof input.storageKey !== 'string' || typeof input.uploadToken !== 'string') {
+    throw new UnprocessableError('A completed upload is required.');
+  }
+  return completeStorageUpload({
+    key: input.storageKey,
+    token: input.uploadToken,
+    purpose: 'inbox',
+    resourceId: context.id,
+    organizationId: context.organizationId,
+    userId: context.userId,
+  });
+}

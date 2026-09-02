@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { uploadDirectlyWhenConfigured } from '@/lib/storage-upload.client';
 
 import type {
   KnowledgeDocumentDetail,
@@ -153,7 +154,25 @@ export function useCreateSource() {
 export function useUploadDocument(sourceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { title: string; file: File }) => {
+    mutationFn: async (input: { title: string; file: File }) => {
+      const direct = await uploadDirectlyWhenConfigured({
+        file: input.file,
+        purpose: 'knowledge',
+        resourceId: sourceId,
+      });
+      if (direct) {
+        const response = await fetch(`/api/knowledge/sources/${sourceId}/documents`, {
+          method: 'POST',
+          body: JSON.stringify({ ...direct, title: input.title }),
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+        });
+        if (!response.ok)
+          throw new Error(`Upload finalization failed (${response.status})`);
+        const payload = (await response.json()) as {
+          data: { documentId: string; versionId: string; jobId: string };
+        };
+        return payload.data;
+      }
       const form = new FormData();
       form.set('title', input.title);
       form.set('file', input.file);

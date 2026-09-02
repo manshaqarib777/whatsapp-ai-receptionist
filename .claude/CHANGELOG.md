@@ -759,3 +759,12 @@ change gets an entry in the same PR.
   was performed.
 - Replaced deletion-only Redis cache invalidation with generation-versioned cache keys so
   an in-flight stale load cannot overwrite a post-mutation invalidation.
+
+# 2026-08-25 — Hybrid hosted deployment
+
+- Added a Vercel Fluid Compute configuration, bounded serverless PostgreSQL pools, and
+  runtime deployment-host fallback for preview URLs.
+- Added private Vercel Blob storage plus authenticated direct browser uploads with
+  signed tenant/user/resource intents, preserving local filesystem uploads in development.
+- Consolidated all durable consumers into one non-root worker image for a persistent
+  Railway service and documented the complete hybrid promotion/rollback contract.

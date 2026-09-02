@@ -35,6 +35,7 @@
     "reviews:work": "tsx scripts/reviews-worker.ts",
     "loyalty:work": "tsx scripts/loyalty-worker.ts",
     "voice:work": "tsx scripts/voice-worker.ts",
+    "workers:work": "tsx scripts/worker-service.ts",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "_prepare_backup": "husky"
   },
@@ -48,6 +49,7 @@
     "@tiptap/pm": "^3.29.2",
     "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",
+    "@vercel/blob": "^2.8.0",
     "better-auth": "^1.6.25",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

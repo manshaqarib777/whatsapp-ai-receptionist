@@ -11,7 +11,7 @@ import {
   ownerAc,
 } from 'better-auth/plugins/organization/access';
 
-import { env, isProduction } from '@/lib/env';
+import { env, isProduction, serverAppUrl } from '@/lib/env';
 import { sendEmail } from '@/lib/email';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
@@ -60,7 +60,7 @@ const viewerAc = defaultAc.newRole({
 
 export const auth = betterAuth({
   appName: 'WhatsApp AI Receptionist',
-  baseURL: env.APP_URL ?? env.NEXT_PUBLIC_APP_URL,
+  baseURL: serverAppUrl,
   secret: env.AUTH_SECRET,
 
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
@@ -162,7 +162,7 @@ export const auth = betterAuth({
         await sendEmail({
           to: email,
           subject: `You have been invited to join ${org.name}`,
-          body: `${inviter.user.name ?? 'A colleague'} invited you to join ${org.name}.\n\n${env.APP_URL ?? env.NEXT_PUBLIC_APP_URL}/accept-invitation/${id}`,
+          body: `${inviter.user.name ?? 'A colleague'} invited you to join ${org.name}.\n\n${serverAppUrl}/accept-invitation/${id}`,
         });
       },
     }),

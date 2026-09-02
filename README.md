@@ -103,8 +103,11 @@ Names and purpose only — never commit values. See [`.env.example`](.env.exampl
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | **yes** | Postgres connection string |
+| `DATABASE_POOL_MAX` | no (`5`) | Per-instance Postgres pool ceiling |
 | `NEXT_PUBLIC_APP_URL` | **yes** | Public base URL; exposed to the browser |
 | `APP_URL` | production | Server-only canonical runtime URL; permits one image digest across environments |
+| `STORAGE_DRIVER` | no (`local`) | `vercel-blob` for hosted private object storage |
+| `BLOB_READ_WRITE_TOKEN` | with Blob | Shared private Blob credential for web and worker |
 | `LOG_LEVEL` | no (defaults to `info`) | Pino log level |
 | `AUTH_SECRET` | **yes** | Session signing secret, 32+ chars. `openssl rand -base64 32` |
 | `EMAIL_FROM` | no | From address on outbound mail |
@@ -242,3 +245,9 @@ does not publish or deploy it; promotion remains an explicit operator action. Se
 [`docs/operations/deployment.md`](docs/operations/deployment.md) for the deployment and
 rollback contract and [`docs/operations/observability.md`](docs/operations/observability.md)
 for signals, alerts, and the incident runbook.
+
+The recommended hosted topology is Vercel for the web/API layer and a persistent
+Railway worker using `docker/worker.Dockerfile`, backed by pooled Postgres, TLS Redis,
+and private Vercel Blob. See
+[`docs/operations/vercel-hybrid.md`](docs/operations/vercel-hybrid.md) for the exact
+configuration and promotion order.

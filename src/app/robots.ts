@@ -1,10 +1,10 @@
 import type { MetadataRoute } from 'next';
 import { connection } from 'next/server';
-import { env } from '@/lib/env';
+import { serverAppUrl } from '@/lib/env';
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
   await connection();
-  const origin = env.APP_URL ?? env.NEXT_PUBLIC_APP_URL;
+  const origin = serverAppUrl;
   return {
     rules: {
       userAgent: '*',

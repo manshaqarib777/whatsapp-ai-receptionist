@@ -22,6 +22,7 @@ describe('parseEnv', () => {
     expect(result.NODE_ENV).toBe('test');
     expect(result.DATABASE_URL).toBe(validEnv.DATABASE_URL);
     expect(result.LOG_LEVEL).toBe('info');
+    expect(result.DATABASE_POOL_MAX).toBe(5);
   });
 
   it('applies defaults for optional variables', () => {
@@ -31,6 +32,21 @@ describe('parseEnv', () => {
 
     expect(result.NODE_ENV).toBe('development');
     expect(result.LOG_LEVEL).toBe('info');
+    expect(result.STORAGE_DRIVER).toBe('local');
+  });
+
+  it('requires a Blob token only for the Vercel Blob storage driver', () => {
+    expect(() => parseEnv({ ...validEnv, STORAGE_DRIVER: 'vercel-blob' })).toThrowError(
+      /BLOB_READ_WRITE_TOKEN/,
+    );
+
+    expect(
+      parseEnv({
+        ...validEnv,
+        STORAGE_DRIVER: 'vercel-blob',
+        BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_test',
+      }).STORAGE_DRIVER,
+    ).toBe('vercel-blob');
   });
 
   it('throws naming the variable when DATABASE_URL is missing', () => {
@@ -55,6 +71,12 @@ describe('parseEnv', () => {
     expect(() =>
       parseEnv({ ...validEnv, NEXT_PUBLIC_APP_URL: 'not-a-url' }),
     ).toThrowError(/NEXT_PUBLIC_APP_URL/);
+  });
+
+  it('accepts a Vercel deployment hostname', () => {
+    expect(
+      parseEnv({ ...validEnv, VERCEL_URL: 'preview.example.vercel.app' }).VERCEL_URL,
+    ).toBe('preview.example.vercel.app');
   });
 
   it('rejects an unknown LOG_LEVEL', () => {

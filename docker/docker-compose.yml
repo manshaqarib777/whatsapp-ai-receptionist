@@ -46,9 +46,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Milestone 7: the knowledge ingestion worker (AD-3). A DB-polled worker that
-  # claims queued ingestion_jobs and parses/chunks/embeds them. No Redis — the
-  # database is the queue. Also runnable directly with `npm run knowledge:work`.
+  # Combined durable worker service. PostgreSQL remains the authoritative queue.
   worker:
     build:
       context: ..

@@ -22,6 +22,7 @@ const serverSchema = z.object({
       (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
       'DATABASE_URL must be a postgresql:// connection string',
     ),
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
 
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
@@ -56,6 +57,12 @@ const serverSchema = z.object({
     )
     .optional(),
   APP_URL: z.string().url('APP_URL must be a valid URL').optional(),
+  VERCEL_URL: z
+    .string()
+    .min(1)
+    .max(253)
+    .regex(/^[a-z0-9.-]+$/i, 'VERCEL_URL must be a hostname without a scheme.')
+    .optional(),
   CACHE_PREFIX: z
     .string()
     .regex(/^[a-z0-9_-]+$/i)
@@ -145,6 +152,8 @@ const serverSchema = z.object({
    * `src/lib/storage.ts` interface.
    */
   STORAGE_DIR: z.string().min(1).default('./storage'),
+  STORAGE_DRIVER: z.enum(['local', 'vercel-blob']).default('local'),
+  BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
 
   /**
    * Embedding provider for the knowledge base (Milestone 7, AD-2).
@@ -246,6 +255,13 @@ const envSchema = serverSchema.merge(clientSchema).superRefine((env, ctx) => {
       message: 'OPENAI_API_KEY is required when SPEECH_PROVIDER=openai.',
     });
   }
+  if (env.STORAGE_DRIVER === 'vercel-blob' && !env.BLOB_READ_WRITE_TOKEN) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['BLOB_READ_WRITE_TOKEN'],
+      message: 'BLOB_READ_WRITE_TOKEN is required when STORAGE_DRIVER=vercel-blob.',
+    });
+  }
 
   // Production must never fall back to writing account-critical mail to a log.
   // E2E_TEST_RUN exempts an automated run against a local production build.
@@ -294,6 +310,8 @@ export const env: Env = parseEnv(process.env);
 export const isDevelopment = env.NODE_ENV === 'development';
 export const isProduction = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';
+export const serverAppUrl =
+  env.APP_URL ?? (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : env.NEXT_PUBLIC_APP_URL);
 
 /**
  * Whether `/design` is served. Development always; a production build only when

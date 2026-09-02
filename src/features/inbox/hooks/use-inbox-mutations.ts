@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { uploadDirectlyWhenConfigured } from '@/lib/storage-upload.client';
 
 import type {
   LabelRow,
@@ -95,6 +96,24 @@ export function useUploadAttachment(conversationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
+      const direct = await uploadDirectlyWhenConfigured({
+        file,
+        purpose: 'inbox',
+        resourceId: conversationId,
+      });
+      if (direct) {
+        const response = await fetch(
+          `/api/inbox/conversations/${conversationId}/attachments`,
+          {
+            method: 'POST',
+            body: JSON.stringify(direct),
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+          },
+        );
+        if (!response.ok)
+          throw new Error(`Upload finalization failed (${response.status})`);
+        return (await response.json()) as { data: unknown };
+      }
       const form = new FormData();
       form.set('file', file);
       const response = await fetch(

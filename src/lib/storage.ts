@@ -1,18 +1,17 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { get, head, put } from '@vercel/blob';
 
 import { env } from '@/lib/env';
 import { NotFoundError, UnprocessableError } from '@/lib/errors';
 
 /**
- * Local object storage for message attachments (AD-6).
+ * Object storage for message attachments and knowledge documents (AD-6).
  *
  * The schema stores a `storage_key`, never a blob. This module is the local
- * implementation: files live under `env.STORAGE_DIR` (gitignored), keyed by
- * `randomUUID`, and served through a signed short-lived URL. A production
- * deployment swaps the write/read/sign functions for real object storage behind
- * the same interface.
+ * implementation stores files under `env.STORAGE_DIR` (gitignored); production
+ * can use private Vercel Blob objects through the same interface.
  *
  * The signed URL is a defence-in-depth affordance: attachments are PII-adjacent
  * (x-rays, photos), so the serving route refuses unsigned requests and the URL
@@ -27,6 +26,17 @@ export async function putStorage(
   data: Buffer,
   options: { mimeType: string; fileName?: string },
 ): Promise<{ key: string; sizeBytes: bigint }> {
+  if (env.STORAGE_DRIVER === 'vercel-blob') {
+    const key = `attachments/${randomUUID()}${path.extname(options.fileName ?? '')}`;
+    const blob = await put(key, data, {
+      access: 'private',
+      addRandomSuffix: false,
+      contentType: options.mimeType,
+      token: env.BLOB_READ_WRITE_TOKEN,
+    });
+    return { key: blob.pathname, sizeBytes: BigInt(data.byteLength) };
+  }
+
   const dir = path.resolve(env.STORAGE_DIR);
   await mkdir(dir, { recursive: true });
 
@@ -42,12 +52,58 @@ export async function putStorage(
 
 /** Reads a storage key's bytes (for signed serving). */
 export async function getStorage(key: string): Promise<Buffer> {
+  if (env.STORAGE_DRIVER === 'vercel-blob') {
+    try {
+      const result = await get(key, {
+        access: 'private',
+        token: env.BLOB_READ_WRITE_TOKEN,
+      });
+      if (!result || result.statusCode !== 200 || !result.stream) {
+        throw new NotFoundError('Attachment not found.');
+      }
+      return Buffer.from(await new Response(result.stream).arrayBuffer());
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
+      throw new NotFoundError('Attachment not found.');
+    }
+  }
+
   const filePath = safeResolve(key);
   try {
     return await readFile(filePath);
   } catch {
     throw new NotFoundError('Attachment not found.');
   }
+}
+
+/** Opens a key for HTTP serving without buffering a private Blob in memory. */
+export async function openStorage(key: string): Promise<{
+  body: ReadableStream<Uint8Array>;
+  mimeType: string;
+  sizeBytes: number;
+}> {
+  if (env.STORAGE_DRIVER === 'vercel-blob') {
+    try {
+      const result = await get(key, {
+        access: 'private',
+        token: env.BLOB_READ_WRITE_TOKEN,
+      });
+      if (!result || result.statusCode !== 200 || !result.stream) {
+        throw new NotFoundError('Attachment not found.');
+      }
+      return {
+        body: result.stream,
+        mimeType: result.blob.contentType || 'application/octet-stream',
+        sizeBytes: result.blob.size,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
+      throw new NotFoundError('Attachment not found.');
+    }
+  }
+
+  const [buffer, info] = await Promise.all([getStorage(key), storageInfo(key)]);
+  return { body: new Blob([new Uint8Array(buffer)]).stream(), ...info };
 }
 
 /** Resolves a storage key inside the storage dir, refusing path traversal. */
@@ -108,6 +164,18 @@ export async function storageInfo(key: string): Promise<{
   mimeType: string;
   sizeBytes: number;
 }> {
+  if (env.STORAGE_DRIVER === 'vercel-blob') {
+    try {
+      const blob = await head(key, { token: env.BLOB_READ_WRITE_TOKEN });
+      return {
+        mimeType: blob.contentType || 'application/octet-stream',
+        sizeBytes: blob.size,
+      };
+    } catch {
+      throw new NotFoundError('Attachment not found.');
+    }
+  }
+
   const filePath = safeResolve(key);
   const info = await stat(filePath);
   let mimeType = 'application/octet-stream';
