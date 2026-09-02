@@ -37,7 +37,8 @@
     "voice:work": "tsx scripts/voice-worker.ts",
     "workers:work": "tsx scripts/worker-service.ts",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "_prepare_backup": "husky"
+    "_prepare_backup": "husky",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
