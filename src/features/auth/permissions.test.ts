@@ -88,6 +88,10 @@ describe('admin', () => {
   it('can read the audit log', () => {
     expect(hasPermission('admin', 'audit:read')).toBe(true);
   });
+
+  it('can approve knowledge documents', () => {
+    expect(hasPermission('admin', 'knowledge:approve')).toBe(true);
+  });
 });
 
 describe('member', () => {
@@ -111,6 +115,12 @@ describe('member', () => {
   it('cannot change settings', () => {
     expect(hasPermission('member', 'settings:update')).toBe(false);
   });
+
+  it('can write knowledge but not approve it', () => {
+    expect(hasPermission('member', 'knowledge:read')).toBe(true);
+    expect(hasPermission('member', 'knowledge:write')).toBe(true);
+    expect(hasPermission('member', 'knowledge:approve')).toBe(false);
+  });
 });
 
 describe('viewer', () => {
@@ -127,6 +137,8 @@ describe('viewer', () => {
     'contact:write',
     'contact:delete',
     'settings:update',
+    'knowledge:write',
+    'knowledge:approve',
   ];
 
   it('holds no write permission of any kind', () => {
@@ -138,6 +150,12 @@ describe('viewer', () => {
   it('can read conversations and contacts', () => {
     expect(hasPermission('viewer', 'conversation:read')).toBe(true);
     expect(hasPermission('viewer', 'contact:read')).toBe(true);
+  });
+
+  it('can read but not write knowledge', () => {
+    expect(hasPermission('viewer', 'knowledge:read')).toBe(true);
+    expect(hasPermission('viewer', 'knowledge:write')).toBe(false);
+    expect(hasPermission('viewer', 'knowledge:approve')).toBe(false);
   });
 
   it('cannot read the audit log', () => {

@@ -2,8 +2,10 @@ import { headers } from 'next/headers';
 import { cache } from 'react';
 
 import { hasPermission, type Permission } from '@/features/auth/permissions';
+import { membershipRole } from '@/features/auth/services/organization.service';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { branchesRepository } from '@/lib/db/auth/branches.repository';
+import { platformAdminRepository } from '@/lib/db/auth/platform-admin.repository';
 import { ForbiddenError, NotFoundError, UnauthenticatedError } from '@/lib/errors';
 
 /**
@@ -34,6 +36,8 @@ export type AuthContext = {
   organizationId: string | null;
   /** Null when `organizationId` is null. */
   role: string | null;
+  /** Trusted branch selection read from this session and verified against the org. */
+  branchId: string | null;
 };
 
 /**
@@ -56,32 +60,33 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
     // The role is read fresh from the membership row rather than trusted from the
     // session payload: a role change must take effect on the next request, not when
     // the session eventually expires.
-    const membership = await prisma.member.findUnique({
-      where: {
-        organizationId_userId: { organizationId, userId: session.user.id },
-      },
-      select: { role: true },
-    });
+    const currentRole = await membershipRole(organizationId, session.user.id);
 
     // No membership means the user was removed from the organization while signed
     // in. Fail closed: no organization, no role.
-    if (!membership) {
+    if (!currentRole) {
       return {
         user: toAuthUser(session.user),
         sessionId: session.session.id,
         organizationId: null,
         role: null,
+        branchId: null,
       };
     }
 
-    role = membership.role;
+    role = currentRole;
   }
+
+  const branch = organizationId
+    ? await branchesRepository.resolveForSession(session.session.id, organizationId)
+    : null;
 
   return {
     user: toAuthUser(session.user),
     sessionId: session.session.id,
     organizationId,
     role,
+    branchId: branch?.id ?? null,
   };
 });
 
@@ -119,6 +124,18 @@ export type OrgAuthContext = AuthContext & {
   role: string;
 };
 
+export type BranchAuthContext = OrgAuthContext & { branchId: string };
+export type PlatformAdminContext = AuthContext & { platformRole: 'operator' };
+
+/** Requires global platform authority; organization ownership never satisfies this. */
+export async function requirePlatformAdmin(): Promise<PlatformAdminContext> {
+  const context = await requireAuth();
+  if (!(await platformAdminRepository.isOperator(context.user.id))) {
+    throw new ForbiddenError('You do not have permission to do that.');
+  }
+  return { ...context, platformRole: 'operator' };
+}
+
 /**
  * Requires an authenticated user **with an active organization**.
  *
@@ -150,6 +167,25 @@ export async function requirePermission(permission: Permission): Promise<OrgAuth
     throw new ForbiddenError('You do not have permission to do that.');
   }
 
+  return context;
+}
+
+/** Requires the active session to resolve to a live branch in its active organization. */
+export async function requireBranch(): Promise<BranchAuthContext> {
+  const context = await requireOrg();
+  if (!context.branchId) {
+    throw new ForbiddenError('Select a branch to continue.');
+  }
+  return context as BranchAuthContext;
+}
+
+export async function requireBranchPermission(
+  permission: Permission,
+): Promise<BranchAuthContext> {
+  const context = await requireBranch();
+  if (!hasPermission(context.role, permission)) {
+    throw new ForbiddenError('You do not have permission to do that.');
+  }
   return context;
 }
 

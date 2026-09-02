@@ -1,4 +1,5 @@
 import * as auditLog from '@/features/auth/services/audit-log.service';
+import { auditLogQuerySchema } from '@/features/auth/validators/auth.validators';
 import { requirePermission } from '@/server/auth-context';
 import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 
@@ -13,12 +14,11 @@ export const GET = withApiHandler(
     const { organizationId } = await requirePermission('audit:read');
 
     const url = new URL(request.url);
-    const limitParam = Number(url.searchParams.get('limit'));
-    const cursor = url.searchParams.get('cursor');
+    const query = auditLogQuerySchema.parse(Object.fromEntries(url.searchParams));
 
     const page = await auditLog.list(organizationId, {
-      limit: Number.isFinite(limitParam) && limitParam > 0 ? limitParam : 50,
-      ...(cursor ? { cursor } : {}),
+      limit: query.limit,
+      ...(query.cursor ? { cursor: query.cursor } : {}),
     });
 
     return jsonSuccess(page.entries, {

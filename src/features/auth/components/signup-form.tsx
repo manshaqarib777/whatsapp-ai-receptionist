@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import { OAuthButtons } from '@/features/auth/components/oauth-buttons';
 import { signUpSchema } from '@/features/auth/validators/auth.validators';
 
@@ -108,7 +108,7 @@ export function SignupForm({ providers }: { providers: string[] }) {
       ) : null}
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <FormField
+        <TextField
           label="Name"
           name="name"
           value={name}
@@ -119,7 +119,7 @@ export function SignupForm({ providers }: { providers: string[] }) {
           autoFocus
         />
 
-        <FormField
+        <TextField
           label="Email"
           name="email"
           type="email"
@@ -130,7 +130,7 @@ export function SignupForm({ providers }: { providers: string[] }) {
           required
         />
 
-        <FormField
+        <TextField
           label="Password"
           name="password"
           type="password"

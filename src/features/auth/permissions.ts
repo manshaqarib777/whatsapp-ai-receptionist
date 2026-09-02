@@ -47,6 +47,51 @@ export const PERMISSIONS = [
   // Settings
   'settings:read',
   'settings:update',
+
+  // Knowledge base — Milestone 7.
+  'knowledge:read',
+  'knowledge:write',
+  'knowledge:approve',
+
+  // AI Engine — Milestone 8.
+  'ai:read',
+  'ai:manage',
+  'ai:run',
+
+  // Appointments — Milestone 9.
+  'appointment:read',
+  'appointment:write',
+
+  // CRM — Milestone 10.
+  'crm:read',
+  'crm:write',
+
+  // Quotes — Milestone 11.
+  'quote:read',
+  'quote:write',
+
+  // Invoices — Milestone 12.
+  'invoice:read',
+  'invoice:write',
+
+  // Workflows — Milestone 13.
+  'workflow:read',
+  'workflow:write',
+
+  // Broadcast — Milestone 14.
+  'broadcast:read',
+  'broadcast:write',
+
+  // Analytics — Milestone 15.
+  'analytics:read',
+
+  // Reviews — Milestone 16.
+  'review:read',
+  'review:write',
+
+  // Loyalty — Milestone 17.
+  'loyalty:read',
+  'loyalty:write',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -78,6 +123,29 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:delete',
     'settings:read',
     'settings:update',
+    'knowledge:read',
+    'knowledge:write',
+    'knowledge:approve',
+    'ai:read',
+    'ai:manage',
+    'ai:run',
+    'appointment:read',
+    'appointment:write',
+    'crm:read',
+    'crm:write',
+    'quote:read',
+    'quote:write',
+    'invoice:read',
+    'invoice:write',
+    'workflow:read',
+    'workflow:write',
+    'broadcast:read',
+    'broadcast:write',
+    'analytics:read',
+    'review:read',
+    'review:write',
+    'loyalty:read',
+    'loyalty:write',
   ],
 
   admin: [
@@ -99,6 +167,29 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:delete',
     'settings:read',
     'settings:update',
+    'knowledge:read',
+    'knowledge:write',
+    'knowledge:approve',
+    'ai:read',
+    'ai:manage',
+    'ai:run',
+    'appointment:read',
+    'appointment:write',
+    'crm:read',
+    'crm:write',
+    'quote:read',
+    'quote:write',
+    'invoice:read',
+    'invoice:write',
+    'workflow:read',
+    'workflow:write',
+    'broadcast:read',
+    'broadcast:write',
+    'analytics:read',
+    'review:read',
+    'review:write',
+    'loyalty:read',
+    'loyalty:write',
   ],
 
   member: [
@@ -111,6 +202,29 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'contact:read',
     'contact:write',
     'settings:read',
+    'knowledge:read',
+    'knowledge:write',
+    // NOT knowledge:approve — approval is admin/owner-only.
+    'ai:read',
+    // NOT ai:manage — template activation is admin/owner-only.
+    'ai:run',
+    'appointment:read',
+    'appointment:write',
+    'crm:read',
+    'crm:write',
+    'quote:read',
+    'quote:write',
+    'invoice:read',
+    'invoice:write',
+    'workflow:read',
+    'workflow:write',
+    'broadcast:read',
+    'broadcast:write',
+    'analytics:read',
+    'review:read',
+    'review:write',
+    'loyalty:read',
+    'loyalty:write',
   ],
 
   viewer: [
@@ -119,6 +233,17 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'conversation:read',
     'contact:read',
     'settings:read',
+    'knowledge:read',
+    'ai:read',
+    'appointment:read',
+    'crm:read',
+    'quote:read',
+    'invoice:read',
+    'workflow:read',
+    'broadcast:read',
+    'analytics:read',
+    'review:read',
+    'loyalty:read',
   ],
 };
 

@@ -7,19 +7,35 @@ qualifying enquiries, booking appointments, and escalating to humans when needed
 
 ## Status
 
-**Milestone 2 — Authentication.** Complete.
+**Sequential implementation is complete through Milestone 25.** The repository produces
+an immutable, non-root standalone container and includes CI, trace propagation,
+liveness/readiness probes, monitoring guidance, alerts, deployment, and rollback
+contracts. Final certification is local; no external preview or production environment
+was deployed or verified.
 
 Development is milestone-driven and sequential. The roadmap and requirements live in
 [`docs/PRODUCT_REQUIREMENTS.md`](docs/PRODUCT_REQUIREMENTS.md); progress per milestone
 is in [`docs/milestones/`](docs/milestones/).
 
 What exists so far: the foundation (tooling, database, configuration, logging, error
-handling, health checks, CI) and a complete multi-tenant authentication system —
-sign-up, sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and
-an append-only audit log.
+handling, health checks, CI), a complete multi-tenant authentication system — sign-up,
+sign-in, magic links, OAuth, two-factor, organizations, RBAC, sessions, and an
+append-only audit log — a token-driven design system every later screen is built from,
+the persistent data model the whole product runs on (covering the inbox,
+knowledge base, AI runs, scheduling, CRM, quotes, invoices, payments, workflows,
+campaigns, reviews, and loyalty), the dashboard and inbox, the knowledge base, the AI
+engine, the appointment engine, CRM, quotations, invoicing and payments, the workflow
+builder, the broadcast system, the analytics surface, the reviews system, and the
+loyalty system (points, membership tiers, coupons, rewards, and referrals), trusted
+multi-branch sessions, sandbox integrations, Voice AI, eight bounded AI specialist
+agents, a separately authorized platform admin portal, hardened security/privacy
+operations, and optional Redis-backed caching/rate limiting with streaming,
+code-splitting, virtualization, and enforced asset budgets. Login-ready deterministic data is documented in
+[`docs/DEMO_DATA.md`](docs/DEMO_DATA.md).
 
-There is no product functionality yet. The dashboard is a placeholder; the design
-system is Milestone 3.
+Browse the components at **<http://localhost:3000/design>** while the development
+server is running. It is a development tool, not a product page, and 404s in a
+production build.
 
 ---
 
@@ -30,9 +46,10 @@ system is Milestone 3.
 | Framework | Next.js 16 (App Router), React 19 |
 | Language | TypeScript, strict |
 | Database | PostgreSQL 17 + Prisma 7 |
+| Cache / ephemeral state | Redis 8 (optional; safe PostgreSQL/direct-read fallbacks) |
 | Async state | React Query v5 |
 | Styling | Tailwind CSS v4 + shadcn/ui |
-| Icons / Fonts | Lucide / Geist |
+| Icons / Fonts | Lucide / packaged local Geist |
 | Auth | Better Auth v1.6 ([ADR-0001](docs/architecture/decisions/ADR-0001-better-auth.md)) |
 | Validation | Zod |
 | Logging | Pino (structured, with redaction) |
@@ -86,7 +103,11 @@ Names and purpose only — never commit values. See [`.env.example`](.env.exampl
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | **yes** | Postgres connection string |
+| `DATABASE_POOL_MAX` | no (`5`) | Per-instance Postgres pool ceiling |
 | `NEXT_PUBLIC_APP_URL` | **yes** | Public base URL; exposed to the browser |
+| `APP_URL` | production | Server-only canonical runtime URL; permits one image digest across environments |
+| `STORAGE_DRIVER` | no (`local`) | `vercel-blob` for hosted private object storage |
+| `BLOB_READ_WRITE_TOKEN` | with Blob | Shared private Blob credential for web and worker |
 | `LOG_LEVEL` | no (defaults to `info`) | Pino log level |
 | `AUTH_SECRET` | **yes** | Session signing secret, 32+ chars. `openssl rand -base64 32` |
 | `EMAIL_FROM` | no | From address on outbound mail |
@@ -135,7 +156,7 @@ names every offending variable. `process.env` is read nowhere else — enforced 
 
 | Command | Purpose |
 |---|---|
-| `npm run dev` | Development server |
+| `npm run dev` | Development server (component gallery at `/design`) |
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run typecheck` | `tsc --noEmit` — must be 0 errors |
@@ -145,11 +166,14 @@ names every offending variable. `process.env` is read nowhere else — enforced 
 | `npm run test` | Unit, integration, component tests |
 | `npm run test:coverage` | Tests with coverage |
 | `npm run test:e2e` | Playwright E2E |
+| `npm run performance:check` | Enforce production JS/CSS asset budgets after build |
 | `npm run verify` | typecheck → lint → test → build |
-| `npm run db:up` / `db:down` | Start / stop Postgres |
+| `npm run db:up` / `db:down` | Start / stop local Postgres, Redis, and worker services |
 | `npm run db:migrate` | Create and apply a migration |
 | `npm run db:deploy` | Apply migrations (CI/production) |
+| `npm run db:generate` | Regenerate the Prisma client |
 | `npm run db:seed` | Seed the database |
+| `npm run db:check-drift` | Fail unless the only schema drift is the known HNSW drop |
 | `npm run db:studio` | Prisma Studio |
 
 Integration tests require Postgres to be running. They **fail** rather than skip when
@@ -177,6 +201,10 @@ tests/e2e/          Playwright specs
 Architecture is feature-first with Controller → Service → Repository layering inside
 each feature. Components never access the database. See
 [`.claude/ARCHITECTURE_RULES.md`](.claude/ARCHITECTURE_RULES.md).
+
+Organizations can contain multiple branches. The active organization and branch are
+trusted database-session state; appointment, knowledge, and AI data is isolated by
+branch. Owners and admins manage locations at `/settings/branches`.
 
 ---
 
@@ -210,4 +238,16 @@ enforced by Commitlint. Pre-commit runs lint-staged and the type-checker.
 
 ## Deployment
 
-Not yet configured. Deployment, monitoring, tracing, and rollback are **Milestone 25**.
+Build the production image with
+`docker build -f docker/app.Dockerfile -t war-app:<version> .`. It runs the Next.js
+standalone server as UID 1001 and probes `/api/health/ready`. CI verifies the image but
+does not publish or deploy it; promotion remains an explicit operator action. See
+[`docs/operations/deployment.md`](docs/operations/deployment.md) for the deployment and
+rollback contract and [`docs/operations/observability.md`](docs/operations/observability.md)
+for signals, alerts, and the incident runbook.
+
+The recommended hosted topology is Vercel for the web/API layer and a persistent
+Railway worker using `docker/worker.Dockerfile`, backed by pooled Postgres, TLS Redis,
+and private Vercel Blob. See
+[`docs/operations/vercel-hybrid.md`](docs/operations/vercel-hybrid.md) for the exact
+configuration and promotion order.

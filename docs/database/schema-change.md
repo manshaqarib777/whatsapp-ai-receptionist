@@ -205,3 +205,792 @@ backup and replay to the target migration — exercised in Milestone 25.
 `audit-log.integration.test.ts` (25 tests) run against real Postgres and prove
 cross-tenant isolation, last-owner protection, privilege-escalation refusal, and that
 the audit log is append-only and PII-free.
+
+---
+
+# Schema Change — Milestone 4 (Database)
+
+Date: 2026-08-02
+Plan: `docs/milestones/MILESTONE_04_PLAN.md` (approved)
+Design: `docs/database/er-diagram.md` — 85 tables across all 25 milestones
+Status: In progress
+
+## Scope
+
+50 new Tier-1 tables — everything milestones 5–14 need, plus `branches`. The 25 Tier-2
+tables are designed in the ER diagram and migrated at their own milestone, per plan
+AD-6.
+
+## Infrastructure Change — Postgres image
+
+`postgres:17-alpine` → `pgvector/pgvector:pg17`, in both `docker/docker-compose.yml` and
+`.github/workflows/ci.yml`.
+
+Stock Postgres does not ship the `vector` extension. Verified before writing any
+migration, per plan risk R-3:
+
+```
+before:  btree_gist 1.7, pgcrypto 1.3
+after:   btree_gist 1.7, pgcrypto 1.3, vector 0.8.6
+```
+
+Same Postgres 17 major version, so the existing data volume carried over untouched — all
+11 tables and the `_prisma_migrations` history survived the swap, verified rather than
+assumed. No reset was required and none was performed.
+
+Both images had to change together. Had only the local one changed, `CREATE EXTENSION
+vector` would have succeeded locally and failed in CI.
+
+## Extensions
+
+| Extension | For |
+|---|---|
+| `vector` | Knowledge-base embeddings (`knowledge_chunks.embedding`), HNSW index |
+| `btree_gist` | Appointment overlap prevention — an exclusion constraint mixing `uuid` equality with `tstzrange` overlap needs GiST support for the scalar column |
+| `pgcrypto` | `gen_random_uuid()` — available in PG 17 core, declared explicitly rather than relied on implicitly |
+
+## New Tables
+
+Grouped by originating milestone. Column detail and rationale are in
+`docs/database/er-diagram.md`; this section records counts and the decisions a reviewer
+needs to check.
+
+| Milestone | Count | Tables |
+|---|---|---|
+| 4 | 1 | `branches` |
+| 5 | 2 | `notifications`, `tasks` |
+| 6 | 8 | `whatsapp_accounts`, `contacts`, `conversations`, `messages`, `message_attachments`, `labels`, `conversation_labels`, `conversation_notes` |
+| 7 | 5 | `knowledge_sources`, `knowledge_documents`, `knowledge_document_versions`, `knowledge_chunks`, `ingestion_jobs` |
+| 8 | 4 | `prompt_templates`, `prompt_template_versions`, `ai_runs`, `ai_run_citations` |
+| 9 | 6 | `services`, `resources`, `availability_rules`, `availability_exceptions`, `appointments`, `appointment_reminders` |
+| 10 | 7 | `companies`, `pipelines`, `pipeline_stages`, `deals`, `tags`, `taggables`, `activities` |
+| 11 | 4 | `quote_templates`, `quotes`, `quote_line_items`, `quote_versions` |
+| 12 | 5 | `invoices`, `invoice_line_items`, `payments`, `refunds`, `payment_events` |
+| 13 | 4 | `workflows`, `workflow_versions`, `workflow_runs`, `workflow_run_steps` |
+| 14 | 4 | `segments`, `whatsapp_message_templates`, `campaigns`, `campaign_recipients` |
+
+**Total: 50.**
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `audit_logs` | Add `diff jsonb` | `DATABASE_RULES.md:83` requires a before/after diff; the Milestone 2 model carries only `metadata`. Column-level allow-list keeps PII out. |
+| `organizations` | Add `branches` relation | Every org auto-provisions a `Main` branch. |
+
+## Relations
+
+Full graph in the ER diagram. The `ON DELETE` policy is the part that needs review:
+
+| Policy | Applied to | Reasoning |
+|---|---|---|
+| `Cascade` | Children genuinely owned by a parent: line items, attachments, versions, run steps, campaign recipients, availability rules | The child is meaningless without the parent and has no independent identity. |
+| `Restrict` | Everything else — the default | Deleting a contact that has invoices must fail loudly, not silently erase financial records. |
+| `SetNull` | `conversations.assignee_id`, `audit_logs.actor_id` | A departing user must not take conversations or audit history with them. |
+
+Business deletion is soft (`deleted_at`), so these policies mostly govern genuine hard
+deletion — which for customer data happens only through the erasure path.
+
+## Indexes
+
+Every foreign key, and every column used in `WHERE`, `ORDER BY`, or `JOIN`.
+`organization_id` leads every composite index, per `DATABASE_RULES.md:103`.
+
+The four mandated from day one by `DATABASE_RULES.md:130`:
+
+```
+idx_conversations_organization_id_last_message_at
+idx_messages_conversation_id_created_at
+uq_messages_organization_id_whatsapp_message_id
+idx_contacts_organization_id_phone_number
+```
+
+Additional indexes needing individual justification, since each costs write throughput:
+
+| Index | Justification |
+|---|---|
+| `idx_messages_organization_id_created_at` | Cursor pagination on message history across a branch, not just one conversation. |
+| `hnsw (embedding vector_cosine_ops)` on `knowledge_chunks` | Similarity search. HNSW over IVFFlat: better recall/latency and no training step. |
+| `idx_knowledge_chunks_branch_id` | Branches have separate knowledge (M18); every retrieval filters on it. |
+| `idx_appointments_branch_id_starts_at` | Calendar views are always a branch plus a date range. |
+| `idx_ai_runs_organization_id_created_at` | M22 reads AI usage by org over a period. |
+| `idx_campaign_recipients_campaign_id_status` | Delivery dashboards group by status within a campaign. |
+| `idx_workflow_run_steps_scheduled_for` | The delay-node scheduler polls for due steps across all runs. Partial: `WHERE status = 'pending'`. |
+
+## Constraints
+
+- `NOT NULL` by default. Nullable columns each justified in the ER diagram —
+  `resources.user_id` (a treatment room has no login) and the optional FKs between
+  quote → deal and invoice → quote are the main ones.
+- `CHECK` constraints for every status/enum column, restricting to the documented set.
+- **`uq_messages_organization_id_whatsapp_message_id`** — makes webhook processing
+  idempotent under Meta's retries (`DATABASE_RULES.md:120`).
+- **Gateway idempotency**: unique `payments.gateway_payment_id` and
+  `payment_events.gateway_event_id`. Five gateways all retry.
+- **Partial unique indexes for soft delete**, `... WHERE deleted_at IS NULL`. Without
+  these a soft-deleted contact permanently blocks its phone number and a restore
+  collides (`DATABASE_RULES.md:80`). Applies to `contacts.phone_number`,
+  `branches.slug`, `quotes.number`, `invoices.number`, `labels.name`, `tags.name`.
+- **Exactly one default branch per org**: partial unique index on
+  `(organization_id) WHERE is_default AND deleted_at IS NULL`.
+- **Appointment overlap**: `EXCLUDE USING gist (resource_id WITH =, tstzrange(starts_at,
+  ends_at) WITH &&) WHERE (status IN ('booked','confirmed') AND deleted_at IS NULL)`.
+  Double-booking is prevented by the database, not by an application check that races
+  under concurrency. This is why `btree_gist` is required.
+- **Money**: `numeric(15,4)` with a sibling `*_currency` column, per plan AD-3. Never
+  `float`.
+
+## Deviations From `DATABASE_RULES.md`
+
+Recorded explicitly rather than slipped in.
+
+1. **Polymorphic references on `taggables` and `activities`** break "foreign keys always"
+   (`:118`). A tag applies to contacts, deals, and conversations; a join table per target
+   is three tables now and six later. Mitigated by a `CHECK` on the type column
+   restricting it to the known set, and an index on `(taggable_type, taggable_id)`. The
+   cost is no referential integrity on that column — accepted, and flagged to the user.
+2. **`workflow_versions.definition` is JSON**, not normalised into node and edge tables.
+   A visual builder saves the whole graph atomically; normalising buys integrity nobody
+   queries and costs a multi-table transaction per save. The version row provides the
+   auditability that is the actual requirement.
+3. **`tenant_id` is named `organization_id`** (`:61`). Already established at Milestone 2
+   — `prisma/schema.prisma:133` designates `Organization` as the tenant. The rule file is
+   being amended to match rather than the schema being bent to a name better-auth owns.
+4. **Hard deletion exists, for erasure only.** `:66` says never hard delete customer
+   data; `:182` requires a purge path. These contradict. Resolved per plan AD-4: soft
+   delete is trash-and-restore, erasure is redaction in place. No customer row is ever
+   `DELETE`d; PII columns are overwritten and `redacted_at` set. The rule file needs
+   amending either way.
+
+## Migration Strategy
+
+**Planned as ten domain migrations; delivered as five.** Recorded as a deviation rather
+than quietly re-scoped.
+
+The plan split the work by domain (inbox, knowledge, AI, …) on the reasoning that "one
+logical change per migration" (`DATABASE_RULES.md:148`) meant one domain per migration.
+That does not survive contact with Prisma: `migrate dev` diffs the whole schema at once,
+so ten domain migrations would mean editing `schema.prisma` down to one domain, migrating,
+adding the next, and repeating — with the cross-domain relations (`Organization` alone
+declares 40 back-relations) making the intermediate states invalid. The intermediate
+migrations would be fiction, all applied together in one deploy, none independently
+revertible because the foreign keys span them.
+
+What was delivered instead is split by genuine dependency order, which is what the rule is
+actually protecting:
+
+| # | Migration | Why it is separate |
+|---|---|---|
+| 1 | `20260802033000_extensions` | `vector` and `btree_gist` types must exist before any table or constraint uses them |
+| 2 | `20260802033724_milestone_4_schema` | The 50 tables. One `CREATE`-only unit, no data touched |
+| 3 | `20260802034000_timestamptz` | 169 columns to `TIMESTAMPTZ(3)` — a distinct correction, and it touches the Milestone 1 and 2 tables too |
+| 4 | `20260802034500_constraints` | Partial indexes, CHECKs, and the EXCLUDE constraint; must follow table creation |
+| 5 | `20260802035500_snake_case_lifecycle_stage` | A naming fix, independently revertible |
+
+**A timestamp ordering trap worth knowing about.** Prisma names migration folders from the
+system clock, and migrations apply in lexicographic order. `extensions` was first created
+by hand as `20260802090000` — a time later that day — which sorted it *after* the
+generated schema migration. Locally it had already applied, so everything worked; on a
+fresh CI database the schema migration would have run first and `CREATE TABLE ...
+vector(1536)` would have failed. Renamed to `20260802033000` with the history row updated
+in place. Any hand-created migration folder must be dated relative to the generated ones,
+not to the wall clock.
+
+`branches` needed no expand → backfill → contract after all: every branch-scoped table is
+created empty in the same migration, so `branch_id NOT NULL` is vacuously satisfied. The
+sequence is still documented in the plan so the pattern is established before Milestone
+25, when it becomes load-bearing against real data.
+
+## Rollback Plan
+
+No production deployment exists. Per migration, rollback is `prisma migrate reset`
+against a local or CI database, then `db:deploy` to the target.
+
+The one migration that would need a real rollback if this were live is #2 — dropping
+`branches` after a backfill loses the branch assignment. For a live environment the
+sequence is: restore from backup, replay to migration 1, redeploy the previous
+application version. Exercised properly in Milestone 25; recorded now so it is not
+invented under pressure.
+
+The image change is independently reversible: revert both files to `postgres:17-alpine`.
+Only migration 1 depends on it, and the volume is compatible in both directions.
+
+## Query Plans
+
+`DATABASE_RULES.md:170` requires `EXPLAIN ANALYZE` on any query against `messages` or
+`conversations` before merging.
+
+Measured against **5,017 conversations and 100,058 messages**, not against the seed. At
+seed volume (17 and 58) Postgres sequentially scans everything regardless of what
+indexes exist, so a plan taken there proves nothing. The volume tenant was created for
+the measurement and deleted afterwards; the row counts above and below confirm it.
+
+**Q1 — inbox list, organization-scoped, newest first, first page**
+
+```
+Limit (actual time=0.036..0.115 rows=25)
+  ->  Index Scan Backward using conversations_organization_id_last_message_at_idx
+        Index Cond: (organization_id = $1)
+        Filter: (deleted_at IS NULL)
+        Buffers: shared hit=27
+Execution Time: 0.184 ms
+```
+
+Index scan, and critically **no sort node** — the composite index supplies the ordering,
+so paging deeper does not degrade into sorting the tenant's whole conversation list.
+27 buffers for 25 rows.
+
+**Q2 — message history within a conversation, cursor-paged**
+
+```
+Limit (actual time=0.101..0.104 rows=20)
+  ->  Sort  (Sort Method: quicksort  Memory: 26kB)
+        ->  Bitmap Heap Scan on messages
+              ->  Bitmap Index Scan on messages_conversation_id_created_at_idx
+                    Index Cond: ((conversation_id = $1) AND (created_at < $2))
+Execution Time: 0.149 ms
+```
+
+Index used. The sort node is present because a bitmap scan does not preserve order, and
+Postgres chose bitmap over a plain index scan at 20 rows per conversation. On a
+conversation long enough for the sort to matter, the planner switches to a backward
+index scan and the sort disappears. Recorded rather than tuned: optimising against a
+plan the planner will not choose at real sizes would be guesswork.
+
+Both are comfortably inside any reasonable budget. The figures are from a warm local
+cache and are index-use evidence, not latency targets — those belong to Milestone 24.
+
+## Verification
+
+- `src/lib/db/scoped-prisma.integration.test.ts` — 32 tests. Cross-tenant and
+  cross-branch reads return empty rather than throwing, creates are stamped with the
+  real scope over whatever the caller passed, cross-tenant writes affect zero rows,
+  unique-selector operations are refused, soft-deleted rows hide by default and are
+  reachable for restore and erasure, a trashed phone number is reusable, and a stale
+  optimistic-locked write is a 409.
+- `src/lib/db/erasure.integration.test.ts` — 12 tests, including that the audit trail
+  still resolves to a real row after erasure and that the redaction registry covers
+  every model carrying `redacted_at`.
+- `src/lib/db/seed.integration.test.ts` — 31 tests turning the `DATABASE_RULES.md` seed
+  checklist into assertions, plus four asserting the data is synthetic.
+- Constraint behaviour was additionally exercised directly against Postgres before any
+  test existed: overlapping booking rejected, adjacent booking accepted, inverted range
+  rejected, lowercase currency rejected, a tax rate of `15` rejected where `0.15` is
+  meant, and a second default branch rejected.
+- Seed determinism: three consecutive runs produce an identical md5 across
+  organizations, contacts, conversations, messages, appointments, deals, invoices, and
+  quotes.
+
+Not covered here: pgvector similarity ordering has no data to rank until Milestone 7
+ingests documents, so the HNSW index is verified as present and correctly typed rather
+than by a ranking assertion.
+
+---
+
+# Schema Change — Milestone 6 (Inbox)
+
+Date: 2026-08-12
+Migration: `prisma/migrations/20260812092315_inbox`
+Plan: `docs/milestones/MILESTONE_06_PLAN.md` (approved)
+Status: Applied (local)
+
+## New Tables
+
+| Table | Purpose |
+|---|---|
+| `conversation_reads` | Per-user read receipt: which user read which conversation, and when. The denormalised `conversations.unread_count` is the org-level aggregate; this is the per-user marker. |
+| `conversation_typing` | Typing indicator. TTL-expiring (`expires_at`); a DB row works across `next start` instances without Redis. Expired rows self-clean on write. |
+| `conversation_summaries` | Conversation Summary. Milestone 6 writes the heuristic summary (`model = 'heuristic'`); Milestone 8's AI Engine writes LLM-generated versions into the same table. One `current` row per conversation. |
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `messages` | Add `read_at timestamptz(3)` | Per-message read marker for the thread UI (per-user receipts live in `conversation_reads`). |
+
+## Enums
+
+`activity_kind` gains `assigned`, `unassigned`, `label_changed`, `archived` — the
+inbox events the activity feed surfaces. Added via `ALTER TYPE` (handled by Prisma
+for multi-value enum additions).
+
+## Hand-written SQL (Prisma cannot express)
+
+- `CREATE EXTENSION "pg_trgm"` + GIN trigram index `idx_messages_body_trgm` on
+  `messages.body` — inbox search (AD-5). Prisma cannot express GIN/trigram, so it
+  lives in the migration with a maintenance-hazard note.
+- `idx_knowledge_chunks_embedding_hnsw` is **recreated** — Prisma's diff proposed
+  dropping it (the known maintenance hazard from 20260802034500); the generated DROP
+  was removed and the index recreated by hand. The drift guard
+  (`scripts/check-schema-drift.ts`) now whitelists both hand-written indexes.
+
+## Indexes
+
+Every FK and WHERE/ORDER BY column, per `DATABASE_RULES.md`: `conversation_reads`
+(conversation_id, user_id) unique + (user_id, last_read_at) + (organization_id);
+`conversation_typing` (conversation_id, user_id) unique + (expires_at) +
+(organization_id); `conversation_summaries` (conversation_id, version) unique +
+(organization_id).
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI; the
+documented restore-from-backup path for any live env (exercised in M25). Note the
+ALTER TYPE additions are not transactional on older Postgres — a rollback re-runs
+the full migration history rather than a single revert.
+
+## Verification
+
+`src/features/inbox/tests/inbox.integration.test.ts` — 15 tests against real
+Postgres: list ordering/filters/pagination, thread messages, read receipts, send
+side effects, labels (cross-org refusal), typing TTL, search isolation, and summary
+persistence. Tenant isolation: org A never sees org B in any query.
+
+---
+
+# Schema Change — Milestone 7 (Knowledge Base)
+
+Date: 2026-08-12
+Migration: `prisma/migrations/20260812185009_knowledge`
+Plan: `docs/milestones/MILESTONE_07_PLAN.md` (approved)
+Status: Applied (local)
+
+The M4 schema already designed the five knowledge tables (`knowledge_sources`,
+`knowledge_documents`, `knowledge_document_versions`, `knowledge_chunks`,
+`ingestion_jobs`). This migration is the minimal delta that makes the feature
+work, exactly as the plan's Database Impact section specified.
+
+## Enums
+
+`knowledge_source_kind` gains `pdf`, `docx`, `csv` — the PRD lists them as
+distinct source kinds. Added via `ALTER TYPE` (Prisma handles multi-value enum
+additions).
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `knowledge_documents` | Add `file_name`, `mime_type`, `storage_key`, `size_bytes` | Blob reference for uploads (house pattern from `message_attachments`); the blob never lives in Postgres |
+| `knowledge_document_versions` | Add `chunk_count Int?`, `checksum String?` | Derived count + content hash for re-ingestion dedupe / change detection |
+| `ingestion_jobs` | Add `progress Int?` (default 0), `document_id UUID?`, `version_id UUID?` | Progress reporting + job → produced document/version links |
+
+The new FKs (`ingestion_jobs.document_id`, `.version_id`) are `ON DELETE SET
+NULL` — a document purge must not take its job history with it.
+
+## Hand-written SQL (Prisma cannot express)
+
+- **`idx_knowledge_chunks_content_trgm`** — GIN trigram index on
+  `knowledge_chunks.content` for keyword search (plan AD-6). Prisma cannot express
+  GIN/trigram, so it lives in the migration with a maintenance note: a future
+  `migrate dev` diff proposes dropping it — strip that DROP and recreate.
+- **`idx_knowledge_chunks_embedding_hnsw` recreated** — Prisma's diff proposed
+  dropping it (the known maintenance hazard from `20260802034500_constraints`);
+  the generated DROP was removed and the index recreated by hand. The drift guard
+  (`scripts/check-schema-drift.ts`) whitelists both hand-written indexes.
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI; the
+documented restore-from-backup path for any live env (exercised in M25). Note the
+ALTER TYPE additions are not transactional on older Postgres — a rollback re-runs
+the full migration history rather than a single revert.
+
+## Verification
+
+`src/features/knowledge/tests/knowledge.integration.test.ts` — against real
+Postgres + pgvector: source CRUD, upload → job claim → parse → chunk → embed →
+draft version, approval transition sets `currentVersionId`, retrieval returns only
+approved current versions, **org A never retrieves org B** (the mandated raw-SQL
+scoping test), job success/failure + progress, version archive.
+
+---
+
+# Schema Change — Milestone 16 (Reviews)
+
+Date: 2026-08-16
+Migrations: `20260816120000_reviews`, `20260816130000_reviews_request_unique`
+Plan: `docs/milestones/MILESTONE_16_PLAN.md` (approved)
+Status: Applied (local)
+
+## New Tables
+
+The three Tier-2 review tables designed in the M4 ER diagram (§10), migrated at
+their owning milestone.
+
+| Table | Purpose |
+|---|---|
+| `review_platforms` | Google / Facebook as rows. Branch-scoped; unique `(branchId, provider)`. `credentials_ref` is a secret-store key, never the token. |
+| `review_requests` | A review asked of a contact, linked to the completed appointment. Unique `(appointmentId, platformId)` — one request per appointment+platform, so the automation worker is idempotent. |
+| `reviews` | The review a request yielded. `rating` constrained 1–5 by a CHECK. `request_id` is `@unique` (one review per request) via the follow-up migration. |
+
+## Enums
+
+| Enum | Values |
+|---|---|
+| `review_platform_provider` | `google`, `facebook` |
+| `review_request_status` | `created`, `sent`, `responded`, `expired`, `cancelled` |
+
+## Relations
+
+- `ReviewRequest.contactId` / `ReviewRequest.appointmentId` /
+  `ReviewRequest.platformId` — `Restrict` (a request never silently loses its
+  subject).
+- `Review.requestId` — `SetNull` (a deleted request keeps the review; the
+  `@unique` makes it one review per request).
+- `Review.contactId` / `Review.platformId` — `Restrict`.
+
+## Constraints
+
+- `reviews_rating_check` — `rating >= 1 AND rating <= 5` (DATABASE_RULES: ranges
+  constrained in the database, not trusted to the application).
+- `review_requests_appointment_id_platform_id_key` — unique request guard.
+- `reviews_request_id_key` — one review per request (follow-up migration).
+
+## Indexes
+
+Every FK plus the query patterns: `review_requests (organization_id, status)`
+(the list filter), `reviews (organization_id, received_at)` (the review feed),
+and `reviews (organization_id, external_review_id)` (platform-idempotent
+imports).
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI;
+the documented restore-from-backup path for any live env (exercised in M25).
+
+## Verification
+
+`src/features/reviews/tests/reviews.integration.test.ts` — 12 tests against real
+Postgres: default platforms, request create → send → expire sweep, consent
+refusals (never-consented and opted-out), non-completed appointment refusal,
+automation (grace window, consent skip, idempotency), review recording +
+feedback threshold, out-of-range rating refusal, and **org A never sees org B**
+for platforms and reviews.
+
+---
+
+# Schema Change — Milestone 17 (Loyalty)
+
+Date: 2026-08-17
+Migrations: `20260817100000_loyalty`, `20260817110000_loyalty_indexes`
+Plan: `docs/milestones/MILESTONE_17_PLAN.md` (approved)
+Status: Applied (local)
+
+## New Tables
+
+The six Tier-2 loyalty tables designed in the M4 ER diagram (§10), migrated at
+their owning milestone.
+
+| Table | Purpose |
+|---|---|
+| `loyalty_programs` | The program: name, points-per-currency earn rate, enabled state. |
+| `loyalty_accounts` | One per contact per program: running `balance`, lifetime `total_earned`, derived `tier`. |
+| `loyalty_transactions` | The points ledger: signed `points_delta`, kind (earn/spend/referral_bonus), optional invoice link. |
+| `coupons` | Discount codes: percent or fixed, expiry, per-coupon redemption limit. |
+| `coupon_redemptions` | A coupon used by a contact. Unique `(coupon_id, contact_id)` — one use per contact. |
+| `referrals` | A contact referring another. Unique `(referrer_id, referred_contact_id)`. |
+
+## Enums
+
+| Enum | Values |
+|---|---|
+| `loyalty_tier` | `bronze`, `silver`, `gold` |
+| `loyalty_transaction_kind` | `earn`, `spend`, `referral_bonus` |
+| `coupon_type` | `percent`, `fixed` |
+| `referral_status` | `pending`, `rewarded` |
+
+## Constraints
+
+- `loyalty_accounts_balance_check` — `balance >= 0` (a ledger never goes
+  negative in the database).
+- `loyalty_accounts_total_earned_check` — `total_earned >= 0`.
+- `loyalty_programs_points_per_currency_check` — `points_per_currency >= 0`.
+- `coupons_max_redemptions_check` — `max_redemptions >= 1`.
+- `coupons_value_check` — `value >= 0`; percent coupons additionally capped at
+  100 by the service.
+
+## Indexes
+
+Every FK plus the query patterns: `loyalty_accounts (organization_id, tier)`
+(the member-list filter), `loyalty_transactions (organization_id, created_at)`
+(the ledger feed), `loyalty_transactions (invoice_id, kind)` unique (a paid
+invoice earns exactly once — the worker's idempotency key).
+
+## Rollback Plan
+
+No production data exists. `prisma migrate reset` + `db:deploy` for local/CI;
+the documented restore-from-backup path for any live env (exercised in M25).
+
+## Verification
+
+`src/features/loyalty/tests/loyalty.integration.test.ts` — 13 tests against real
+Postgres: program create + negative-rate refusal, the earn worker (credits a
+paid invoice exactly once, creates the account, floors partial rates, no-ops
+without a program), redemption (decrements, refuses above balance), coupons
+(create, percent-cap, one-use-per-contact), referrals (referrer rewarded when
+the referral earns, self-referral refused), and **org A never sees org B**.
+
+---
+
+# Schema Change — Milestone 18 (Multi Branch)
+
+Date: 2026-08-22
+Migration: `20260822090000_active_branch_session`
+Plan: `docs/milestones/MILESTONE_18_PLAN.md`
+Status: Planned; implementation paused until Milestone 8 closes
+
+## Modified Tables
+
+| Table | Change | Why |
+|---|---|---|
+| `sessions` | Add nullable `active_branch_id UUID` | Persist a trusted branch selection beside the trusted active organization instead of accepting branch scope from a request body, query string, header, or client-only cookie. |
+
+`active_branch_id` references `branches.id` with `ON DELETE SET NULL`. A deleted branch
+must not delete login sessions; a null selection is recovered by validating and
+persisting the active organization's default branch.
+
+## Existing Constraints Reused
+
+- `uq_branches_organization_id_slug` keeps live branch slugs unique per organization.
+- `uq_branches_one_default_per_organization` permits one live default branch per
+  organization.
+- Every calendar, knowledge, and AI-owned row already carries a non-null `branch_id`
+  from Milestone 4. Milestone 18 changes runtime scoping rather than rewriting those
+  tables.
+
+## Indexes
+
+- `sessions_active_branch_id_idx` supports referential integrity operations and
+  branch cleanup without a session-table scan.
+
+## Migration Strategy
+
+1. Add the nullable column and index without changing existing request behavior.
+2. Backfill sessions with an active organization to that organization's live default
+   branch.
+3. Add the foreign key after the backfill.
+4. Deploy auth-context compatibility logic that resolves a missing selection to the
+   organization's default branch and persists it.
+
+The column remains nullable because a session may legitimately have no active
+organization during onboarding.
+
+## Rollback Plan
+
+Drop the foreign key, index, and `active_branch_id` column. No branch or business data
+is deleted, and pre-Milestone-18 behavior resumes by resolving the default branch.
+
+## Verification
+
+Integration tests will prove the backfill, valid branch persistence, rejection of a
+branch from another organization, null behavior during onboarding, and safe fallback
+when a selected branch is soft-deleted.
+
+# Milestone 8 repair — durable AI turn jobs (2026-08-23)
+
+## Change
+
+`ai_turn_jobs` stores an organization/branch/conversation-scoped reference to one
+persisted inbound customer message. The raw body remains exclusively in `messages`.
+`input_message_id` is unique for idempotent enqueue; `run_id` is unique and nullable
+until completion. Status, attempt limit, lock timestamp, and bounded last-error text
+support database polling, retry, and stale-work recovery.
+
+## Relations and indexes
+
+Conversation and input-message deletion cascade to the job; organization and branch
+deletion remain restricted; run deletion clears the optional completion link. The
+worker scans `(organization_id, status, created_at)` and claim SQL uses `FOR UPDATE
+SKIP LOCKED`. Branch and conversation foreign keys have supporting indexes.
+
+## Migration strategy and rollback
+
+`20260823133000_ai_turn_jobs` adds the enum/table/indexes. The follow-up
+`20260823134500_align_ai_turn_jobs` removes database defaults that Prisma generates in
+the client and aligns foreign-key update actions, leaving the migration history drift
+clean. Deploy both before starting `npm run ai:work`. Rollback stops the worker, drops
+the table, then drops `ai_turn_job_status`; persisted messages and completed runs remain.
+
+# Milestone 10 repair — company CRM subjects (2026-08-23)
+
+Migration `20260823150000_crm_company_subject` adds `company` to
+`taggable_type`, which is shared by `taggables.taggable_type` and
+`activities.subject_type`. This makes company automation, tags, and timeline events
+refer to their real subject type instead of storing a company UUID as a fictitious
+contact. The enum addition is forward-only in PostgreSQL; rollback first removes any
+company-subject rows, recreates the enum without `company`, and casts both columns.
+
+# Milestone 12 repair — auditable manual payments (2026-08-23)
+
+Migration `20260823160000_manual_payments` adds `manual` to `payment_gateway`.
+Cash/offline “mark paid” now records a succeeded payment for the remaining balance,
+including a unique `manual-<uuid>` gateway reference and capture timestamp, before
+invoice reconciliation. PostgreSQL enum rollback requires recreating the enum after
+removing or remapping manual payment rows.
+
+# Milestone 19 — integration connections (2026-08-24)
+
+## Change
+
+Add `integration_connections`, an organization-owned registry with exactly one live
+record per provider. It stores status, sandbox/live mode, enabled state, allow-listed
+non-secret JSON configuration, masked credential metadata, health timestamps, a
+bounded error summary, optimistic version, timestamps, and soft deletion.
+
+## Constraints and indexes
+
+The primary tenant guard is a foreign key to `organizations` with cascade deletion.
+`(organization_id, provider)` is unique so retries upsert rather than duplicate a
+connection. `(organization_id, status)` and `(organization_id, updated_at)` support
+the settings list and operational health views.
+
+## Migration and rollback
+
+The migration is additive and needs no backfill. Deploy it before the application
+starts writing integration state. Rollback removes the table and its provider/status
+enums; no existing business data changes.
+
+# Milestone 20 — voice transcriptions (2026-08-24)
+
+## Change
+
+Add `transcriptions`, a branch-scoped durable speech-to-text record and job. Each row
+references one audio message and attachment, records provider/model/language, bounded
+attempt and locking state, optional confidence, transcript PII, error summary,
+timestamps, soft deletion, and redaction.
+
+## Constraints and indexes
+
+`attachment_id` is unique, making repeated queue requests idempotent. Composite
+foreign keys are not required because the scoped repository verifies the message and
+attachment under the same organization and branch before creation, while every query
+is filtered by scoped Prisma. `(organization_id, status, created_at)` supports worker
+discovery and `(message_id, created_at)` supports thread rendering. Foreign-key
+columns are indexed.
+
+## Migration and rollback
+
+The migration is additive and needs no backfill. Deploy it before starting the voice
+worker. Rollback stops that worker and drops only `transcriptions` and
+`transcription_status`; messages and stored attachments remain intact.
+# Milestone 22 — platform administration and subscriptions (2026-08-24)
+
+## Change
+
+Add a closed `users.platform_role` whose default is an ordinary user, plus the global
+`plans` catalog and one current organization-owned `subscription`. Subscription rows
+snapshot amount, currency, interval, period, trial, cancellation, status, and optimistic
+version so historical commercial state never changes when a plan is edited.
+
+## Isolation and indexes
+
+Platform role is identity authority and is read fresh from PostgreSQL for every admin
+request; tenant membership never grants it. Plans are intentionally global and may be
+read only through the platform-admin repository. Subscriptions carry
+`organization_id`, so normal scoped Prisma access remains fail-closed. Unique
+organization contracts and status/period/plan indexes support portal operations.
+
+## Migration and rollback
+
+Migration `20260824130000_admin_portal` is additive and defaults every existing user to
+`user`. Deploy it before the admin application. Rollback removes subscriptions, plans,
+then the three enums and user column; it does not modify tenant invoices or payments.
+
+# Milestone 21 — specialist AI agents (2026-08-24)
+
+## Change
+
+Add `ai_agents`, a branch-scoped configuration record for each of the eight closed
+specialist kinds. It stores safe display configuration, activation state, an optional
+prompt-template reference, optimistic version, timestamps, and soft deletion. Add an
+optional `ai_runs.agent_id` relation so usage and outcomes are attributable without
+copying agent configuration into run logs.
+
+## Constraints and indexes
+
+`(branch_id, kind)` is unique, preventing duplicate specialists in one branch.
+Organization/branch enabled indexes support the management list and runtime router;
+foreign-key indexes cover prompt and run attribution. Scoped Prisma derives tenant
+and branch predicates from the verified session for every repository operation.
+
+## Migration and rollback
+
+Migration `20260824120000_ai_agents` is additive. Deploy it before seeding or enabling
+specialist routing. Rollback first removes `ai_runs.agent_id`, then drops `ai_agents`
+and `ai_agent_kind`; existing runs, prompts, and conversations remain intact.
+
+# Milestone 2 repair — durable sign-in lockout (2026-08-23)
+
+## Change
+
+Add `failed_login_attempts` and `locked_until` to `users`. The authentication route
+adapter updates these fields after failed password sign-ins and clears them after a
+successful password check. Keeping this state in PostgreSQL makes the control effective
+across application instances and deploys.
+
+## Relations and indexes
+
+No relation changes. `locked_until` is indexed for operational inspection and cleanup;
+email remains the lookup key for sign-in enforcement.
+
+## Migration strategy
+
+The additive columns are nullable/defaulted and require no backfill. Deploy the migration
+before the application version that writes them.
+
+## Rollback
+
+Roll back the application first, then drop the index and both columns. Existing identity
+and credential data is unaffected.
+## 2026-08-23 — Milestone 13 delayed workflow context
+
+- Added `WorkflowRun.context Json @default("{}")` so delayed continuations replay
+  the same condition variables.
+- Migration: `20260823170000_workflow_run_context`.
+
+## 2026-08-23 — Milestone 17 coupon invoice discounts
+
+- Added `invoices.discount_amount` and optional legacy-compatible
+  `coupon_redemptions.invoice_id` plus `discount_amount` snapshot.
+- New redemptions require a unique draft invoice and update its total in the
+  same locked transaction. Migration: `20260823180000_coupon_invoice_discounts`.
+
+## 2026-08-23 — Milestone 18 trusted active branches
+
+- Added nullable `sessions.active_branch_id`, its branch foreign key with `ON DELETE
+  SET NULL`, and a lookup index.
+- Migration `20260823190000_active_branch_sessions` backfills existing active sessions
+  from each organization's live default branch before application rollout.
+- Organization switching writes active organization and default branch atomically.
+  Rollback removes the FK, index, and nullable column; business data is untouched.
+# Milestone 23 — security and privacy workflow (planned 2026-08-24)
+
+## New tables
+
+- `rate_limit_buckets`: global hashed limiter key, count, and expiry for atomic,
+  multi-process security throttling. It contains no raw IP, email, or tenant PII.
+- `privacy_requests`: organization-scoped access/export or erasure lifecycle record,
+  requester, subject contact, status, completion/failure timestamps, version, and soft
+  deletion. Export payloads are never stored in this table.
+
+## Changed tables
+
+- `integration_connections`: nullable versioned AES-GCM credential envelope and
+  non-secret credential hint. Ciphertext is never selected by normal repositories.
+
+## Relations and indexes
+
+- Privacy requests reference organization, requesting user, and optional subject
+  contact. Index organization/status/created time and subject/type/status.
+- Rate-limit buckets are keyed by a SHA-256 digest and indexed by expiry for cleanup.
+
+## Migration strategy
+
+One additive migration creates nullable/defaulted fields and new tables. Existing
+sandbox integrations remain valid without credentials. No existing PII is copied.
+
+## Rollback plan
+
+Stop credential/privacy writes, export any open request metadata needed for operations,
+then drop the additive tables/columns. Encrypted credentials cannot be downgraded to
+plaintext; operators must re-enter them after rollback.

@@ -14,6 +14,7 @@ env:
   NODE_VERSION: '22'
   # Test-only credentials for the ephemeral service container. Not a secret.
   DATABASE_URL: postgresql://war_test:war_test_password@localhost:5432/war_test?schema=public
+  REDIS_URL: redis://localhost:6379
   NEXT_PUBLIC_APP_URL: http://localhost:3000
   LOG_LEVEL: error
 
@@ -23,8 +24,21 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
+      redis:
+        image: redis:8.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
       postgres:
-        image: postgres:17-alpine
+        # Must match docker/docker-compose.yml. Milestone 4 stores embeddings in
+        # Postgres, and stock postgres:17-alpine has no vector extension — the
+        # migration that runs CREATE EXTENSION vector would pass locally and fail here.
+        image: pgvector/pgvector:pg17
         env:
           POSTGRES_USER: war_test
           POSTGRES_PASSWORD: war_test_password
@@ -60,6 +74,19 @@ jobs:
       - name: Apply migrations
         run: npm run db:deploy
 
+      - name: Seed
+        # The seed's own acceptance tests assert against this data
+        # (src/lib/db/seed.integration.test.ts), and it is deterministic, so running it
+        # here costs a second and keeps CI identical to a developer's database.
+        run: npm run db:seed
+
+      - name: Check schema drift
+        # Prisma cannot express the HNSW index, so `migrate diff` proposes dropping it
+        # on every run (Milestone 4, Issue 8). This step fails the build if the diff
+        # contains ANYTHING beyond that known drop — an unreviewed generated migration
+        # can no longer silently delete the vector index.
+        run: npm run db:check-drift
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -75,11 +102,47 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Enforce production asset budgets
+        run: npm run performance:check
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
       - name: E2E tests
         run: npm run test:e2e -- --project=chromium
+
+      - name: Build production container
+        run: docker build --file docker/app.Dockerfile --tag war-app:${{ github.sha }} .
+
+      - name: Verify production container metadata
+        run: |
+          test "$(docker image inspect war-app:${{ github.sha }} --format '{{.Config.User}}')" = "nextjs"
+          docker image inspect war-app:${{ github.sha }} --format '{{json .Config.Healthcheck.Test}}' | grep -q '/api/health/ready'
+
+      - name: Smoke production container
+        run: |
+          docker run --detach --name war-app-smoke --network host \
+            --env PORT=3200 \
+            --env APP_URL=http://127.0.0.1:3200 \
+            --env DATABASE_URL="$DATABASE_URL" \
+            --env REDIS_URL="$REDIS_URL" \
+            --env AUTH_SECRET="ci-runtime-secret-at-least-32-characters" \
+            --env EMAIL_TRANSPORT=smtp \
+            --env EMAIL_FROM=ci@example.test \
+            --env SMTP_HOST=127.0.0.1 \
+            --env SMTP_USER=ci@example.test \
+            --env SMTP_PASSWORD=ci-runtime-placeholder \
+            war-app:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3200/api/health/ready; then exit 0; fi
+            sleep 1
+          done
+          docker logs war-app-smoke
+          exit 1
+
+      - name: Stop smoke container
+        if: always()
+        run: docker rm --force war-app-smoke 2>/dev/null || true
 
       - name: Upload Playwright report
         if: failure()

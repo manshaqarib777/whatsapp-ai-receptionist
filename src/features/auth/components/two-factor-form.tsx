@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import {
   backupCodeSchema,
   twoFactorCodeSchema,
@@ -114,7 +114,7 @@ export function TwoFactorForm() {
 
       {useBackupCode ? (
         <form onSubmit={handleBackupSubmit} noValidate className="space-y-4">
-          <FormField
+          <TextField
             label="Backup code"
             name="backupCode"
             value={backupCode}

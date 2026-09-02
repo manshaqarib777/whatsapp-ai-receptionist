@@ -7,9 +7,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* Was `var(--font-sans)` — self-referential, so it resolved to nothing and the
+     entire UI fell back to the browser's default serif. The layout defines
+     --font-geist-sans / --font-geist-mono via next/font. */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -23,6 +26,10 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-chart-6: var(--chart-6);
+  --color-chart-positive: var(--chart-positive);
+  --color-chart-negative: var(--chart-negative);
+  --color-chart-grid: var(--chart-grid);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -39,6 +46,25 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-xl);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -60,24 +86,75 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* 0.556 gave 4.34:1 against --muted, just under the 4.5:1 AA threshold — and this
+     token is used for table headers and secondary labels, which are text. */
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* Darkened from 0.577: as TEXT on --destructive-subtle it measured 4.0:1, and the
+     destructive button variant is tinted background plus coloured text. */
+  --destructive: oklch(0.52 0.21 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  /* Categorical palette, hue-separated so series stay distinguishable under
+     deuteranopia and protanopia. COMPONENT_DESIGN.md §8. */
+  --chart-1: oklch(0.55 0.17 250);
+  --chart-2: oklch(0.6 0.14 175);
+  --chart-3: oklch(0.66 0.16 60);
+  --chart-4: oklch(0.52 0.2 305);
+  --chart-5: oklch(0.58 0.19 20);
+  --chart-6: oklch(0.52 0.12 200);
+  --chart-positive: oklch(0.55 0.15 155);
+  --chart-negative: oklch(0.58 0.19 27);
+  --chart-grid: oklch(0.92 0 0);
+  /* 16px. DESIGN_TOKENS.md §6 — large rounded surfaces are the house style. */
+  --radius: 1rem;
+
+  /* Status. Solid for icons/text/borders; -subtle for filled backgrounds. */
+  /* 0.55 measured 4.44:1 on white — a metric delta is text, so it needs 4.5:1. */
+  --success: oklch(0.5 0.14 155);
+  --success-foreground: oklch(0.99 0 0);
+  --success-subtle: oklch(0.95 0.04 155);
+  --warning: oklch(0.7 0.16 75);
+  --warning-foreground: oklch(0.2 0.05 75);
+  --warning-subtle: oklch(0.96 0.05 75);
+  --info: oklch(0.58 0.16 250);
+  --info-foreground: oklch(0.99 0 0);
+  --info-subtle: oklch(0.95 0.04 250);
+  --destructive-foreground: oklch(0.99 0 0);
+  --destructive-subtle: oklch(0.96 0.03 27);
+  --border-strong: oklch(0.85 0 0);
+
+  /* Two layers each: a tight contact shadow and a wide ambient one. A single
+     layer is what makes a UI look like Bootstrap. DESIGN_TOKENS.md §4. */
+  --elevation-xs: 0 1px 2px 0 oklch(0 0 0 / 0.04);
+  --elevation-sm: 0 1px 3px 0 oklch(0 0 0 / 0.06), 0 1px 2px -1px oklch(0 0 0 / 0.04);
+  --elevation-md: 0 4px 12px -2px oklch(0 0 0 / 0.08), 0 2px 6px -2px oklch(0 0 0 / 0.05);
+  --elevation-lg:
+    0 12px 32px -8px oklch(0 0 0 / 0.12), 0 4px 12px -4px oklch(0 0 0 / 0.06);
+  --elevation-xl:
+    0 24px 64px -12px oklch(0 0 0 / 0.16), 0 8px 24px -8px oklch(0 0 0 / 0.08);
+
+  /* Named stacking order. Ad-hoc z-50 is how stacking bugs start. */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 20;
+  --z-dropdown: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-palette: 60;
+  --z-toast: 70;
+  --z-tooltip: 80;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  /* 0.97 against a 0.985 rail was all but invisible, and COMPONENT_DESIGN.md §6 asks
+     for an active state that cannot be missed — losing your place in the navigation is
+     the most disorientating thing a sidebar can do. Dark mode already steps clearly
+     (0.269 on 0.205), so only light needed changing. */
+  --sidebar-accent: oklch(0.94 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
@@ -102,11 +179,38 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --success: oklch(0.7 0.16 155);
+  --success-foreground: oklch(0.16 0.03 155);
+  --success-subtle: oklch(0.27 0.06 155);
+  --warning: oklch(0.8 0.15 75);
+  --warning-foreground: oklch(0.18 0.04 75);
+  --warning-subtle: oklch(0.28 0.06 75);
+  --info: oklch(0.72 0.15 250);
+  --info-foreground: oklch(0.16 0.04 250);
+  --info-subtle: oklch(0.27 0.07 250);
+  --destructive-foreground: oklch(0.16 0.03 27);
+  --destructive-subtle: oklch(0.28 0.06 27);
+  --border-strong: oklch(1 0 0 / 20%);
+
+  /* Shadows barely register on dark surfaces — elevation is carried by surface
+     lightness instead, so these are roughly half strength. */
+  --elevation-xs: 0 1px 2px 0 oklch(0 0 0 / 0.2);
+  --elevation-sm: 0 1px 3px 0 oklch(0 0 0 / 0.28), 0 1px 2px -1px oklch(0 0 0 / 0.2);
+  --elevation-md: 0 4px 12px -2px oklch(0 0 0 / 0.36), 0 2px 6px -2px oklch(0 0 0 / 0.24);
+  --elevation-lg:
+    0 12px 32px -8px oklch(0 0 0 / 0.44), 0 4px 12px -4px oklch(0 0 0 / 0.28);
+  --elevation-xl:
+    0 24px 64px -12px oklch(0 0 0 / 0.56), 0 8px 24px -8px oklch(0 0 0 / 0.32);
+
+  --chart-1: oklch(0.7 0.15 250);
+  --chart-2: oklch(0.72 0.14 175);
+  --chart-3: oklch(0.78 0.15 65);
+  --chart-4: oklch(0.68 0.17 305);
+  --chart-5: oklch(0.7 0.16 20);
+  --chart-6: oklch(0.68 0.11 200);
+  --chart-positive: oklch(0.7 0.16 155);
+  --chart-negative: oklch(0.7 0.18 27);
+  --chart-grid: oklch(1 0 0 / 12%);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -118,6 +222,21 @@
 }
 
 @layer base {
+  /**
+   * Reduced motion is an accessibility requirement, not a preference: vestibular
+   * disorders make large movement genuinely unpleasant. ACCESSIBILITY_RULES.md.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   * {
     @apply border-border outline-ring/50;
   }

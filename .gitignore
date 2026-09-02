@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# command code — local tool config (permissions, learned taste)
+/.commandcode/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -46,3 +49,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local object storage for message attachments (Milestone 6)
+/storage/

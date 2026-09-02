@@ -38,7 +38,12 @@ export function SystemStatus() {
 
       <CardContent>
         {isPending ? (
-          <div className="space-y-3" aria-busy="true" aria-label="Loading system status">
+          <div
+            role="status"
+            className="space-y-3"
+            aria-busy="true"
+            aria-label="Loading system status"
+          >
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-5 w-48" />
           </div>
@@ -71,6 +76,17 @@ export function SystemStatus() {
               <dd className="flex items-center gap-2 font-medium">
                 <CheckCircle2 aria-hidden="true" className="size-4 text-emerald-600" />
                 {data.checks.database === 'ok' ? 'Connected' : 'Unavailable'}
+              </dd>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-muted-foreground">Cache</dt>
+              <dd className="font-medium">
+                {data.checks.redis === 'ok'
+                  ? 'Connected'
+                  : data.checks.redis === 'not-configured'
+                    ? 'Optional'
+                    : 'Unavailable'}
               </dd>
             </div>
 

@@ -15,9 +15,14 @@ import { LoginForm } from '@/features/auth/components/login-form';
 const push = vi.fn();
 const refresh = vi.fn();
 
+/**
+ * Test seam: the module mock returns whatever URLSearchParams this function
+ * produces, so a test can simulate ?error=... without touching Next's router.
+ */
+let searchParams = new URLSearchParams('');
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, refresh }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => searchParams,
 }));
 
 const signInEmail = vi.fn();
@@ -36,6 +41,7 @@ vi.mock('@/lib/auth-client', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  searchParams = new URLSearchParams('');
   signInEmail.mockResolvedValue({ data: { user: {} }, error: null });
   signInMagicLink.mockResolvedValue({ data: {}, error: null });
 });
@@ -219,6 +225,29 @@ describe('LoginForm — magic link', () => {
     const status = await screen.findByRole('status');
 
     expect(status).toHaveTextContent(/if an account exists/i);
+  });
+});
+
+describe('LoginForm — magic-link signup disabled', () => {
+  it('explains the error and links to signup', () => {
+    searchParams = new URLSearchParams('error=new_user_signup_disabled');
+    render(<LoginForm providers={[]} />);
+
+    const message = screen.getByRole('status');
+    expect(message).toHaveTextContent(/no account/i);
+    expect(screen.getByRole('link', { name: /create an account/i })).toHaveAttribute(
+      'href',
+      '/signup',
+    );
+  });
+
+  it('shows nothing on a normal visit', () => {
+    render(<LoginForm providers={[]} />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /create an account/i }),
+    ).not.toBeInTheDocument();
   });
 });
 

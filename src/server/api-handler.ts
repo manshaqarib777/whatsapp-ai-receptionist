@@ -12,6 +12,7 @@ import {
   type ErrorDetail,
 } from '@/lib/errors';
 import { requestLogger } from '@/lib/logger';
+import { requestTrace, type RequestTrace } from '@/lib/tracing';
 
 /**
  * The single error-handling boundary for every API route.
@@ -23,6 +24,7 @@ import { requestLogger } from '@/lib/logger';
  */
 
 export const CORRELATION_ID_HEADER = 'x-correlation-id';
+export const TRACEPARENT_HEADER = 'traceparent';
 
 export type ApiSuccess<T> = {
   data: T;
@@ -39,6 +41,7 @@ export type ApiError = {
 
 export type RouteContext = {
   correlationId: string;
+  trace: RequestTrace;
   logger: ReturnType<typeof requestLogger>;
 };
 
@@ -128,9 +131,12 @@ export function withApiHandler<T = unknown>(routeName: string, handler: Handler<
     routeParams: RouteParams<T> = { params: Promise.resolve({} as T) },
   ): Promise<NextResponse> {
     const correlationId = request.headers.get(CORRELATION_ID_HEADER) ?? randomUUID();
+    const trace = requestTrace(request.headers.get(TRACEPARENT_HEADER));
 
     const log = requestLogger({
       correlationId,
+      traceId: trace.traceId,
+      spanId: trace.spanId,
       route: routeName,
       method: request.method,
     });
@@ -140,7 +146,7 @@ export function withApiHandler<T = unknown>(routeName: string, handler: Handler<
     try {
       const response = await handler(
         request,
-        { correlationId, logger: log },
+        { correlationId, trace, logger: log },
         routeParams,
       );
 
@@ -153,6 +159,7 @@ export function withApiHandler<T = unknown>(routeName: string, handler: Handler<
       );
 
       response.headers.set(CORRELATION_ID_HEADER, correlationId);
+      response.headers.set(TRACEPARENT_HEADER, trace.traceparent);
       return response;
     } catch (error) {
       const appError = normaliseError(error);
@@ -172,7 +179,9 @@ export function withApiHandler<T = unknown>(routeName: string, handler: Handler<
         );
       }
 
-      return jsonError(appError, correlationId);
+      const response = jsonError(appError, correlationId);
+      response.headers.set(TRACEPARENT_HEADER, trace.traceparent);
+      return response;
     }
   };
 }

@@ -12,7 +12,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-
     /* Strictness — PRD: "Strict TypeScript only."
        These go beyond `strict: true`, which alone still permits several classes
        of runtime error that are cheap to eliminate at compile time. */
@@ -25,7 +24,6 @@
     "forceConsistentCasingInFileNames": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
-
     "plugins": [
       {
         "name": "next"
@@ -41,7 +39,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next/dev/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules", ".next", "coverage", "playwright-report", "test-results"]
 }

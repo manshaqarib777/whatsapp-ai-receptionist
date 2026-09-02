@@ -1,6 +1,33 @@
 services:
+  redis:
+    image: redis:8.2-alpine
+    container_name: war_redis
+    restart: unless-stopped
+    command:
+      [
+        'redis-server',
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+        '--maxmemory',
+        '128mb',
+        '--maxmemory-policy',
+        'allkeys-lru',
+      ]
+    ports:
+      - '127.0.0.1:6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   postgres:
-    image: postgres:17-alpine
+    # pgvector, not stock postgres: Milestone 4 stores knowledge-base embeddings in
+    # Postgres (MILESTONE_04_PLAN.md AD-5) and postgres:17-alpine does not ship the
+    # vector extension. Same Postgres 17 major version, so the data volume carries over.
+    image: pgvector/pgvector:pg17
     container_name: war_postgres
     restart: unless-stopped
     environment:
@@ -19,5 +46,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # Combined durable worker service. PostgreSQL remains the authoritative queue.
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: war_knowledge_worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://war_dev:war_dev_password@postgres:5432/war_dev?schema=public
+      NODE_ENV: development
+      LOG_LEVEL: info
+      EMBEDDING_PROVIDER: local
+      STORAGE_DIR: /app/storage
+      AUTH_SECRET: worker-only-local-secret-32-characters-long
+    volumes:
+      - war_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   war_postgres_data:
+  # Shared with the app so uploads written by the API are visible to the worker.
+  war_storage:

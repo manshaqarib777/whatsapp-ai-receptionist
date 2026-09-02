@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
 import { OAuthButtons } from '@/features/auth/components/oauth-buttons';
 import {
   signInSchema,
@@ -36,6 +36,15 @@ export function LoginForm({ providers }: { providers: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeRedirect(searchParams.get('next'), DEFAULT_REDIRECT);
+
+  /**
+   * Better Auth appends ?error=... to the callback URL when a sign-in attempt
+   * cannot complete. The only code the app expects today is the magic-link
+   * plugin's `new_user_signup_disabled` — a link was sent for an address with
+   * no account, and magic links never auto-provision (disableSignUp). Reading
+   * it here keeps the message off the sign-in screen for every normal visit.
+   */
+  const signupDisabled = searchParams.get('error') === 'new_user_signup_disabled';
 
   const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
@@ -131,6 +140,21 @@ export function LoginForm({ providers }: { providers: string[] }) {
         </p>
       </div>
 
+      {signupDisabled ? (
+        <Alert role="status">
+          <AlertDescription>
+            That sign-in link was sent to an address with no account. Create one first,
+            then use the link or sign in with your password.{' '}
+            <Link
+              href="/signup"
+              className="text-foreground focus-visible:ring-ring rounded underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Create an account
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {formError ? (
         <Alert variant="destructive">
           <AlertDescription>{formError}</AlertDescription>
@@ -142,7 +166,7 @@ export function LoginForm({ providers }: { providers: string[] }) {
         noValidate
         className="space-y-4"
       >
-        <FormField
+        <TextField
           label="Email"
           name="email"
           type="email"
@@ -156,7 +180,7 @@ export function LoginForm({ providers }: { providers: string[] }) {
 
         {mode === 'password' ? (
           <div className="space-y-2">
-            <FormField
+            <TextField
               label="Password"
               name="password"
               type="password"

@@ -120,3 +120,20 @@ on deploy. Redis replaces the storage in Milestone 24.
    mail can never be silently discarded.
 2. **OAuth is unverified end to end** — no credentials are available. The configuration
    logic and the disabled path are tested; the redirect round-trip is not.
+# Session management and progressive lockout
+
+Security settings list the authenticated user's database-backed sessions through Better
+Auth's `/list-sessions` endpoint and can revoke any session other than the current one
+through `/revoke-session`. Successful revocation is recorded as
+`auth.session_revoked`; bulk revocation is recorded as `auth.all_sessions_revoked`.
+
+Password sign-in is wrapped by the application auth route adapter. Failures are stored
+durably on the user row. Attempts 1–4 do not lock the account; attempt 5 locks for one
+minute, then subsequent failures progressively extend the duration to 5 minutes,
+15 minutes, and a one-hour cap. Requests during an active lock return `429` and a
+`Retry-After` header. Successful password verification clears the counter. Unknown
+addresses do not create state, preserving enumeration resistance.
+
+TOTP enrolment renders a QR code locally in the browser from the returned `otpauth:` URI;
+the secret is not sent to an external QR service, and the URI remains available as an
+accessible manual setup fallback.

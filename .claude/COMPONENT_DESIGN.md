@@ -109,14 +109,14 @@ Behaviour and validation are in `UI_RULES.md` → Forms. This is the visual spec
 ```
 Label                          ← 13px, 500, --foreground, gap 2 below
 ┌───────────────────────────┐
-│ Placeholder               │  ← h-10, radius-lg, --input border
+│ Placeholder               │  ← h-8, radius-lg, --input border
 └───────────────────────────┘
 Helper or error text           ← 12px, gap 1.5 above
 ```
 
 | Property | Value |
 |---|---|
-| Height | 40px (`h-10`); 36px in dense contexts |
+| Height | 32px (`h-8`) default; 36px (`h-9`) large, 28px (`h-7`) dense |
 | Radius | `--radius-lg` |
 | Border | 1px `--input` |
 | Focus | 2px `--ring`, `outline-offset: 2px` — **never** `outline: none` alone |
@@ -125,6 +125,11 @@ Helper or error text           ← 12px, gap 1.5 above
 
 ### Rules
 
+- **The control scale is compact — 28 / 32 / 36px — and it is deliberate.** It arrived
+  with the shadcn preset in Milestone 1, every control in the system follows it, and it
+  was ratified at the Milestone 3 design review. An earlier draft of this document
+  specified 40px; that was never what shipped. Do not "restore" 40px. At 32px the
+  controls still clear WCAG 2.2 §2.5.8 Target Size (Minimum), which asks for 24×24px.
 - **Labels are always visible**, above the field. Not placeholders, not floating
   labels — both fail for screen readers and both vanish exactly when the user needs
   them (mid-typing).

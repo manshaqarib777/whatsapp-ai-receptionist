@@ -4,6 +4,13 @@ Status: Planned
 Created: 2026-08-01
 Requirement source: `/docs/PRODUCT_REQUIREMENTS.md` → `# MILESTONE 1`
 
+> **Verification amendment — 2026-08-23:** The historical completion is being
+> re-opened after a full milestone audit. The repair scope is limited to Milestone 1
+> gates: make font compilation independent of Google network access, clear current
+> high/critical dependency advisories without a forced downgrade, and reproduce the
+> complete foundation verification suite. No later-milestone product behavior is
+> added here.
+
 ---
 
 ## Objective

@@ -13,7 +13,7 @@ test.describe('application shell', () => {
       page.getByRole('heading', { name: 'WhatsApp AI Receptionist' }),
     ).toBeVisible();
     await expect(page.getByText('Operational')).toBeVisible();
-    await expect(page.getByText('Connected')).toBeVisible();
+    await expect(page.getByText('Connected', { exact: true }).first()).toBeVisible();
   });
 
   test('serves a 404 page for an unknown route', async ({ page }) => {
@@ -31,11 +31,12 @@ test.describe('health endpoint', () => {
     expect(response.status()).toBe(200);
 
     const payload = (await response.json()) as {
-      data: { status: string; checks: { database: string } };
+      data: { status: string; checks: { database: string; redis: string } };
     };
 
     expect(payload.data.status).toBe('ok');
     expect(payload.data.checks.database).toBe('ok');
+    expect(payload.data.checks.redis).toBe('ok');
   });
 
   test('returns a correlation id header', async ({ request }) => {

@@ -1,12 +1,10 @@
-import { headers } from 'next/headers';
-
 import * as organizationService from '@/features/auth/services/organization.service';
 import * as auditLog from '@/features/auth/services/audit-log.service';
 import { switchOrganizationSchema } from '@/features/auth/validators/auth.validators';
-import { auth } from '@/lib/auth';
 import { NotFoundError } from '@/lib/errors';
 import { clientIp } from '@/lib/rate-limit';
 import { requireAuth } from '@/server/auth-context';
+import { branchesRepository } from '@/lib/db/auth/branches.repository';
 import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 
 /**
@@ -20,7 +18,7 @@ import { jsonSuccess, withApiHandler } from '@/server/api-handler';
 export const PATCH = withApiHandler(
   'PATCH /api/organizations/active',
   async (request, { correlationId }) => {
-    const { user } = await requireAuth();
+    const { user, sessionId } = await requireAuth();
 
     const body: unknown = await request.json();
     const { organizationId } = switchOrganizationSchema.parse(body);
@@ -32,10 +30,13 @@ export const PATCH = withApiHandler(
       throw new NotFoundError('Organization not found.');
     }
 
-    await auth.api.setActiveOrganization({
-      headers: await headers(),
-      body: { organizationId },
-    });
+    // Organization and branch selection move in one transaction so a request can
+    // never observe a target organization with a branch from the previous tenant.
+    const branch = await branchesRepository.switchOrganizationSession(
+      sessionId,
+      organizationId,
+    );
+    if (!branch) throw new NotFoundError('Organization has no active branch.');
 
     await auditLog.record({
       action: 'organization.switched',
@@ -47,6 +48,6 @@ export const PATCH = withApiHandler(
       userAgent: request.headers.get('user-agent'),
     });
 
-    return jsonSuccess({ organizationId, role }, { correlationId });
+    return jsonSuccess({ organizationId, branchId: branch.id, role }, { correlationId });
   },
 );

@@ -1,6 +1,8 @@
 # Architecture Overview
 
-Current as of Milestone 1. Updated at the end of every milestone.
+Current implementation reaches Milestone 24. The sequential verification/repair pass has
+closed Milestones 1–24 locally and stops at the Milestone 25 production boundary.
+Deployment and external-environment completion claims remain under review.
 
 ---
 
@@ -33,6 +35,13 @@ PostgreSQL
 
 Components never call the database. Enforced by an ESLint rule that forbids importing
 `@prisma/client` outside `src/lib/prisma.ts`.
+
+**Read-only, server-rendered surfaces bypass the Hook row.** The dashboard (Milestone
+5) is a set of server components that call the service directly behind per-widget
+`Suspense` boundaries — there is no client fetch and no React Query provider for it.
+The plan (AD-3) rejected a client fetch for a surface with no mutation or polling. The
+React Query stack stays the convention for interactive surfaces such as the Milestone-6
+inbox.
 
 ---
 
@@ -118,13 +127,34 @@ cached data into another's response.
 | Dependency audit in CI (fails on high/critical) | Yes |
 | Authentication / authorization | **Milestone 2** |
 | Tenant isolation | **Milestone 2 / 4** |
-| Rate limiting | **Milestone 23 / 24** |
+| Rate limiting | **Milestone 23 / 24 — durable PostgreSQL + Redis acceleration** |
 | CSP nonces (removing `unsafe-inline` for scripts) | **Milestone 23** |
 
 The gaps are milestone-scheduled, not oversights. They are listed in
 `docs/milestones/MILESTONE_01_COMPLETED.md` under Known Limitations.
 
 ---
+
+## Trusted branch scope (Milestone 18)
+
+Authenticated business requests derive both organization and branch from the current
+database session. `requireBranch()` validates that the selected branch belongs to the
+active organization, persists a default fallback for upgraded sessions, and fails
+closed when none exists. Appointment, knowledge, and AI controllers convert that
+context to a `BranchScope`; client values never construct tenant scope.
+
+Organization and default-branch selection change atomically. Better Auth session cookie
+caching is disabled so branch switches, role changes, and revocation take effect on the
+next request rather than after a cache TTL.
+
+## Specialist AI routing (Milestone 21)
+
+One guarded engine serves eight branch-scoped specialist profiles. Deterministic routing
+selects an enabled specialist from message semantics, then intersects its requested work
+with an immutable server-owned tool ceiling. Agent records configure display state and
+prompt references but cannot grant tools, construct tenant scope, or bypass confirmation.
+Runs carry optional agent attribution for later usage reporting. Local tests are labelled,
+make no model call, and never deliver a message.
 
 ## Deferred by Design
 
@@ -137,3 +167,12 @@ The gaps are milestone-scheduled, not oversights. They are listed in
 | AI engine | 8 |
 | Redis, caching, virtualization | 24 |
 | Deployment, monitoring, tracing, rollback | 25 |
+
+## Production boundary (Milestone 25)
+
+The web artifact is a Next.js standalone, non-root OCI image. Infrastructure probes
+process liveness separately from PostgreSQL/configured-Redis readiness. API responses
+carry validated W3C trace context alongside correlation IDs, while structured logs keep
+the existing PII redaction boundary. CI builds and smoke-tests the immutable artifact;
+release automation exports it without publishing or deploying. External environment
+promotion and verification remain operator-controlled and were not performed locally.

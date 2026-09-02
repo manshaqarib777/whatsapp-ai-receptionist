@@ -67,6 +67,8 @@ export const logger: Logger = pino({
  */
 export function requestLogger(context: {
   correlationId: string;
+  traceId?: string;
+  spanId?: string;
   route?: string;
   method?: string;
 }): Logger {

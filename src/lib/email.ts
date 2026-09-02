@@ -247,7 +247,7 @@ export async function verifyEmailTransport(): Promise<boolean | null> {
 }
 
 export async function sendEmail(message: EmailMessage): Promise<void> {
-  if (isProduction && env.EMAIL_TRANSPORT !== 'smtp') {
+  if (isProduction && env.EMAIL_TRANSPORT !== 'smtp' && !env.E2E_TEST_RUN) {
     // Belt and braces: env validation already rejects this at boot. Silently
     // discarding a password-reset email is worse than a loud failure.
     throw new Error(

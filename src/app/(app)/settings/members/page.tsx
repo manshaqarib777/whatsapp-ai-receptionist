@@ -1,10 +1,16 @@
 import type { Metadata } from 'next';
 
 import { MembersTable } from '@/features/auth/components/members-table';
+import { InviteMemberForm } from '@/features/auth/components/invite-member-form';
+import { hasPermission } from '@/features/auth/permissions';
 import * as organizationService from '@/features/auth/services/organization.service';
 import { requirePermission } from '@/server/auth-context';
 
 export const metadata: Metadata = { title: 'Members' };
+
+// Session + permission reads make this page request-time only; it must never
+// be statically prerendered (a prerender has no session headers).
+export const dynamic = 'force-dynamic';
 
 export default async function MembersSettingsPage() {
   // Authorization happens HERE, server-side. The table receives only what this
@@ -21,6 +27,8 @@ export default async function MembersSettingsPage() {
           People with access to this organization.
         </p>
       </div>
+
+      {hasPermission(role, 'member:invite') ? <InviteMemberForm /> : null}
 
       <MembersTable members={members} currentUserId={user.id} currentRole={role} />
     </div>

@@ -1,8 +1,8 @@
 import { canAssignRole, hasPermission, type Role } from '@/features/auth/permissions';
 import { slugify } from '@/features/auth/validators/auth.validators';
 import * as auditLog from '@/features/auth/services/audit-log.service';
+import { organizationsRepository } from '@/lib/db/auth/organizations.repository';
 import { ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { prisma } from '@/lib/prisma';
 
 /**
  * Organization and membership business logic.
@@ -23,22 +23,7 @@ export type OrganizationSummary = {
 
 /** Organizations the user belongs to, with their role in each. */
 export async function listForUser(userId: string): Promise<OrganizationSummary[]> {
-  const memberships = await prisma.member.findMany({
-    where: { userId, organization: { deletedAt: null } },
-    select: {
-      role: true,
-      organization: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          logo: true,
-          _count: { select: { members: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
+  const memberships = await organizationsRepository.listForUser(userId);
 
   return memberships.map((membership) => ({
     id: membership.organization.id,
@@ -56,12 +41,7 @@ async function uniqueSlug(base: string): Promise<string> {
 
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const slug = attempt === 0 ? candidate : `${candidate}-${attempt + 1}`;
-    const existing = await prisma.organization.findUnique({
-      where: { slug },
-      select: { id: true },
-    });
-
-    if (!existing) return slug;
+    if (!(await organizationsRepository.slugExists(slug))) return slug;
   }
 
   throw new ConflictError('Could not generate a unique organization address.');
@@ -82,17 +62,10 @@ export async function create(input: {
 }): Promise<OrganizationSummary> {
   const slug = await uniqueSlug(input.slug ?? slugify(input.name));
 
-  const organization = await prisma.$transaction(async (tx) => {
-    const created = await tx.organization.create({
-      data: { name: input.name, slug },
-      select: { id: true, name: true, slug: true, logo: true },
-    });
-
-    await tx.member.create({
-      data: { organizationId: created.id, userId: input.userId, role: 'owner' },
-    });
-
-    return created;
+  const organization = await organizationsRepository.createWithOwner({
+    userId: input.userId,
+    name: input.name,
+    slug,
   });
 
   await auditLog.record({
@@ -117,12 +90,7 @@ export async function membershipRole(
   organizationId: string,
   userId: string,
 ): Promise<string | null> {
-  const membership = await prisma.member.findUnique({
-    where: { organizationId_userId: { organizationId, userId } },
-    select: { role: true },
-  });
-
-  return membership?.role ?? null;
+  return organizationsRepository.membershipRole(organizationId, userId);
 }
 
 export type MemberSummary = {
@@ -137,16 +105,7 @@ export type MemberSummary = {
 
 /** Members of one organization. Scoped by `organizationId`, always. */
 export async function listMembers(organizationId: string): Promise<MemberSummary[]> {
-  const members = await prisma.member.findMany({
-    where: { organizationId },
-    select: {
-      id: true,
-      role: true,
-      createdAt: true,
-      user: { select: { id: true, name: true, email: true, image: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
+  const members = await organizationsRepository.listMembers(organizationId);
 
   return members.map((member) => ({
     id: member.id,
@@ -176,15 +135,7 @@ export async function updateMemberRole(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }): Promise<MemberSummary> {
-  const member = await prisma.member.findUnique({
-    where: { id: input.memberId },
-    select: {
-      id: true,
-      role: true,
-      organizationId: true,
-      user: { select: { id: true, name: true, email: true, image: true } },
-    },
-  });
+  const member = await organizationsRepository.findMember(input.memberId);
 
   // Cross-tenant: 404, never 403 — a 403 confirms the member exists elsewhere.
   if (!member || member.organizationId !== input.organizationId) {
@@ -198,9 +149,7 @@ export async function updateMemberRole(input: {
   // Demoting the final owner would leave nobody able to manage billing or delete
   // the organization.
   if (member.role === 'owner' && input.role !== 'owner') {
-    const owners = await prisma.member.count({
-      where: { organizationId: input.organizationId, role: 'owner' },
-    });
+    const owners = await organizationsRepository.countOwners(input.organizationId);
 
     if (owners <= 1) {
       throw new ConflictError(
@@ -209,16 +158,10 @@ export async function updateMemberRole(input: {
     }
   }
 
-  const updated = await prisma.member.update({
-    where: { id: input.memberId },
-    data: { role: input.role },
-    select: {
-      id: true,
-      role: true,
-      createdAt: true,
-      user: { select: { id: true, name: true, email: true, image: true } },
-    },
-  });
+  const updated = await organizationsRepository.updateMemberRole(
+    input.memberId,
+    input.role,
+  );
 
   await auditLog.record({
     action: 'member.role_changed',
@@ -256,26 +199,21 @@ export async function removeMember(input: {
     throw new ForbiddenError('You do not have permission to do that.');
   }
 
-  const member = await prisma.member.findUnique({
-    where: { id: input.memberId },
-    select: { id: true, role: true, organizationId: true, userId: true },
-  });
+  const member = await organizationsRepository.findMember(input.memberId);
 
   if (!member || member.organizationId !== input.organizationId) {
     throw new NotFoundError('Member not found.');
   }
 
   if (member.role === 'owner') {
-    const owners = await prisma.member.count({
-      where: { organizationId: input.organizationId, role: 'owner' },
-    });
+    const owners = await organizationsRepository.countOwners(input.organizationId);
 
     if (owners <= 1) {
       throw new ConflictError('You cannot remove the only owner.');
     }
   }
 
-  await prisma.member.delete({ where: { id: input.memberId } });
+  await organizationsRepository.removeMember(input.memberId);
 
   await auditLog.record({
     action: 'member.removed',

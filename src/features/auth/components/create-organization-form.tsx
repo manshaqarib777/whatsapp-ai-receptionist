@@ -3,7 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { FormField } from '@/features/auth/components/form-field';
+import { TextField } from '@/components/form-field';
+import {
+  createOrganization,
+  switchActiveOrganization,
+} from '@/features/auth/services/members.client';
 import {
   createOrganizationSchema,
   slugify,
@@ -52,27 +56,14 @@ export function CreateOrganizationForm() {
     setErrors({});
     setIsPending(true);
 
-    const response = await fetch('/api/organizations', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(parsed.data),
-    });
-
-    if (!response.ok) {
+    try {
+      const organization = await createOrganization(parsed.data);
+      await switchActiveOrganization(organization.id);
+    } catch {
       setIsPending(false);
       setFormError('We could not create your organization. Please try again.');
       return;
     }
-
-    const payload = (await response.json()) as { data: { id: string } };
-
-    // Make the new organization active before navigating, so the dashboard has a
-    // tenant to scope by.
-    await fetch('/api/organizations/active', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ organizationId: payload.data.id }),
-    });
 
     router.push('/dashboard');
     router.refresh();
@@ -86,7 +77,7 @@ export function CreateOrganizationForm() {
         </Alert>
       ) : null}
 
-      <FormField
+      <TextField
         label="Organization name"
         name="name"
         value={name}
@@ -97,7 +88,7 @@ export function CreateOrganizationForm() {
         autoFocus
       />
 
-      <FormField
+      <TextField
         label="Address"
         name="slug"
         value={effectiveSlug}

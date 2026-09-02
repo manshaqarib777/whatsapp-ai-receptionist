@@ -22,6 +22,7 @@ const serverSchema = z.object({
       (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
       'DATABASE_URL must be a postgresql:// connection string',
     ),
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(5),
 
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
@@ -35,6 +36,38 @@ const serverSchema = z.object({
       32,
       'AUTH_SECRET must be at least 32 characters. Generate one with: openssl rand -base64 32',
     ),
+
+  DATA_ENCRYPTION_KEY: z
+    .string()
+    .refine((value) => {
+      try {
+        return Buffer.from(value, 'base64').length === 32;
+      } catch {
+        return false;
+      }
+    }, 'DATA_ENCRYPTION_KEY must be a base64-encoded 32-byte key.')
+    .optional(),
+
+  REDIS_URL: z
+    .string()
+    .url()
+    .refine(
+      (value) => value.startsWith('redis://') || value.startsWith('rediss://'),
+      'REDIS_URL must use redis:// or rediss://.',
+    )
+    .optional(),
+  APP_URL: z.string().url('APP_URL must be a valid URL').optional(),
+  VERCEL_URL: z
+    .string()
+    .min(1)
+    .max(253)
+    .regex(/^[a-z0-9.-]+$/i, 'VERCEL_URL must be a hostname without a scheme.')
+    .optional(),
+  CACHE_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9_-]+$/i)
+    .default('war'),
+  CACHE_TTL_SECONDS: z.coerce.number().int().min(1).max(300).default(30),
 
   EMAIL_FROM: z.string().email().default('noreply@whatsapp-receptionist.local'),
 
@@ -95,6 +128,60 @@ const serverSchema = z.object({
     .transform((value) => value === 'true'),
 
   /**
+   * Serves the design-system gallery at `/design` from a production BUILD.
+   *
+   * The gallery is a development tool. It is always available in development, and in
+   * a production build it 404s unless this is explicitly set — which only the E2E
+   * suite does, so it can audit the real production markup rather than the
+   * development server's (whose injected dev toolbar is not ours to make accessible).
+   *
+   * A deployment must never set it. It exposes no data and reaches no API, but it is
+   * not a product surface and has no business being reachable.
+   */
+  DESIGN_GALLERY: z
+    .enum(['enabled', 'disabled'])
+    .default('disabled')
+    .transform((value) => value === 'enabled'),
+
+  /**
+   * Local object-storage directory for message attachments (AD-6).
+   *
+   * The schema stores a `storage_key`, never a blob, so the blob lives wherever
+   * this points. Local development writes under `./storage` (gitignored); a
+   * production deployment swaps in real object storage behind the same
+   * `src/lib/storage.ts` interface.
+   */
+  STORAGE_DIR: z.string().min(1).default('./storage'),
+  STORAGE_DRIVER: z.enum(['local', 'vercel-blob']).default('local'),
+  BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
+
+  /**
+   * Embedding provider for the knowledge base (Milestone 7, AD-2).
+   *
+   * `openai` — text-embedding-3-small (1536-dim, matches the schema's
+   * `vector(1536)`). Requires OPENAI_API_KEY.
+   * `local` — a deterministic hash embedder. No key, unit-testable, used by the
+   * test suite and seed so they never depend on an external service. Vectors are
+   * NOT semantically meaningful — the real key is required for live ingestion.
+   */
+  EMBEDDING_PROVIDER: z.enum(['openai', 'local']).default('local'),
+  EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+
+  /**
+   * LLM provider for the AI Engine (Milestone 8, AD-2).
+   *
+   * `openai` — chat completions via the OpenAI SDK. Requires OPENAI_API_KEY.
+   * `local` — a deterministic rule-based provider. No key, unit-testable, used
+   * by the test suite and seed. Answers are NOT semantically rich — the real
+   * provider is required for live replies. Per-turn `ai_runs` record the
+   * "provider/model" string so a switch is a documented decision with an eval.
+   */
+  LLM_PROVIDER: z.enum(['openai', 'local']).default('local'),
+  LLM_CLASSIFY_MODEL: z.string().min(1).default('anthropic/claude-haiku-4-5'),
+  LLM_REPLY_MODEL: z.string().min(1).default('anthropic/claude-sonnet-5'),
+
+  /**
    * OAuth providers are optional. A provider is offered only when both its id and
    * secret are present; absent credentials must not break the app or the tests.
    */
@@ -102,6 +189,18 @@ const serverSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   GITHUB_CLIENT_ID: z.string().min(1).optional(),
   GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /**
+   * Payment gateways (Milestone 12). Stripe keys are optional: absent keys
+   * degrade the adapter to `configured: false`, and the service refuses with a
+   * clear error instead of a silent no-op. Secrets never reach the client.
+   */
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  INTEGRATIONS_LIVE_ENABLED: z.enum(['true', 'false']).default('false'),
+  SPEECH_PROVIDER: z.enum(['local', 'openai']).default('local'),
+  SPEECH_TO_TEXT_MODEL: z.string().min(1).default('gpt-4o-mini-transcribe'),
+  TEXT_TO_SPEECH_MODEL: z.string().min(1).default('gpt-4o-mini-tts'),
 });
 
 /**
@@ -137,6 +236,30 @@ const envSchema = serverSchema.merge(clientSchema).superRefine((env, ctx) => {
       code: 'custom',
       path: ['SMTP_USER'],
       message: 'SMTP_USER is required when SMTP_PASSWORD is set.',
+    });
+  }
+
+  // The OpenAI embedding provider is unusable without its key; fail at boot
+  // rather than at the first ingestion.
+  if (env.EMBEDDING_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['OPENAI_API_KEY'],
+      message: 'OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai.',
+    });
+  }
+  if (env.SPEECH_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['OPENAI_API_KEY'],
+      message: 'OPENAI_API_KEY is required when SPEECH_PROVIDER=openai.',
+    });
+  }
+  if (env.STORAGE_DRIVER === 'vercel-blob' && !env.BLOB_READ_WRITE_TOKEN) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['BLOB_READ_WRITE_TOKEN'],
+      message: 'BLOB_READ_WRITE_TOKEN is required when STORAGE_DRIVER=vercel-blob.',
     });
   }
 
@@ -187,3 +310,11 @@ export const env: Env = parseEnv(process.env);
 export const isDevelopment = env.NODE_ENV === 'development';
 export const isProduction = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';
+export const serverAppUrl =
+  env.APP_URL ?? (env.VERCEL_URL ? `https://${env.VERCEL_URL}` : env.NEXT_PUBLIC_APP_URL);
+
+/**
+ * Whether `/design` is served. Development always; a production build only when
+ * `DESIGN_GALLERY=enabled` is set explicitly, which only the E2E suite does.
+ */
+export const isDesignGalleryEnabled = !isProduction || env.DESIGN_GALLERY;
